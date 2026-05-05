@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using AuthCore.Domain.Common.Aggregates;
 using AuthCore.Domain.Common.Exceptions;
 
 namespace AuthCore.Domain.Passports.Aggregates;
@@ -6,7 +7,7 @@ namespace AuthCore.Domain.Passports.Aggregates;
 /// <summary>
 /// Representa a verificação de e-mail pendente do usuário.
 /// </summary>
-public sealed class EmailVerification
+public sealed class EmailVerification : AggregateRoot
 {
     private const int CODE_LENGTH = 6;
 
@@ -108,6 +109,54 @@ public sealed class EmailVerification
         Validate();
     }
 
+    /// <summary>
+    /// Operação para criar instância da classe.
+    /// </summary>
+    /// <param name="id">Identificador persistido da verificação.</param>
+    /// <param name="createdAt">Data de criação persistida.</param>
+    /// <param name="updateAt">Data da última atualização persistida.</param>
+    /// <param name="isActive">Status de atividade persistido.</param>
+    /// <param name="userId">Identificador interno do usuário.</param>
+    /// <param name="email">E-mail em verificação.</param>
+    /// <param name="codeHash">Hash persistido do código.</param>
+    /// <param name="expiresAtUtc">Data de expiração do código em UTC.</param>
+    /// <param name="attemptCount">Quantidade de tentativas inválidas.</param>
+    /// <param name="maxAttempts">Quantidade máxima de tentativas.</param>
+    /// <param name="cooldownUntilUtc">Data limite para novo reenvio em UTC.</param>
+    /// <param name="lastSentAtUtc">Data do último envio em UTC.</param>
+    /// <param name="consumedAtUtc">Data de consumo do código em UTC.</param>
+    /// <param name="revokedAtUtc">Data de revogação da verificação em UTC.</param>
+    private EmailVerification(
+        Guid id,
+        DateTime createdAt,
+        DateTime updateAt,
+        bool isActive,
+        Guid userId,
+        string email,
+        string codeHash,
+        DateTime expiresAtUtc,
+        int attemptCount,
+        int maxAttempts,
+        DateTime? cooldownUntilUtc,
+        DateTime lastSentAtUtc,
+        DateTime? consumedAtUtc,
+        DateTime? revokedAtUtc)
+        : base(id, createdAt, updateAt, isActive)
+    {
+        UserId = userId;
+        Email = NormalizeEmail(email);
+        CodeHash = NormalizeHash(codeHash);
+        ExpiresAtUtc = expiresAtUtc;
+        AttemptCount = attemptCount;
+        MaxAttempts = maxAttempts;
+        CooldownUntilUtc = cooldownUntilUtc;
+        LastSentAtUtc = lastSentAtUtc;
+        ConsumedAtUtc = consumedAtUtc;
+        RevokedAtUtc = revokedAtUtc;
+
+        Validate();
+    }
+
     #endregion
 
     #region Factory
@@ -160,6 +209,10 @@ public sealed class EmailVerification
     /// <param name="revokedAtUtc">Data de revogação da verificação em UTC.</param>
     /// <returns>Verificação reconstruída.</returns>
     public static EmailVerification Restore(
+        Guid id,
+        DateTime createdAt,
+        DateTime updateAt,
+        bool isActive,
         Guid userId,
         string email,
         string codeHash,
@@ -172,6 +225,10 @@ public sealed class EmailVerification
         DateTime? revokedAtUtc)
     {
         return new EmailVerification(
+            id,
+            createdAt,
+            updateAt,
+            isActive,
             userId,
             email,
             codeHash,
@@ -222,7 +279,11 @@ public sealed class EmailVerification
 
         if (CodeHash == NormalizeHash(providedCodeHash))
         {
-            return new EmailVerification(
+            return Restore(
+                Id,
+                CreatedAt,
+                validatedAtUtc,
+                IsActive,
                 UserId,
                 Email,
                 CodeHash,
@@ -240,7 +301,11 @@ public sealed class EmailVerification
             ? validatedAtUtc
             : RevokedAtUtc;
 
-        return new EmailVerification(
+        return Restore(
+            Id,
+            CreatedAt,
+            validatedAtUtc,
+            IsActive,
             UserId,
             Email,
             CodeHash,
@@ -262,7 +327,11 @@ public sealed class EmailVerification
     {
         DomainException.When(revokedAtUtc == default, "A data de revogação da verificação é obrigatória.");
 
-        return new EmailVerification(
+        return Restore(
+            Id,
+            CreatedAt,
+            revokedAtUtc,
+            IsActive,
             UserId,
             Email,
             CodeHash,
@@ -273,6 +342,41 @@ public sealed class EmailVerification
             LastSentAtUtc,
             ConsumedAtUtc,
             revokedAtUtc);
+    }
+
+    /// <summary>
+    /// Operação para reemitir a verificação preservando a identidade persistida.
+    /// </summary>
+    /// <param name="codeHash">Novo hash persistido do código.</param>
+    /// <param name="expiresAtUtc">Nova data de expiração do código em UTC.</param>
+    /// <param name="maxAttempts">Nova quantidade máxima de tentativas.</param>
+    /// <param name="cooldownUntilUtc">Nova data limite para reenvio em UTC.</param>
+    /// <param name="sentAtUtc">Nova data de envio em UTC.</param>
+    /// <returns>Nova instância reemitida.</returns>
+    public EmailVerification Reissue(
+        string codeHash,
+        DateTime expiresAtUtc,
+        int maxAttempts,
+        DateTime? cooldownUntilUtc,
+        DateTime sentAtUtc)
+    {
+        DomainException.When(sentAtUtc == default, "A data de envio do código é obrigatória.");
+
+        return Restore(
+            Id,
+            CreatedAt,
+            sentAtUtc,
+            IsActive,
+            UserId,
+            Email,
+            codeHash,
+            expiresAtUtc,
+            attemptCount: 0,
+            maxAttempts,
+            cooldownUntilUtc,
+            sentAtUtc,
+            consumedAtUtc: null,
+            revokedAtUtc: null);
     }
 
     /// <summary>
@@ -292,6 +396,7 @@ public sealed class EmailVerification
     /// </summary>
     private void Validate()
     {
+        DomainException.When(Id == Guid.Empty, "O identificador da verificação é obrigatório.");
         DomainException.When(UserId == Guid.Empty, "O identificador do usuário é obrigatório.");
         DomainException.When(string.IsNullOrWhiteSpace(Email), "O e-mail da verificação é obrigatório.");
         DomainException.When(string.IsNullOrWhiteSpace(CodeHash), "O hash do código de verificação é obrigatório.");

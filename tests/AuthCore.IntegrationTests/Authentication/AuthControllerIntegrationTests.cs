@@ -50,7 +50,7 @@ public sealed class AuthControllerIntegrationTests
                 Email = "bruno@authcore.dev"
             }
         };
-        var controller = CreateController();
+        var controller = CreateAuthController();
 
         var result = await controller.Register(useCase, new RequestRegisterUserJson
         {
@@ -76,7 +76,7 @@ public sealed class AuthControllerIntegrationTests
     public async Task VerifyEmail_WhenUseCaseSucceeds_ShouldReturnNoContentAndForwardCommand()
     {
         var useCase = new SpyVerifyEmailUseCase();
-        var controller = CreateController();
+        var controller = CreateAuthController();
 
         var result = await controller.VerifyEmail(useCase, new RequestVerifyEmailJson
         {
@@ -93,7 +93,7 @@ public sealed class AuthControllerIntegrationTests
     public async Task VerifyEmail_WhenUseCaseThrowsNotFoundException_ShouldReturnBadRequestWithGenericResponse()
     {
         var useCase = new ThrowingVerifyEmailUseCase(new NotFoundException("Nenhuma verificação pendente foi encontrada para o e-mail informado."));
-        var controller = CreateController();
+        var controller = CreateAuthController();
 
         var result = await controller.VerifyEmail(useCase, new RequestVerifyEmailJson
         {
@@ -111,7 +111,7 @@ public sealed class AuthControllerIntegrationTests
     public async Task ResendVerification_WhenUseCaseThrowsForbiddenException_ShouldReturnNoContent()
     {
         var useCase = new ThrowingResendVerificationUseCase(new ForbiddenException("O reenvio da verificação ainda está em cooldown."));
-        var controller = CreateController();
+        var controller = CreateAuthController();
 
         var result = await controller.ResendVerification(useCase, new RequestResendVerificationJson
         {
@@ -140,7 +140,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController();
+        var controller = CreateSessionController();
 
         var result = await controller.Login(useCase, authCookieOptions, new RequestSessionLoginJson
         {
@@ -166,7 +166,7 @@ public sealed class AuthControllerIntegrationTests
     public async Task Login_WhenUseCaseThrowsForbiddenException_ShouldReturnForbiddenResponseErrorJson()
     {
         var useCase = new ThrowingLoginSessionUseCase(new ForbiddenException("O usuário precisa verificar o e-mail antes de autenticar."));
-        var controller = CreateController();
+        var controller = CreateSessionController();
 
         var result = await controller.Login(useCase, Options.Create(new AuthCookieOptions()), new RequestSessionLoginJson
         {
@@ -194,9 +194,9 @@ public sealed class AuthControllerIntegrationTests
                 RefreshTokenExpiresAtUtc = new DateTime(2026, 4, 20, 15, 0, 0, DateTimeKind.Utc)
             }
         };
-        var controller = CreateController();
+        var controller = CreateTokenController();
 
-        var result = await controller.Token(useCase, new RequestLoginJson
+        var result = await controller.Login(useCase, new RequestLoginJson
         {
             Email = "bruno@authcore.dev",
             Password = "ValidPassword#2026"
@@ -224,7 +224,7 @@ public sealed class AuthControllerIntegrationTests
                 RefreshTokenExpiresAtUtc = new DateTime(2026, 4, 20, 15, 15, 0, DateTimeKind.Utc)
             }
         };
-        var controller = CreateController();
+        var controller = CreateTokenController();
 
         var result = await controller.Refresh(useCase, new RequestRefreshSessionJson
         {
@@ -243,9 +243,9 @@ public sealed class AuthControllerIntegrationTests
     public async Task TokenLogout_WhenUseCaseSucceeds_ShouldReturnNoContentAndForwardRefreshToken()
     {
         var useCase = new SpyLogoutSessionUseCase();
-        var controller = CreateController();
+        var controller = CreateTokenController();
 
-        var result = await controller.TokenLogout(useCase, new RequestTokenLogoutJson
+        var result = await controller.Logout(useCase, new RequestTokenLogoutJson
         {
             RefreshToken = "refresh-token"
         });
@@ -258,9 +258,9 @@ public sealed class AuthControllerIntegrationTests
     public async Task TokenLogout_WhenUseCaseThrowsUnauthorizedAccessException_ShouldReturnUnauthorizedResponseErrorJson()
     {
         var useCase = new ThrowingLogoutSessionUseCase(new UnauthorizedAccessException("A sessão informada é inválida ou expirou."));
-        var controller = CreateController();
+        var controller = CreateTokenController();
 
-        var result = await controller.TokenLogout(useCase, new RequestTokenLogoutJson
+        var result = await controller.Logout(useCase, new RequestTokenLogoutJson
         {
             RefreshToken = "invalid-refresh-token"
         });
@@ -275,14 +275,14 @@ public sealed class AuthControllerIntegrationTests
     public async Task TokenLogout_WhenUseCaseCompletesForRepeatedLogout_ShouldRemainNoContent()
     {
         var useCase = new SpyLogoutSessionUseCase();
-        var controller = CreateController();
+        var controller = CreateTokenController();
 
-        _ = await controller.TokenLogout(useCase, new RequestTokenLogoutJson
+        _ = await controller.Logout(useCase, new RequestTokenLogoutJson
         {
             RefreshToken = "refresh-token"
         });
 
-        var result = await controller.TokenLogout(useCase, new RequestTokenLogoutJson
+        var result = await controller.Logout(useCase, new RequestTokenLogoutJson
         {
             RefreshToken = "refresh-token"
         });
@@ -295,7 +295,7 @@ public sealed class AuthControllerIntegrationTests
     public void Me_WhenUserClaimsArePresent_ShouldReturnOkWithAuthenticatedUserResponse()
     {
         var userId = Guid.NewGuid();
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
             new Claim(ClaimTypes.Email, "bruno@authcore.dev"),
@@ -316,7 +316,7 @@ public sealed class AuthControllerIntegrationTests
     [Fact]
     public void Me_WhenSessionUserIsPending_ShouldReturnForbiddenResponseErrorJson()
     {
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Email, "pending@authcore.dev"),
@@ -343,7 +343,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
@@ -364,7 +364,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(
+        var controller = CreateSessionController(
             [
                 new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123"),
                 new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, Guid.NewGuid().ToString())
@@ -406,7 +406,7 @@ public sealed class AuthControllerIntegrationTests
                 ]
             }
         };
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
@@ -435,7 +435,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
@@ -459,7 +459,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
@@ -482,7 +482,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(
+        var controller = CreateSessionController(
             [
                 new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
                 new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-current")
@@ -508,7 +508,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-current")
@@ -531,7 +531,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-current")
@@ -556,7 +556,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(new[]
+        var controller = CreateSessionController(new[]
         {
             new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
@@ -579,7 +579,7 @@ public sealed class AuthControllerIntegrationTests
             SessionCookieName = "sid",
             Secure = false
         });
-        var controller = CreateController(
+        var controller = CreateSessionController(
             [
                 new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
                 new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
@@ -620,7 +620,7 @@ public sealed class AuthControllerIntegrationTests
             MaxAttemptsPerEmail = 1,
             WindowMinutes = 5
         });
-        var controller = CreateController(loginRateLimiter: rateLimiter);
+        var controller = CreateSessionController(loginRateLimiter: rateLimiter);
 
         controller.HttpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("127.0.0.1");
 
@@ -663,17 +663,17 @@ public sealed class AuthControllerIntegrationTests
             MaxAttemptsPerEmail = 20,
             WindowMinutes = 5
         });
-        var controller = CreateController(loginRateLimiter: rateLimiter);
+        var controller = CreateTokenController(loginRateLimiter: rateLimiter);
 
         controller.HttpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("127.0.0.1");
 
-        _ = await controller.Token(useCase, new RequestLoginJson
+        _ = await controller.Login(useCase, new RequestLoginJson
         {
             Email = "first@authcore.dev",
             Password = "ValidPassword#2026"
         });
 
-        var blockedResult = await controller.Token(useCase, new RequestLoginJson
+        var blockedResult = await controller.Login(useCase, new RequestLoginJson
         {
             Email = "second@authcore.dev",
             Password = "ValidPassword#2026"
@@ -746,26 +746,46 @@ public sealed class AuthControllerIntegrationTests
         await using var scope = app.Services.CreateAsyncScope();
         var actionProvider = scope.ServiceProvider.GetRequiredService<IActionDescriptorCollectionProvider>();
         var actions = actionProvider.ActionDescriptors.Items
-            .Where(action => string.Equals(action.RouteValues["controller"], "Auth", StringComparison.OrdinalIgnoreCase))
+            .Select(action => action.AttributeRouteInfo?.Template)
+            .Where(template => !string.IsNullOrWhiteSpace(template))
             .ToList();
 
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/login");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/register");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/verify-email");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/resend-verification");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/token");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/refresh");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/token/logout");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/me");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/logout");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/sessions");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/sessions/{sid}");
-        Assert.Contains(actions, action => action.AttributeRouteInfo?.Template == "api/auth/logout-all");
+        Assert.Contains("api/auth/session/login", actions);
+        Assert.Contains("api/auth/register", actions);
+        Assert.Contains("api/auth/verify-email", actions);
+        Assert.Contains("api/auth/resend-verification", actions);
+        Assert.Contains("api/auth/token/login", actions);
+        Assert.Contains("api/auth/token/refresh", actions);
+        Assert.Contains("api/auth/token/logout", actions);
+        Assert.Contains("api/auth/session/me", actions);
+        Assert.Contains("api/auth/session/logout", actions);
+        Assert.Contains("api/auth/session/sessions", actions);
+        Assert.Contains("api/auth/session/sessions/{sid}", actions);
+        Assert.Contains("api/auth/session/logout-all", actions);
+        Assert.DoesNotContain("api/auth/login", actions);
+        Assert.DoesNotContain("api/auth/token", actions);
+        Assert.DoesNotContain("api/auth/refresh", actions);
+        Assert.DoesNotContain("api/auth/me", actions);
+        Assert.DoesNotContain("api/auth/logout", actions);
+        Assert.DoesNotContain("api/auth/sessions", actions);
+        Assert.DoesNotContain("api/auth/sessions/{sid}", actions);
+        Assert.DoesNotContain("api/auth/logout-all", actions);
     }
 
     #region Helpers
 
-    private static AuthController CreateController(
+    private static AuthController CreateAuthController()
+    {
+        return new AuthController(NullLogger<AuthController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+    }
+
+    private static SessionAuthController CreateSessionController(
         IEnumerable<Claim>? claims = null,
         ICsrfRequestValidator? csrfRequestValidator = null,
         ILoginRateLimiter? loginRateLimiter = null)
@@ -779,10 +799,34 @@ public sealed class AuthControllerIntegrationTests
                 SessionAuthenticationDefaults.AuthenticationScheme));
         }
 
-        return new AuthController(
+        return new SessionAuthController(
             csrfRequestValidator ?? new AllowAllCsrfRequestValidator(),
             loginRateLimiter ?? new AllowAllLoginRateLimiter(),
-            NullLogger<AuthController>.Instance)
+            NullLogger<SessionAuthController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            }
+        };
+    }
+
+    private static TokenAuthController CreateTokenController(
+        IEnumerable<Claim>? claims = null,
+        ILoginRateLimiter? loginRateLimiter = null)
+    {
+        var httpContext = new DefaultHttpContext();
+
+        if (claims is not null)
+        {
+            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+                claims,
+                SessionAuthenticationDefaults.AuthenticationScheme));
+        }
+
+        return new TokenAuthController(
+            loginRateLimiter ?? new AllowAllLoginRateLimiter(),
+            NullLogger<TokenAuthController>.Instance)
         {
             ControllerContext = new ControllerContext
             {

@@ -418,15 +418,15 @@ public sealed class SessionAuthenticationIntegrationTests
             .BuildServiceProvider();
     }
 
-    private static AuthController CreateController(IServiceProvider serviceProvider, HttpContext? httpContext = null)
+    private static SessionAuthController CreateController(IServiceProvider serviceProvider, HttpContext? httpContext = null)
     {
         var resolvedHttpContext = httpContext ?? new DefaultHttpContext();
         resolvedHttpContext.RequestServices = serviceProvider;
 
-        return new AuthController(
+        return new SessionAuthController(
             serviceProvider.GetRequiredService<ICsrfRequestValidator>(),
             serviceProvider.GetRequiredService<ILoginRateLimiter>(),
-            serviceProvider.GetRequiredService<ILogger<AuthController>>())
+            serviceProvider.GetRequiredService<ILogger<SessionAuthController>>())
         {
             ControllerContext = new ControllerContext
             {

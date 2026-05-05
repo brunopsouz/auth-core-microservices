@@ -148,7 +148,9 @@ As responsabilidades observadas hoje incluem:
 
 Os controllers atuais seguem o papel correto de borda:
 
-- `AuthController` atende autenticação, renovação e logout de sessão
+- `AuthController` atende registro e verificação pública de autenticação
+- `SessionAuthController` atende autenticação e gerenciamento de sessão por cookie
+- `TokenAuthController` atende autenticação e renovação por access token e refresh token
 - `UserController` atende registro, perfil, atualização, troca de senha e exclusão
 
 ### AuthCore.Infrastructure

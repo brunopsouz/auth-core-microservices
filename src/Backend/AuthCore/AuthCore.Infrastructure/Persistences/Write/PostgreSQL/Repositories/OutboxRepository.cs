@@ -37,6 +37,9 @@ public sealed class OutboxRepository : IOutboxRepository
             INSERT INTO "OutboxMessages"
             (
                 "Id",
+                "CreatedAt",
+                "UpdateAt",
+                "IsActive",
                 "Type",
                 "Content",
                 "OccurredAtUtc",
@@ -47,6 +50,9 @@ public sealed class OutboxRepository : IOutboxRepository
             VALUES
             (
                 @Id,
+                @CreatedAt,
+                @UpdateAt,
+                @IsActive,
                 @Type,
                 @Content,
                 @OccurredAtUtc,
@@ -126,6 +132,7 @@ public sealed class OutboxRepository : IOutboxRepository
         const string sql = """
             UPDATE "OutboxMessages"
             SET
+                "UpdateAt" = @UpdateAt,
                 "ProcessedAtUtc" = @ProcessedAtUtc,
                 "AttemptCount" = @AttemptCount,
                 "LastError" = @LastError
@@ -153,9 +160,16 @@ public sealed class OutboxRepository : IOutboxRepository
 
         if (includeStaticColumns)
         {
+            command.Parameters.AddWithValue("CreatedAt", message.OccurredAtUtc);
+            command.Parameters.AddWithValue("UpdateAt", message.OccurredAtUtc);
+            command.Parameters.AddWithValue("IsActive", true);
             command.Parameters.AddWithValue("Type", message.Type);
             command.Parameters.AddWithValue("Content", message.Content);
             command.Parameters.AddWithValue("OccurredAtUtc", message.OccurredAtUtc);
+        }
+        else
+        {
+            command.Parameters.AddWithValue("UpdateAt", DateTime.UtcNow);
         }
 
         command.Parameters.AddWithValue("ProcessedAtUtc", message.ProcessedAtUtc ?? (object)DBNull.Value);

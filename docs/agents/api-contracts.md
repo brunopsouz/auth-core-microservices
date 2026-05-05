@@ -50,6 +50,8 @@ O padrão atual está bem representado em:
 
 - `Controllers/UserController.cs`
 - `Controllers/AuthController.cs`
+- `Controllers/SessionAuthController.cs`
+- `Controllers/TokenAuthController.cs`
 
 ## Estrutura de contratos
 
@@ -144,9 +146,12 @@ Hoje a API usa rotas iniciadas por `api/...` e não há versionamento explícito
 
 Padrões observados:
 
-- `api/auth/login`
-- `api/auth/refresh`
-- `api/auth/logout`
+- `api/auth/register`
+- `api/auth/session/login`
+- `api/auth/session/logout`
+- `api/auth/token/login`
+- `api/auth/token/refresh`
+- `api/auth/token/logout`
 - `api/users`
 - `api/users/profile`
 - `api/users/change-password`
@@ -222,7 +227,7 @@ Mapeamento atual do handler global:
 - `ConflictException` -> `409 Conflict`
 - exceções não tratadas -> `500 Internal Server Error`
 
-O `AuthController` também possui mapeamento local para exceções conhecidas. Ao criar novos endpoints, preserve consistência com o formato de erro já exposto pela API.
+Os controllers de autenticação também possuem mapeamento local para exceções conhecidas. Ao criar novos endpoints, preserve consistência com o formato de erro já exposto pela API.
 
 ## Swagger e documentação do contrato
 
@@ -257,6 +262,8 @@ Antes de concluir uma mudança em contrato HTTP, confirme:
 Arquivos mais úteis para seguir o padrão atual:
 
 - `src/Backend/AuthCore/AuthCore.Api/Controllers/AuthController.cs`
+- `src/Backend/AuthCore/AuthCore.Api/Controllers/SessionAuthController.cs`
+- `src/Backend/AuthCore/AuthCore.Api/Controllers/TokenAuthController.cs`
 - `src/Backend/AuthCore/AuthCore.Api/Controllers/UserController.cs`
 - `src/Backend/AuthCore/AuthCore.Api/Contracts/Requests`
 - `src/Backend/AuthCore/AuthCore.Api/Contracts/Responses`

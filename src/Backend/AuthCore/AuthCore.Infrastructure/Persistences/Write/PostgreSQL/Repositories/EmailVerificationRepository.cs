@@ -36,6 +36,10 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
         const string sql = """
             INSERT INTO "EmailVerificationTokens"
             (
+                "Id",
+                "CreatedAt",
+                "UpdateAt",
+                "IsActive",
                 "UserId",
                 "Email",
                 "TokenHash",
@@ -49,6 +53,10 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
             )
             VALUES
             (
+                @Id,
+                @CreatedAt,
+                @UpdateAt,
+                @IsActive,
                 @UserId,
                 @Email,
                 @TokenHash,
@@ -80,6 +88,8 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
         const string sql = """
             UPDATE "EmailVerificationTokens"
             SET
+                "UpdateAt" = @UpdateAt,
+                "IsActive" = @IsActive,
                 "Email" = @Email,
                 "TokenHash" = @TokenHash,
                 "ExpiresAtUtc" = @ExpiresAtUtc,
@@ -89,7 +99,7 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
                 "MaxAttempts" = @MaxAttempts,
                 "CooldownUntilUtc" = @CooldownUntilUtc,
                 "LastSentAtUtc" = @LastSentAtUtc
-            WHERE "UserId" = @UserId;
+            WHERE "Id" = @Id;
             """;
 
         var connection = await _databaseSession.GetOpenConnectionAsync();
@@ -108,6 +118,10 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
     {
         var sql = """
             SELECT
+                "Id",
+                "CreatedAt",
+                "UpdateAt",
+                "IsActive",
                 "UserId",
                 "Email",
                 "TokenHash",
@@ -142,6 +156,10 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
     {
         var sql = """
             SELECT
+                "Id",
+                "CreatedAt",
+                "UpdateAt",
+                "IsActive",
                 "UserId",
                 "Email",
                 "TokenHash",
@@ -180,6 +198,10 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
     {
         var sql = """
             SELECT
+                "Id",
+                "CreatedAt",
+                "UpdateAt",
+                "IsActive",
                 "UserId",
                 "Email",
                 "TokenHash",
@@ -218,6 +240,10 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
     /// <param name="emailVerification">Verificação persistida.</param>
     private static void AddParameters(NpgsqlCommand command, EmailVerification emailVerification)
     {
+        command.Parameters.AddWithValue("Id", emailVerification.Id);
+        command.Parameters.AddWithValue("CreatedAt", emailVerification.CreatedAt);
+        command.Parameters.AddWithValue("UpdateAt", emailVerification.UpdateAt);
+        command.Parameters.AddWithValue("IsActive", emailVerification.IsActive);
         command.Parameters.AddWithValue("UserId", emailVerification.UserId);
         command.Parameters.AddWithValue("Email", emailVerification.Email);
         command.Parameters.AddWithValue("TokenHash", emailVerification.CodeHash);
@@ -265,6 +291,10 @@ public sealed class EmailVerificationRepository : IEmailVerificationRepository
             return null;
 
         return EmailVerification.Restore(
+            reader.GetGuid(reader.GetOrdinal("Id")),
+            reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+            reader.GetDateTime(reader.GetOrdinal("UpdateAt")),
+            reader.GetBoolean(reader.GetOrdinal("IsActive")),
             reader.GetGuid(reader.GetOrdinal("UserId")),
             reader.GetString(reader.GetOrdinal("Email")),
             reader.GetString(reader.GetOrdinal("TokenHash")),

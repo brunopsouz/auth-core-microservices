@@ -76,14 +76,21 @@ public sealed class ResendVerificationUseCase : IResendVerificationUseCase
             }
 
             var material = _emailVerificationService.Create();
-            var verification = EmailVerification.Issue(
-                user.Id,
-                user.Email.Value,
-                material.Hash,
-                _emailVerificationService.GetExpiresAtUtc(),
-                _emailVerificationService.GetMaxAttempts(),
-                _emailVerificationService.GetCooldownUntilUtc(),
-                nowUtc);
+            var verification = existingVerification is null
+                ? EmailVerification.Issue(
+                    user.Id,
+                    user.Email.Value,
+                    material.Hash,
+                    _emailVerificationService.GetExpiresAtUtc(),
+                    _emailVerificationService.GetMaxAttempts(),
+                    _emailVerificationService.GetCooldownUntilUtc(),
+                    nowUtc)
+                : existingVerification.Reissue(
+                    material.Hash,
+                    _emailVerificationService.GetExpiresAtUtc(),
+                    _emailVerificationService.GetMaxAttempts(),
+                    _emailVerificationService.GetCooldownUntilUtc(),
+                    nowUtc);
             var outboxEvent = new EmailVerificationRequested
             {
                 UserId = user.Id,
