@@ -168,8 +168,15 @@ http://localhost:8080
 
 As configurações de desenvolvimento estão em:
 
-- `src/Backend/.env.development`
+- `src/Backend/.env.development.example`, modelo versionado sem segredos
+- `src/Backend/.env.development`, arquivo local ignorado pelo Git
 - `src/Backend/AuthCore/AuthCore.Api/appsettings.Development.json`
+
+Antes de executar o projeto pela primeira vez, crie o arquivo local a partir do modelo e preencha os valores vazios:
+
+```bash
+cp src/Backend/.env.development.example src/Backend/.env.development
+```
 
 Serviços padrão em desenvolvimento:
 
@@ -182,7 +189,7 @@ Serviços padrão em desenvolvimento:
 | RabbitMQ | `localhost` | `5672` |
 | RabbitMQ Management | `localhost` | `15672` |
 
-As credenciais presentes nos arquivos de desenvolvimento são apenas defaults locais. Para ambientes reais, configure segredos por variáveis de ambiente ou pelo mecanismo de configuração do ambiente de deploy.
+Credenciais, senhas e chave de assinatura JWT devem ficar no `.env.development` local ou no mecanismo de segredos do ambiente de deploy. O `docker-compose.yml` apenas referencia essas variáveis.
 
 ## Endpoints principais
 

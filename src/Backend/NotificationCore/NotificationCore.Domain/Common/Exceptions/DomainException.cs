@@ -1,0 +1,35 @@
+namespace NotificationCore.Domain.Common.Exceptions;
+
+/// <summary>
+/// Representa erro de regra de negócio do domínio.
+/// </summary>
+public class DomainException : Exception
+{
+    /// <summary>
+    /// Operação para criar instância da classe.
+    /// </summary>
+    /// <param name="message">Mensagem que descreve o erro.</param>
+    public DomainException(string message) : base(message)
+    {
+    }
+
+    /// <summary>
+    /// Operação para criar instância da classe.
+    /// </summary>
+    /// <param name="message">Mensagem que descreve o erro.</param>
+    /// <param name="inner">Exceção que originou o erro.</param>
+    public DomainException(string message, Exception inner) : base(message, inner)
+    {
+    }
+
+    /// <summary>
+    /// Operação para validar pré-condição de domínio.
+    /// </summary>
+    /// <param name="hasError">Indica se existe erro.</param>
+    /// <param name="errorMessage">Mensagem que descreve o erro.</param>
+    public static void When(bool hasError, string errorMessage)
+    {
+        if (hasError)
+            throw new DomainException(errorMessage);
+    }
+}

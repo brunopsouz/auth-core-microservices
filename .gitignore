@@ -434,3 +434,4 @@ docs/explain
 docs/specs
 AGENTS.md
 .env.*
+!src/Backend/.env.development.example
