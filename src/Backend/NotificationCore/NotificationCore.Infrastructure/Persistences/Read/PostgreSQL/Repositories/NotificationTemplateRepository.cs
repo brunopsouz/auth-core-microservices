@@ -1,0 +1,96 @@
+using NotificationCore.Domain.Notifications.Enums;
+using NotificationCore.Infrastructure.Abstractions.Data;
+using NotificationCore.Infrastructure.Notifications.Templates;
+using Npgsql;
+
+namespace NotificationCore.Infrastructure.Persistences.Read.PostgreSQL.Repositories;
+
+/// <summary>
+/// Representa repositório PostgreSQL de leitura de templates de notificação.
+/// </summary>
+public sealed class NotificationTemplateRepository : INotificationTemplateRepository
+{
+    private readonly IDatabaseSession _databaseSession;
+
+    #region Constructors
+
+    /// <summary>
+    /// Operação para criar instância da classe.
+    /// </summary>
+    /// <param name="databaseSession">Sessão atual de banco de dados.</param>
+    public NotificationTemplateRepository(IDatabaseSession databaseSession)
+    {
+        _databaseSession = databaseSession;
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Operação para obter o template ativo mais recente.
+    /// </summary>
+    /// <param name="templateKey">Chave do template.</param>
+    /// <param name="channel">Canal da notificação.</param>
+    /// <returns>Template ativo mais recente ou nulo.</returns>
+    public async Task<NotificationTemplate?> GetActiveAsync(string templateKey, NotificationChannel channel)
+    {
+        const string sql = """
+            SELECT
+                "TemplateKey",
+                "Channel",
+                "Subject",
+                "HtmlBody",
+                "TextBody"
+            FROM "NotificationTemplates"
+            WHERE "TemplateKey" = @TemplateKey
+              AND "Channel" = @Channel
+              AND "IsActive" = TRUE
+            ORDER BY "Version" DESC
+            LIMIT 1;
+            """;
+
+        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var command = CreateCommand(connection, sql);
+
+        command.Parameters.AddWithValue("TemplateKey", templateKey.Trim());
+        command.Parameters.AddWithValue("Channel", (int)channel);
+
+        return await ReadTemplateAsync(command);
+    }
+
+    #region Helpers
+
+    /// <summary>
+    /// Operação para criar comando SQL respeitando a transação atual.
+    /// </summary>
+    /// <param name="connection">Conexão aberta da sessão.</param>
+    /// <param name="sql">Comando SQL a ser executado.</param>
+    /// <returns>Comando pronto para uso.</returns>
+    private NpgsqlCommand CreateCommand(NpgsqlConnection connection, string sql)
+    {
+        return new NpgsqlCommand(sql, connection, _databaseSession.CurrentTransaction);
+    }
+
+    /// <summary>
+    /// Operação para materializar template a partir do comando SQL.
+    /// </summary>
+    /// <param name="command">Comando SQL configurado.</param>
+    /// <returns>Template materializado ou nulo.</returns>
+    private static async Task<NotificationTemplate?> ReadTemplateAsync(NpgsqlCommand command)
+    {
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (!await reader.ReadAsync())
+            return null;
+
+        return new NotificationTemplate
+        {
+            TemplateKey = reader.GetString(reader.GetOrdinal("TemplateKey")),
+            Channel = (NotificationChannel)reader.GetInt32(reader.GetOrdinal("Channel")),
+            Subject = reader.GetString(reader.GetOrdinal("Subject")),
+            HtmlBody = reader.GetString(reader.GetOrdinal("HtmlBody")),
+            TextBody = reader.GetString(reader.GetOrdinal("TextBody"))
+        };
+    }
+
+    #endregion
+}

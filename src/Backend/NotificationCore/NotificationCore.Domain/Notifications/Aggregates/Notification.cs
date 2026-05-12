@@ -317,15 +317,21 @@ public sealed class Notification : AggregateRoot
     /// Operação para iniciar processamento da notificação.
     /// </summary>
     /// <param name="startedAtUtc">Data de início do processamento.</param>
-    public void StartProcessing(DateTime startedAtUtc)
+    /// <param name="processingTimeoutAtUtc">Data de expiração do processamento.</param>
+    public void StartProcessing(DateTime startedAtUtc, DateTime? processingTimeoutAtUtc = null)
     {
         ValidateUtc(startedAtUtc, "A data de início do processamento é obrigatória e deve estar em UTC.");
+        ValidateNullableUtc(processingTimeoutAtUtc, "A data de expiração do processamento deve estar em UTC.");
         EnsureStatusIs(
             [NotificationStatus.Pending, NotificationStatus.RetryScheduled],
             "A notificação só pode iniciar processamento quando estiver pendente ou com retry agendado.");
         DomainException.When(startedAtUtc < ScheduledAtUtc, "A notificação só pode iniciar processamento na data agendada.");
+        DomainException.When(processingTimeoutAtUtc.HasValue && processingTimeoutAtUtc.Value <= startedAtUtc, "A data de expiração do processamento deve ser posterior ao início.");
 
         Status = NotificationStatus.Processing;
+
+        if (processingTimeoutAtUtc.HasValue)
+            ScheduledAtUtc = processingTimeoutAtUtc.Value;
     }
 
     /// <summary>

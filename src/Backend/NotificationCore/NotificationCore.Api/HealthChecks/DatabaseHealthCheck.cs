@@ -1,0 +1,54 @@
+using System.Data;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using NotificationCore.Infrastructure.Abstractions.Data;
+
+namespace NotificationCore.Api.HealthChecks;
+
+/// <summary>
+/// Representa health check para a conectividade com o banco de dados.
+/// </summary>
+public sealed class DatabaseHealthCheck : IHealthCheck
+{
+    private readonly IDbConnectionFactory _dbConnectionFactory;
+
+    #region Constructors
+
+    /// <summary>
+    /// Operação para criar instância da classe.
+    /// </summary>
+    /// <param name="dbConnectionFactory">Fábrica de conexões abertas do banco.</param>
+    public DatabaseHealthCheck(IDbConnectionFactory dbConnectionFactory)
+    {
+        ArgumentNullException.ThrowIfNull(dbConnectionFactory);
+
+        _dbConnectionFactory = dbConnectionFactory;
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Operação para verificar a saúde da conectividade com o banco.
+    /// </summary>
+    /// <param name="context">Contexto da execução do health check.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>Resultado do health check executado.</returns>
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        try
+        {
+            using var connection = await _dbConnectionFactory.CreateOpenConnectionAsync(cancellationToken);
+
+            return connection.State == ConnectionState.Open
+                ? HealthCheckResult.Healthy("Banco de dados acessível.")
+                : HealthCheckResult.Unhealthy("Conexão com o banco de dados não foi aberta.");
+        }
+        catch (Exception exception)
+        {
+            return HealthCheckResult.Unhealthy("Falha ao validar a conectividade com o banco de dados.", exception);
+        }
+    }
+}

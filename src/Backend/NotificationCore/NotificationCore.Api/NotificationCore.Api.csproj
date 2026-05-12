@@ -8,6 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.21" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\NotificationCore.Application\NotificationCore.Application.csproj" />
     <ProjectReference Include="..\NotificationCore.Infrastructure\NotificationCore.Infrastructure.csproj" />
   </ItemGroup>
