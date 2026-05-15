@@ -22,7 +22,6 @@ O objetivo do projeto é servir como um núcleo de autenticação robusto para a
 - [Endpoints principais](#endpoints-principais)
 - [Testes](#testes)
 - [Estrutura do projeto](#estrutura-do-projeto)
-- [Contribuição](#contribuição)
 - [Licença](#licença)
 
 ## Funcionalidades
@@ -302,17 +301,6 @@ dotnet test tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj
 ```
 
 `AuthCore.ArchitectureTests` existe hoje apenas como diretório reservado para testes arquiteturais futuros.
-
-## Contribuição
-
-1. Crie uma branch a partir da branch principal.
-2. Mantenha as responsabilidades de cada camada.
-3. Preserve regras de negócio dentro do domínio.
-4. Use casos de uso na camada `Application` para orquestração.
-5. Mantenha controllers finos na camada `Api`.
-6. Use SQL explícito e Npgsql na infraestrutura.
-7. Adicione ou atualize testes quando alterar comportamento.
-8. Execute `dotnet build AuthCore.sln` e `dotnet test AuthCore.sln` antes de abrir um pull request.
 
 ## Licença
 
