@@ -26,6 +26,36 @@ public sealed class NotificationTemplateRepository : INotificationTemplateReposi
     #endregion
 
     /// <summary>
+    /// Operação para listar templates ativos.
+    /// </summary>
+    /// <returns>Lista de templates ativos.</returns>
+    public async Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync()
+    {
+        const string sql = """
+            SELECT
+                "TemplateKey",
+                "Channel",
+                "Subject",
+                "HtmlBody",
+                "TextBody"
+            FROM "NotificationTemplates"
+            WHERE "IsActive" = TRUE
+            ORDER BY "TemplateKey", "Channel", "Version" DESC;
+            """;
+
+        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var command = CreateCommand(connection, sql);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        var templates = new List<NotificationTemplate>();
+
+        while (await reader.ReadAsync())
+            templates.Add(ReadTemplate(reader));
+
+        return templates;
+    }
+
+    /// <summary>
     /// Operação para obter o template ativo mais recente.
     /// </summary>
     /// <param name="templateKey">Chave do template.</param>
@@ -82,6 +112,16 @@ public sealed class NotificationTemplateRepository : INotificationTemplateReposi
         if (!await reader.ReadAsync())
             return null;
 
+        return ReadTemplate(reader);
+    }
+
+    /// <summary>
+    /// Operação para materializar template a partir do leitor SQL.
+    /// </summary>
+    /// <param name="reader">Leitor SQL posicionado no registro.</param>
+    /// <returns>Template materializado.</returns>
+    private static NotificationTemplate ReadTemplate(NpgsqlDataReader reader)
+    {
         return new NotificationTemplate
         {
             TemplateKey = reader.GetString(reader.GetOrdinal("TemplateKey")),

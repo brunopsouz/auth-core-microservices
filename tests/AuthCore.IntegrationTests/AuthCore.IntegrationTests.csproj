@@ -28,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\BuildingBlocks\BuildingBlocks.Messaging.Contracts\BuildingBlocks.Messaging.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Backend\AuthCore\AuthCore.Api\AuthCore.Api.csproj" />
     <ProjectReference Include="..\..\src\Backend\AuthCore\AuthCore.Application\AuthCore.Application.csproj" />
     <ProjectReference Include="..\..\src\Backend\AuthCore\AuthCore.Infrastructure\AuthCore.Infrastructure.csproj" />

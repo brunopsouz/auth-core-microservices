@@ -1,8 +1,10 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
+using BuildingBlocks.Messaging.Contracts.Notifications;
+using BuildingBlocks.Messaging.Contracts.Security;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
-using AuthCore.Domain.Security.Emails;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,9 +16,17 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// </summary>
 public sealed class OutboxProcessor : IOutboxProcessor
 {
+    private const string SOURCE = "AuthCore";
+    private const string CHANNEL = "Email";
+    private const string TEMPLATE_KEY = "auth.email-confirmation";
+    private const string PRIORITY = "High";
+    private const string CONFIRMATION_CODE_VARIABLE = "confirmationCode";
+    private const string EXPIRES_IN_MINUTES_VARIABLE = "expiresInMinutes";
+    private const string LEGACY_IDEMPOTENCY_KEY_PREFIX = "auth-email-confirmation-legacy";
+
     private readonly IOutboxRepository _outboxRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IEmailSender _emailSender;
+    private readonly INotificationRequestPublisher _notificationRequestPublisher;
     private readonly OutboxOptions _outboxOptions;
     private readonly OutboxMetrics _outboxMetrics;
     private readonly ILogger<OutboxProcessor> _logger;
@@ -28,21 +38,21 @@ public sealed class OutboxProcessor : IOutboxProcessor
     /// </summary>
     /// <param name="outboxRepository">Repositório da outbox.</param>
     /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
-    /// <param name="emailSender">Sender de e-mail.</param>
+    /// <param name="notificationRequestPublisher">Publisher de solicitações de notificação.</param>
     /// <param name="outboxOptions">Opções de processamento da outbox.</param>
     /// <param name="outboxMetrics">Métricas da outbox.</param>
     /// <param name="logger">Serviço de logging.</param>
     public OutboxProcessor(
         IOutboxRepository outboxRepository,
         IUnitOfWork unitOfWork,
-        IEmailSender emailSender,
+        INotificationRequestPublisher notificationRequestPublisher,
         IOptions<OutboxOptions> outboxOptions,
         OutboxMetrics outboxMetrics,
         ILogger<OutboxProcessor> logger)
     {
         _outboxRepository = outboxRepository;
         _unitOfWork = unitOfWork;
-        _emailSender = emailSender;
+        _notificationRequestPublisher = notificationRequestPublisher;
         _outboxOptions = outboxOptions.Value;
         _outboxMetrics = outboxMetrics;
         _logger = logger;
@@ -119,6 +129,12 @@ public sealed class OutboxProcessor : IOutboxProcessor
         OutboxMessage message,
         CancellationToken cancellationToken)
     {
+        using var scope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["messageId"] = message.Id,
+            ["messageType"] = message.Type
+        });
+
         try
         {
             await DispatchAsync(message, cancellationToken);
@@ -145,11 +161,13 @@ public sealed class OutboxProcessor : IOutboxProcessor
             _outboxMetrics.RecordFailed(message.Type);
 
             _logger.LogWarning(
-                exception,
-                "Falha ao processar mensagem de outbox. MessageId={MessageId}, Type={MessageType}, AttemptCount={AttemptCount}.",
+                "Falha ao processar mensagem de outbox. MessageId={MessageId}, Type={MessageType}, AttemptCount={AttemptCount}, ExceptionType={ExceptionType}, ErrorMessage={ErrorMessage}, ExceptionDetails={ExceptionDetails}.",
                 message.Id,
                 message.Type,
-                failedMessage.AttemptCount);
+                failedMessage.AttemptCount,
+                exception.GetType().Name,
+                failedMessage.LastError,
+                SensitivePayloadSanitizer.SanitizeText(exception.ToString()));
 
             return false;
         }
@@ -162,18 +180,107 @@ public sealed class OutboxProcessor : IOutboxProcessor
     /// <param name="cancellationToken">Token para cancelamento da operação.</param>
     private async Task DispatchAsync(OutboxMessage message, CancellationToken cancellationToken)
     {
-        if (message.Type != nameof(EmailVerificationRequested))
-            throw new InvalidOperationException($"Tipo de mensagem de outbox não suportado: {message.Type}.");
+        if (message.Type == nameof(SendTransactionalNotificationRequested))
+        {
+            var request = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(message.Content)
+                ?? throw new InvalidOperationException("Conteúdo da mensagem de outbox inválido.");
 
+            ValidateNotificationRequest(request);
+
+            using var notificationScope = _logger.BeginScope(CreateNotificationRequestScope(request));
+
+            await _notificationRequestPublisher.PublishAsync(
+                request,
+                message.Content,
+                cancellationToken);
+
+            return;
+        }
+
+        if (message.Type == nameof(EmailVerificationRequested))
+        {
+            var request = CreateRequestFromLegacyEvent(message);
+            var payload = JsonSerializer.Serialize(request);
+
+            using var notificationScope = _logger.BeginScope(CreateNotificationRequestScope(request));
+
+            await _notificationRequestPublisher.PublishAsync(
+                request,
+                payload,
+                cancellationToken);
+
+            return;
+        }
+
+        throw new InvalidOperationException($"Tipo de mensagem de outbox não suportado: {message.Type}.");
+    }
+
+    /// <summary>
+    /// Operação para converter evento legado de verificação de e-mail para solicitação transacional.
+    /// </summary>
+    /// <param name="message">Mensagem legada da outbox.</param>
+    /// <returns>Solicitação transacional de notificação.</returns>
+    private static SendTransactionalNotificationRequested CreateRequestFromLegacyEvent(OutboxMessage message)
+    {
         var outboxEvent = JsonSerializer.Deserialize<EmailVerificationRequested>(message.Content)
             ?? throw new InvalidOperationException("Conteúdo da mensagem de outbox inválido.");
 
         outboxEvent.Validate();
 
-        await _emailSender.SendEmailVerificationAsync(
-            outboxEvent.Email,
-            outboxEvent.Code,
-            cancellationToken);
+        return new SendTransactionalNotificationRequested
+        {
+            MessageId = message.Id,
+            CorrelationId = message.Id.ToString("D"),
+            Source = SOURCE,
+            Channel = CHANNEL,
+            Recipient = outboxEvent.Email,
+            TemplateKey = TEMPLATE_KEY,
+            Variables = new Dictionary<string, string>
+            {
+                [CONFIRMATION_CODE_VARIABLE] = outboxEvent.Code,
+                [EXPIRES_IN_MINUTES_VARIABLE] = "15"
+            },
+            Priority = PRIORITY,
+            IdempotencyKey = string.Create(
+                CultureInfo.InvariantCulture,
+                $"{LEGACY_IDEMPOTENCY_KEY_PREFIX}:{outboxEvent.UserId:D}:{outboxEvent.RequestedAtUtc.Ticks}"),
+            RequestedAtUtc = outboxEvent.RequestedAtUtc
+        };
+    }
+
+    /// <summary>
+    /// Operação para validar a mensagem transacional de notificação.
+    /// </summary>
+    /// <param name="request">Solicitação transacional de notificação.</param>
+    private static void ValidateNotificationRequest(SendTransactionalNotificationRequested request)
+    {
+        if (request.MessageId == Guid.Empty
+            || string.IsNullOrWhiteSpace(request.CorrelationId)
+            || string.IsNullOrWhiteSpace(request.Source)
+            || string.IsNullOrWhiteSpace(request.Channel)
+            || string.IsNullOrWhiteSpace(request.Recipient)
+            || string.IsNullOrWhiteSpace(request.TemplateKey)
+            || string.IsNullOrWhiteSpace(request.Priority)
+            || string.IsNullOrWhiteSpace(request.IdempotencyKey)
+            || request.RequestedAtUtc == default)
+            throw new InvalidOperationException("Conteúdo da mensagem de outbox inválido.");
+    }
+
+    /// <summary>
+    /// Operação para criar escopo de logging da solicitação de notificação.
+    /// </summary>
+    /// <param name="request">Solicitação transacional de notificação.</param>
+    /// <returns>Dados do escopo de logging.</returns>
+    private static Dictionary<string, object?> CreateNotificationRequestScope(SendTransactionalNotificationRequested request)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["correlationId"] = request.CorrelationId,
+            ["messageId"] = request.MessageId,
+            ["source"] = request.Source,
+            ["templateKey"] = request.TemplateKey,
+            ["channel"] = request.Channel
+        };
     }
 
     /// <summary>
@@ -183,9 +290,11 @@ public sealed class OutboxProcessor : IOutboxProcessor
     /// <returns>Mensagem de erro normalizada.</returns>
     private static string GetErrorMessage(Exception exception)
     {
-        return string.IsNullOrWhiteSpace(exception.Message)
+        var message = string.IsNullOrWhiteSpace(exception.Message)
             ? exception.GetType().Name
             : exception.Message;
+
+        return SensitivePayloadSanitizer.SanitizeText(message);
     }
 
     #endregion

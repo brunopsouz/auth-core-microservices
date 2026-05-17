@@ -334,9 +334,13 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
                 ["Redis:KeyPrefix"] = "authcore-tests",
                 ["RabbitMq:Host"] = "localhost",
                 ["RabbitMq:Port"] = "5672",
+                ["RabbitMq:VirtualHost"] = "/",
                 ["RabbitMq:Username"] = "guest",
                 ["RabbitMq:Password"] = "guest",
-                ["RabbitMq:EmailVerificationQueue"] = "auth.email-verification"
+                ["RabbitMq:Exchange"] = "notification.requests",
+                ["RabbitMq:RoutingKey"] = "notification.email.requested",
+                ["RabbitMq:Queue"] = "notification.email.requests",
+                ["RabbitMq:DeadLetterQueue"] = "notification.email.requests.dlq"
             })
             .Build();
 

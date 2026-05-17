@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using BuildingBlocks.Messaging.Contracts.Notifications;
+using BuildingBlocks.Messaging.Contracts.Security;
 using Microsoft.Extensions.Options;
 using NotificationCore.Application.Notifications.UseCases.RegisterNotificationRequest;
 using NotificationCore.Domain.Common.Exceptions;
@@ -90,10 +91,12 @@ public sealed class RabbitMqNotificationConsumerHostedService : BackgroundServic
         catch (JsonException exception)
         {
             _logger.LogWarning(
-                exception,
-                "Mensagem RabbitMQ de notificação inválida. MessageId={MessageId}, CorrelationId={CorrelationId}.",
+                "Mensagem RabbitMQ de notificação inválida. MessageId={MessageId}, CorrelationId={CorrelationId}, ExceptionType={ExceptionType}, ErrorMessage={ErrorMessage}, ExceptionDetails={ExceptionDetails}.",
                 message.MessageId,
-                message.CorrelationId);
+                message.CorrelationId,
+                exception.GetType().Name,
+                SensitivePayloadSanitizer.SanitizeText(exception.Message),
+                SensitivePayloadSanitizer.SanitizeText(exception.ToString()));
 
             return RabbitMqNotificationDisposition.DeadLetter;
         }
@@ -108,15 +111,29 @@ public sealed class RabbitMqNotificationConsumerHostedService : BackgroundServic
             return RabbitMqNotificationDisposition.DeadLetter;
         }
 
+        using var loggingScope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["correlationId"] = request.CorrelationId,
+            ["messageId"] = request.MessageId,
+            ["source"] = request.Source,
+            ["templateKey"] = request.TemplateKey,
+            ["channel"] = request.Channel
+        });
+
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            await using var scope = _serviceScopeFactory.CreateAsyncScope();
-            var useCase = scope.ServiceProvider.GetRequiredService<IRegisterNotificationRequestUseCase>();
+            await using var serviceScope = _serviceScopeFactory.CreateAsyncScope();
+            var useCase = serviceScope.ServiceProvider.GetRequiredService<IRegisterNotificationRequestUseCase>();
             var result = await useCase.Execute(new RegisterNotificationRequestCommand
             {
                 Request = request
+            });
+
+            using var notificationScope = _logger.BeginScope(new Dictionary<string, object?>
+            {
+                ["notificationId"] = result.NotificationId
             });
 
             _logger.LogInformation(
@@ -137,24 +154,28 @@ public sealed class RabbitMqNotificationConsumerHostedService : BackgroundServic
         catch (DomainException exception)
         {
             _logger.LogWarning(
-                exception,
-                "Mensagem RabbitMQ de notificação rejeitada por regra de domínio. MessageId={MessageId}, CorrelationId={CorrelationId}, Source={Source}, TemplateKey={TemplateKey}.",
+                "Mensagem RabbitMQ de notificação rejeitada por regra de domínio. MessageId={MessageId}, CorrelationId={CorrelationId}, Source={Source}, TemplateKey={TemplateKey}, ExceptionType={ExceptionType}, ErrorMessage={ErrorMessage}, ExceptionDetails={ExceptionDetails}.",
                 request.MessageId,
                 request.CorrelationId,
                 request.Source,
-                request.TemplateKey);
+                request.TemplateKey,
+                exception.GetType().Name,
+                SensitivePayloadSanitizer.SanitizeText(exception.Message),
+                SensitivePayloadSanitizer.SanitizeText(exception.ToString()));
 
             return RabbitMqNotificationDisposition.DeadLetter;
         }
         catch (Exception exception)
         {
             _logger.LogError(
-                exception,
-                "Falha técnica ao persistir mensagem RabbitMQ de notificação. MessageId={MessageId}, CorrelationId={CorrelationId}, Source={Source}, TemplateKey={TemplateKey}.",
+                "Falha técnica ao persistir mensagem RabbitMQ de notificação. MessageId={MessageId}, CorrelationId={CorrelationId}, Source={Source}, TemplateKey={TemplateKey}, ExceptionType={ExceptionType}, ErrorMessage={ErrorMessage}, ExceptionDetails={ExceptionDetails}.",
                 request.MessageId,
                 request.CorrelationId,
                 request.Source,
-                request.TemplateKey);
+                request.TemplateKey,
+                exception.GetType().Name,
+                SensitivePayloadSanitizer.SanitizeText(exception.Message),
+                SensitivePayloadSanitizer.SanitizeText(exception.ToString()));
 
             return RabbitMqNotificationDisposition.Requeue;
         }

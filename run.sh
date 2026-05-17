@@ -6,7 +6,7 @@ SOLUTION_FILE="$ROOT_DIR/AuthCore.sln"
 BACKEND_DIR="$ROOT_DIR/src/Backend"
 COMPOSE_FILE="$BACKEND_DIR/docker-compose.yml"
 ENV_FILE="$BACKEND_DIR/.env.development"
-API_PROJECT="$BACKEND_DIR/AuthCore/AuthCore.Api/AuthCore.Api.csproj"
+AUTHCORE_API_PROJECT="$BACKEND_DIR/AuthCore/AuthCore.Api/AuthCore.Api.csproj"
 DEFAULT_COMMAND="${1:-dev}"
 
 GREEN='\033[1;32m'
@@ -76,7 +76,7 @@ load_environment() {
 
 is_development_environment_variable() {
     case "$1" in
-        API_PORT|ASPNETCORE_ENVIRONMENT|POSTGRES_PORT|POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|REDIS_PORT|REDIS_PASSWORD|REDIS__KEYPREFIX|RABBITMQ_PORT|RABBITMQ_MANAGEMENT_PORT|RABBITMQ__USERNAME|RABBITMQ__PASSWORD|RABBITMQ__EMAILVERIFICATIONQUEUE|AUTHENTICATION__JWT__ISSUER|AUTHENTICATION__JWT__AUDIENCE|AUTHENTICATION__JWT__SIGNINGKEY|AUTHENTICATION__JWT__ACCESSTOKENLIFETIMEMINUTES)
+        AUTHCORE_API_PORT|NOTIFICATIONCORE_API_PORT|GATEWAY_API_PORT|ASPNETCORE_ENVIRONMENT|AUTHCORE_POSTGRES_PORT|AUTHCORE_POSTGRES_DB|AUTHCORE_POSTGRES_USER|AUTHCORE_POSTGRES_PASSWORD|AUTHCORE_DATABASE_MIGRATIONS_AUTOMIGRATEONSTARTUP|AUTHCORE_DATABASE_MIGRATIONS_ENSUREDATABASECREATED|NOTIFICATIONCORE_POSTGRES_PORT|NOTIFICATIONCORE_POSTGRES_DB|NOTIFICATIONCORE_POSTGRES_USER|NOTIFICATIONCORE_POSTGRES_PASSWORD|NOTIFICATIONCORE_DATABASE_MIGRATIONS_AUTOMIGRATEONSTARTUP|NOTIFICATIONCORE_DATABASE_MIGRATIONS_ENSUREDATABASECREATED|REDIS_PORT|REDIS_PASSWORD|AUTHCORE_REDIS_KEYPREFIX|RABBITMQ_PORT|RABBITMQ_MANAGEMENT_PORT|RABBITMQ_USERNAME|RABBITMQ_PASSWORD|RABBITMQ_EXCHANGE|RABBITMQ_ROUTING_KEY|RABBITMQ_QUEUE|RABBITMQ_DEAD_LETTER_QUEUE|SMTP_PORT|SMTP_WEB_PORT|SMTP_SENDER_EMAIL|SMTP_SENDER_NAME|SMTP_TIMEOUT_SECONDS|AUTHENTICATION_JWT_ISSUER|AUTHENTICATION_JWT_AUDIENCE|AUTHENTICATION_JWT_SIGNINGKEY|AUTHENTICATION_JWT_ACCESSTOKENLIFETIMEMINUTES|AUTHENTICATION_JWT_REFRESHTOKENLIFETIMEDAYS|AUTHENTICATION_JWT_CLOCKSKEWSECONDS|AUTHCORE_OUTBOX_ENABLED|AUTHCORE_OUTBOX_BATCH_SIZE|AUTHCORE_OUTBOX_POLLING_INTERVAL_SECONDS|AUTHCORE_OUTBOX_MAX_ATTEMPTS|NOTIFICATIONCORE_RABBITMQ_CONSUMER_ENABLED|NOTIFICATIONCORE_DISPATCHER_ENABLED|NOTIFICATIONCORE_DISPATCHER_BATCH_SIZE|NOTIFICATIONCORE_DISPATCHER_POLLING_INTERVAL_SECONDS|NOTIFICATIONCORE_DISPATCHER_RETRY_DELAY_SECONDS|NOTIFICATIONCORE_DISPATCHER_PROCESSING_TIMEOUT_SECONDS)
             return 0
             ;;
         *)
@@ -95,28 +95,57 @@ require_environment_value() {
 }
 
 require_infrastructure_environment() {
-    require_environment_value "POSTGRES_PORT"
-    require_environment_value "POSTGRES_DB"
-    require_environment_value "POSTGRES_USER"
-    require_environment_value "POSTGRES_PASSWORD"
+    require_environment_value "AUTHCORE_POSTGRES_PORT"
+    require_environment_value "AUTHCORE_POSTGRES_DB"
+    require_environment_value "AUTHCORE_POSTGRES_USER"
+    require_environment_value "AUTHCORE_POSTGRES_PASSWORD"
+    require_environment_value "NOTIFICATIONCORE_POSTGRES_PORT"
+    require_environment_value "NOTIFICATIONCORE_POSTGRES_DB"
+    require_environment_value "NOTIFICATIONCORE_POSTGRES_USER"
+    require_environment_value "NOTIFICATIONCORE_POSTGRES_PASSWORD"
     require_environment_value "REDIS_PORT"
     require_environment_value "REDIS_PASSWORD"
-    require_environment_value "REDIS__KEYPREFIX"
+    require_environment_value "AUTHCORE_REDIS_KEYPREFIX"
     require_environment_value "RABBITMQ_PORT"
     require_environment_value "RABBITMQ_MANAGEMENT_PORT"
-    require_environment_value "RABBITMQ__USERNAME"
-    require_environment_value "RABBITMQ__PASSWORD"
-    require_environment_value "RABBITMQ__EMAILVERIFICATIONQUEUE"
+    require_environment_value "RABBITMQ_USERNAME"
+    require_environment_value "RABBITMQ_PASSWORD"
+    require_environment_value "RABBITMQ_EXCHANGE"
+    require_environment_value "RABBITMQ_ROUTING_KEY"
+    require_environment_value "RABBITMQ_QUEUE"
+    require_environment_value "RABBITMQ_DEAD_LETTER_QUEUE"
+    require_environment_value "SMTP_PORT"
+    require_environment_value "SMTP_CONTAINER_PORT"
+    require_environment_value "SMTP_WEB_PORT"
+    require_environment_value "SMTP_HOST"
+    require_environment_value "SMTP_USE_TLS"
 }
 
 require_api_environment() {
     require_infrastructure_environment
-    require_environment_value "API_PORT"
+    require_environment_value "AUTHCORE_API_PORT"
+    require_environment_value "NOTIFICATIONCORE_API_PORT"
+    require_environment_value "GATEWAY_API_PORT"
     require_environment_value "ASPNETCORE_ENVIRONMENT"
-    require_environment_value "AUTHENTICATION__JWT__ISSUER"
-    require_environment_value "AUTHENTICATION__JWT__AUDIENCE"
-    require_environment_value "AUTHENTICATION__JWT__SIGNINGKEY"
-    require_environment_value "AUTHENTICATION__JWT__ACCESSTOKENLIFETIMEMINUTES"
+    require_environment_value "AUTHENTICATION_JWT_ISSUER"
+    require_environment_value "AUTHENTICATION_JWT_AUDIENCE"
+    require_environment_value "AUTHENTICATION_JWT_SIGNINGKEY"
+    require_environment_value "AUTHENTICATION_JWT_ACCESSTOKENLIFETIMEMINUTES"
+    require_environment_value "AUTHENTICATION_JWT_REFRESHTOKENLIFETIMEDAYS"
+    require_environment_value "AUTHENTICATION_JWT_CLOCKSKEWSECONDS"
+    require_environment_value "AUTHCORE_OUTBOX_ENABLED"
+    require_environment_value "AUTHCORE_OUTBOX_BATCH_SIZE"
+    require_environment_value "AUTHCORE_OUTBOX_POLLING_INTERVAL_SECONDS"
+    require_environment_value "AUTHCORE_OUTBOX_MAX_ATTEMPTS"
+    require_environment_value "NOTIFICATIONCORE_RABBITMQ_CONSUMER_ENABLED"
+    require_environment_value "NOTIFICATIONCORE_DISPATCHER_ENABLED"
+    require_environment_value "NOTIFICATIONCORE_DISPATCHER_BATCH_SIZE"
+    require_environment_value "NOTIFICATIONCORE_DISPATCHER_POLLING_INTERVAL_SECONDS"
+    require_environment_value "NOTIFICATIONCORE_DISPATCHER_RETRY_DELAY_SECONDS"
+    require_environment_value "NOTIFICATIONCORE_DISPATCHER_PROCESSING_TIMEOUT_SECONDS"
+    require_environment_value "SMTP_SENDER_EMAIL"
+    require_environment_value "SMTP_SENDER_NAME"
+    require_environment_value "SMTP_TIMEOUT_SECONDS"
 }
 
 export_api_configuration() {
@@ -124,10 +153,28 @@ export_api_configuration() {
     require_api_environment
 
     export ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Development}"
-    export CONNECTIONSTRINGS__POSTGRESQL="Host=localhost;Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Pooling=true"
+    export CONNECTIONSTRINGS__POSTGRESQL="Host=localhost;Port=${AUTHCORE_POSTGRES_PORT};Database=${AUTHCORE_POSTGRES_DB};Username=${AUTHCORE_POSTGRES_USER};Password=${AUTHCORE_POSTGRES_PASSWORD};Pooling=true"
     export REDIS__CONNECTIONSTRING="localhost:${REDIS_PORT},password=${REDIS_PASSWORD},abortConnect=false"
+    export REDIS__KEYPREFIX="${AUTHCORE_REDIS_KEYPREFIX}"
+    export AUTHENTICATION__JWT__ISSUER="${AUTHENTICATION_JWT_ISSUER}"
+    export AUTHENTICATION__JWT__AUDIENCE="${AUTHENTICATION_JWT_AUDIENCE}"
+    export AUTHENTICATION__JWT__SIGNINGKEY="${AUTHENTICATION_JWT_SIGNINGKEY}"
+    export AUTHENTICATION__JWT__ACCESSTOKENLIFETIMEMINUTES="${AUTHENTICATION_JWT_ACCESSTOKENLIFETIMEMINUTES}"
+    export AUTHENTICATION__JWT__REFRESHTOKENLIFETIMEDAYS="${AUTHENTICATION_JWT_REFRESHTOKENLIFETIMEDAYS}"
+    export AUTHENTICATION__JWT__CLOCKSKEWSECONDS="${AUTHENTICATION_JWT_CLOCKSKEWSECONDS}"
     export RABBITMQ__HOST="localhost"
     export RABBITMQ__PORT="${RABBITMQ_PORT}"
+    export RABBITMQ__VIRTUALHOST="/"
+    export RABBITMQ__USERNAME="${RABBITMQ_USERNAME}"
+    export RABBITMQ__PASSWORD="${RABBITMQ_PASSWORD}"
+    export RABBITMQ__EXCHANGE="${RABBITMQ_EXCHANGE}"
+    export RABBITMQ__ROUTINGKEY="${RABBITMQ_ROUTING_KEY}"
+    export RABBITMQ__QUEUE="${RABBITMQ_QUEUE}"
+    export RABBITMQ__DEADLETTERQUEUE="${RABBITMQ_DEAD_LETTER_QUEUE}"
+    export OUTBOX__ENABLED="${AUTHCORE_OUTBOX_ENABLED}"
+    export OUTBOX__BATCHSIZE="${AUTHCORE_OUTBOX_BATCH_SIZE}"
+    export OUTBOX__POLLINGINTERVALSECONDS="${AUTHCORE_OUTBOX_POLLING_INTERVAL_SECONDS}"
+    export OUTBOX__MAXATTEMPTS="${AUTHCORE_OUTBOX_MAX_ATTEMPTS}"
 }
 
 print_usage() {
@@ -136,7 +183,7 @@ Uso:
   ./run.sh [comando]
 
 Comandos:
-  dev       Sobe postgres, redis e rabbitmq com Docker e executa a API localmente.
+  dev       Sobe infraestrutura com Docker e executa AuthCore.Api localmente.
   watch     Igual ao dev, mas usa dotnet watch.
   infra     Sobe apenas a infraestrutura em background.
   docker    Sobe toda a aplicacao com Docker Compose.
@@ -174,27 +221,27 @@ start_infra() {
     require_infrastructure_environment
 
     echo -e "${YELLOW}Subindo infraestrutura...${NC}"
-    compose up -d postgres redis rabbitmq
+    compose up -d authcore-postgres notificationcore-postgres redis rabbitmq smtp
     INFRA_STARTED=true
     echo -e "${GREEN}Infraestrutura pronta.${NC}"
 }
 
 run_api() {
     ensure_command dotnet
-    ensure_file "$API_PROJECT"
+    ensure_file "$AUTHCORE_API_PROJECT"
     export_api_configuration
 
     echo -e "${YELLOW}Executando AuthCore.Api localmente...${NC}"
-    dotnet run --project "$API_PROJECT" --launch-profile http
+    dotnet run --project "$AUTHCORE_API_PROJECT" --launch-profile http
 }
 
 watch_api() {
     ensure_command dotnet
-    ensure_file "$API_PROJECT"
+    ensure_file "$AUTHCORE_API_PROJECT"
     export_api_configuration
 
     echo -e "${YELLOW}Executando AuthCore.Api com hot reload...${NC}"
-    dotnet watch --project "$API_PROJECT" run --launch-profile http
+    dotnet watch --project "$AUTHCORE_API_PROJECT" run --launch-profile http
 }
 
 run_docker() {

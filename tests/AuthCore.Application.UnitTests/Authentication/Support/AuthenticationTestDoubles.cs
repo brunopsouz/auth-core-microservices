@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
@@ -11,6 +13,7 @@ using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Domain.Users.Aggregates;
 using AuthCore.Domain.Users.Enums;
 using AuthCore.Domain.Users.Repositories;
+using BuildingBlocks.Messaging.Contracts.Notifications;
 
 namespace AuthCore.Application.UnitTests.Authentication.Support;
 
@@ -199,6 +202,48 @@ internal sealed class FakeOutboxRepository : IOutboxRepository
     {
         UpdatedMessages.Add(message);
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeEmailVerificationNotificationOutboxFactory : IEmailVerificationNotificationOutboxFactory
+{
+    public OutboxMessage Create(
+        EmailVerification verification,
+        string confirmationCode,
+        DateTime requestedAtUtc)
+    {
+        var request = new SendTransactionalNotificationRequested
+        {
+            MessageId = Guid.NewGuid(),
+            CorrelationId = Guid.NewGuid().ToString("D"),
+            Source = "AuthCore",
+            Channel = "Email",
+            Recipient = verification.Email,
+            TemplateKey = "auth.email-confirmation",
+            Variables = new Dictionary<string, string>
+            {
+                ["confirmationCode"] = confirmationCode,
+                ["expiresInMinutes"] = CalculateExpiresInMinutes(verification, requestedAtUtc)
+                    .ToString(CultureInfo.InvariantCulture)
+            },
+            Priority = "High",
+            IdempotencyKey = $"auth-email-confirmation:{verification.Id:D}:{requestedAtUtc.Ticks}",
+            RequestedAtUtc = requestedAtUtc
+        };
+
+        return OutboxMessage.Create(
+            nameof(SendTransactionalNotificationRequested),
+            JsonSerializer.Serialize(request),
+            requestedAtUtc);
+    }
+
+    private static int CalculateExpiresInMinutes(
+        EmailVerification verification,
+        DateTime requestedAtUtc)
+    {
+        var totalMinutes = (verification.ExpiresAtUtc - requestedAtUtc).TotalMinutes;
+
+        return Math.Max(1, Convert.ToInt32(Math.Round(totalMinutes, MidpointRounding.AwayFromZero)));
     }
 }
 

@@ -105,6 +105,13 @@ public sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsumer
         BasicDeliverEventArgs eventArgs,
         CancellationToken cancellationToken)
     {
+        using var scope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["messageId"] = eventArgs.BasicProperties?.MessageId,
+            ["correlationId"] = eventArgs.BasicProperties?.CorrelationId,
+            ["deliveryTag"] = eventArgs.DeliveryTag
+        });
+
         try
         {
             var message = new RabbitMqNotificationMessage(

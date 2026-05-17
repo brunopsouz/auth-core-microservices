@@ -1,3 +1,4 @@
+using BuildingBlocks.Messaging.Contracts.Security;
 using NotificationCore.Domain.Notifications.Aggregates;
 using NotificationCore.Domain.Notifications.Entities;
 using NotificationCore.Domain.Notifications.Enums;
@@ -601,7 +602,7 @@ public sealed class NotificationRepository : INotificationRepository
         command.Parameters.AddWithValue("CreatedAtUtc", notification.CreatedAtUtc);
         command.Parameters.AddWithValue("SentAtUtc", notification.SentAtUtc ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("FailedAtUtc", notification.FailedAtUtc ?? (object)DBNull.Value);
-        command.Parameters.AddWithValue("LastError", string.IsNullOrWhiteSpace(notification.LastError) ? DBNull.Value : notification.LastError);
+        command.Parameters.AddWithValue("LastError", string.IsNullOrWhiteSpace(notification.LastError) ? DBNull.Value : SensitivePayloadSanitizer.SanitizeText(notification.LastError));
     }
 
     /// <summary>
@@ -619,7 +620,7 @@ public sealed class NotificationRepository : INotificationRepository
         command.Parameters.AddWithValue("StartedAtUtc", deliveryAttempt.StartedAtUtc);
         command.Parameters.AddWithValue("FinishedAtUtc", deliveryAttempt.FinishedAtUtc);
         command.Parameters.AddWithValue("ErrorCode", string.IsNullOrWhiteSpace(deliveryAttempt.ErrorCode) ? DBNull.Value : deliveryAttempt.ErrorCode);
-        command.Parameters.AddWithValue("ErrorMessage", string.IsNullOrWhiteSpace(deliveryAttempt.ErrorMessage) ? DBNull.Value : deliveryAttempt.ErrorMessage);
+        command.Parameters.AddWithValue("ErrorMessage", string.IsNullOrWhiteSpace(deliveryAttempt.ErrorMessage) ? DBNull.Value : SensitivePayloadSanitizer.SanitizeText(deliveryAttempt.ErrorMessage));
         command.Parameters.AddWithValue("ProviderMessageId", string.IsNullOrWhiteSpace(deliveryAttempt.ProviderMessageId) ? DBNull.Value : deliveryAttempt.ProviderMessageId);
     }
 

@@ -1,7 +1,7 @@
 using System.Text.Json;
+using BuildingBlocks.Messaging.Contracts.Notifications;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
-using AuthCore.Domain.Security.Emails;
 using AuthCore.Infrastructure.Configurations;
 using AuthCore.Infrastructure.Services.Messaging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,7 +12,35 @@ namespace AuthCore.IntegrationTests.Services.Messaging;
 public sealed class OutboxProcessorTests
 {
     [Fact]
-    public async Task ProcessPendingAsync_WhenEmailVerificationMessageIsPending_ShouldSendEmailAndMarkProcessed()
+    public async Task ProcessPendingAsync_WhenNotificationRequestIsPending_ShouldPublishAndMarkProcessed()
+    {
+        var notificationRequest = CreateNotificationRequest("user@example.com", "123456");
+        var payload = JsonSerializer.Serialize(notificationRequest);
+        var message = OutboxMessage.Create(
+            nameof(SendTransactionalNotificationRequested),
+            payload,
+            DateTime.UtcNow);
+        var outboxRepository = new FakeOutboxRepository(message);
+        var unitOfWork = new SpyUnitOfWork();
+        var publisher = new SpyNotificationRequestPublisher();
+        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
+
+        var result = await processor.ProcessPendingAsync();
+
+        Assert.Equal(1, result.ProcessedCount);
+        Assert.Equal(0, result.FailedCount);
+        Assert.Single(publisher.PublishedMessages);
+        Assert.Equal(notificationRequest.MessageId, publisher.PublishedMessages[0].Request.MessageId);
+        Assert.Equal(payload, publisher.PublishedMessages[0].Payload);
+        Assert.Single(outboxRepository.UpdatedMessages);
+        Assert.NotNull(outboxRepository.UpdatedMessages[0].ProcessedAtUtc);
+        Assert.Equal(1, unitOfWork.BeginCount);
+        Assert.Equal(1, unitOfWork.CommitCount);
+        Assert.Equal(0, unitOfWork.RollbackCount);
+    }
+
+    [Fact]
+    public async Task ProcessPendingAsync_WhenLegacyEmailVerificationMessageIsPending_ShouldPublishConvertedRequestAndMarkProcessed()
     {
         var outboxEvent = new EmailVerificationRequested
         {
@@ -27,15 +55,18 @@ public sealed class OutboxProcessorTests
             DateTime.UtcNow);
         var outboxRepository = new FakeOutboxRepository(message);
         var unitOfWork = new SpyUnitOfWork();
-        var emailSender = new SpyEmailSender();
-        var processor = CreateProcessor(outboxRepository, unitOfWork, emailSender);
+        var publisher = new SpyNotificationRequestPublisher();
+        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
 
         var result = await processor.ProcessPendingAsync();
 
         Assert.Equal(1, result.ProcessedCount);
         Assert.Equal(0, result.FailedCount);
-        Assert.Single(emailSender.SentVerifications);
-        Assert.Equal(("user@example.com", "123456"), emailSender.SentVerifications[0]);
+        Assert.Single(publisher.PublishedMessages);
+        Assert.Equal(message.Id, publisher.PublishedMessages[0].Request.MessageId);
+        Assert.Equal("user@example.com", publisher.PublishedMessages[0].Request.Recipient);
+        Assert.Equal("123456", publisher.PublishedMessages[0].Request.Variables["confirmationCode"]);
+        Assert.Contains("auth-email-confirmation-legacy", publisher.PublishedMessages[0].Request.IdempotencyKey);
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.NotNull(outboxRepository.UpdatedMessages[0].ProcessedAtUtc);
         Assert.Equal(1, unitOfWork.BeginCount);
@@ -52,14 +83,14 @@ public sealed class OutboxProcessorTests
             DateTime.UtcNow);
         var outboxRepository = new FakeOutboxRepository(message);
         var unitOfWork = new SpyUnitOfWork();
-        var emailSender = new SpyEmailSender();
-        var processor = CreateProcessor(outboxRepository, unitOfWork, emailSender);
+        var publisher = new SpyNotificationRequestPublisher();
+        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
 
         var result = await processor.ProcessPendingAsync();
 
         Assert.Equal(0, result.ProcessedCount);
         Assert.Equal(1, result.FailedCount);
-        Assert.Empty(emailSender.SentVerifications);
+        Assert.Empty(publisher.PublishedMessages);
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.Equal(1, outboxRepository.UpdatedMessages[0].AttemptCount);
         Assert.Contains("não suportado", outboxRepository.UpdatedMessages[0].LastError);
@@ -68,26 +99,20 @@ public sealed class OutboxProcessorTests
     }
 
     [Fact]
-    public async Task ProcessPendingAsync_WhenEmailSenderFails_ShouldRegisterFailureAndCommit()
+    public async Task ProcessPendingAsync_WhenNotificationPublishFails_ShouldRegisterFailureAndCommit()
     {
-        var outboxEvent = new EmailVerificationRequested
-        {
-            UserId = Guid.NewGuid(),
-            Email = "user@example.com",
-            Code = "123456",
-            RequestedAtUtc = DateTime.UtcNow
-        };
+        var notificationRequest = CreateNotificationRequest("user@example.com", "123456");
         var message = OutboxMessage.Create(
-            nameof(EmailVerificationRequested),
-            JsonSerializer.Serialize(outboxEvent),
+            nameof(SendTransactionalNotificationRequested),
+            JsonSerializer.Serialize(notificationRequest),
             DateTime.UtcNow);
         var outboxRepository = new FakeOutboxRepository(message);
         var unitOfWork = new SpyUnitOfWork();
-        var emailSender = new SpyEmailSender
+        var publisher = new SpyNotificationRequestPublisher
         {
-            ExceptionToThrow = new InvalidOperationException("SMTP indisponível.")
+            ExceptionToThrow = new InvalidOperationException("RabbitMQ indisponível.")
         };
-        var processor = CreateProcessor(outboxRepository, unitOfWork, emailSender);
+        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
 
         var result = await processor.ProcessPendingAsync();
 
@@ -95,20 +120,67 @@ public sealed class OutboxProcessorTests
         Assert.Equal(1, result.FailedCount);
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.Equal(1, outboxRepository.UpdatedMessages[0].AttemptCount);
-        Assert.Equal("SMTP indisponível.", outboxRepository.UpdatedMessages[0].LastError);
+        Assert.Equal("RabbitMQ indisponível.", outboxRepository.UpdatedMessages[0].LastError);
         Assert.Equal(1, unitOfWork.CommitCount);
         Assert.Equal(0, unitOfWork.RollbackCount);
+    }
+
+    [Fact]
+    public async Task ProcessPendingAsync_WhenFailureHasSensitiveData_ShouldPersistSanitizedError()
+    {
+        var notificationRequest = CreateNotificationRequest("user@example.com", "123456");
+        var message = OutboxMessage.Create(
+            nameof(SendTransactionalNotificationRequested),
+            JsonSerializer.Serialize(notificationRequest),
+            DateTime.UtcNow);
+        var outboxRepository = new FakeOutboxRepository(message);
+        var unitOfWork = new SpyUnitOfWork();
+        var publisher = new SpyNotificationRequestPublisher
+        {
+            ExceptionToThrow = new InvalidOperationException("Falha com confirmationCode=123456.")
+        };
+        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
+
+        var result = await processor.ProcessPendingAsync();
+
+        var updatedMessage = Assert.Single(outboxRepository.UpdatedMessages);
+
+        Assert.Equal(0, result.ProcessedCount);
+        Assert.Equal(1, result.FailedCount);
+        Assert.DoesNotContain("123456", updatedMessage.LastError);
+        Assert.Contains("confirmationCode=[REDACTED]", updatedMessage.LastError);
+    }
+
+    private static SendTransactionalNotificationRequested CreateNotificationRequest(string recipient, string confirmationCode)
+    {
+        return new SendTransactionalNotificationRequested
+        {
+            MessageId = Guid.NewGuid(),
+            CorrelationId = Guid.NewGuid().ToString("D"),
+            Source = "AuthCore",
+            Channel = "Email",
+            Recipient = recipient,
+            TemplateKey = "auth.email-confirmation",
+            Variables = new Dictionary<string, string>
+            {
+                ["confirmationCode"] = confirmationCode,
+                ["expiresInMinutes"] = "15"
+            },
+            Priority = "High",
+            IdempotencyKey = $"auth-email-confirmation:{Guid.NewGuid():D}",
+            RequestedAtUtc = DateTime.UtcNow
+        };
     }
 
     private static OutboxProcessor CreateProcessor(
         IOutboxRepository outboxRepository,
         IUnitOfWork unitOfWork,
-        IEmailSender emailSender)
+        INotificationRequestPublisher publisher)
     {
         return new OutboxProcessor(
             outboxRepository,
             unitOfWork,
-            emailSender,
+            publisher,
             Options.Create(new OutboxOptions
             {
                 BatchSize = 20,
@@ -179,21 +251,21 @@ public sealed class OutboxProcessorTests
         }
     }
 
-    private sealed class SpyEmailSender : IEmailSender
+    private sealed class SpyNotificationRequestPublisher : INotificationRequestPublisher
     {
-        public List<(string Email, string Code)> SentVerifications { get; } = [];
+        public List<(SendTransactionalNotificationRequested Request, string Payload)> PublishedMessages { get; } = [];
 
         public Exception? ExceptionToThrow { get; init; }
 
-        public Task SendEmailVerificationAsync(
-            string email,
-            string code,
+        public Task PublishAsync(
+            SendTransactionalNotificationRequested request,
+            string payload,
             CancellationToken cancellationToken = default)
         {
             if (ExceptionToThrow is not null)
                 throw ExceptionToThrow;
 
-            SentVerifications.Add((email, code));
+            PublishedMessages.Add((request, payload));
             return Task.CompletedTask;
         }
     }

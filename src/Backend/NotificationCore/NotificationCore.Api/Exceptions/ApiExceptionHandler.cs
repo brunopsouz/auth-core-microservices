@@ -1,3 +1,4 @@
+using BuildingBlocks.Messaging.Contracts.Security;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Diagnostics;
 using NotificationCore.Api.Contracts.Responses;
@@ -85,11 +86,20 @@ public sealed class ApiExceptionHandler : IExceptionHandler
     {
         if (statusCode >= StatusCodes.Status500InternalServerError)
         {
-            _logger.LogError(exception, "Erro interno não tratado durante o processamento da requisição.");
+            _logger.LogError(
+                "Erro interno não tratado durante o processamento da requisição. ExceptionType={ExceptionType}, ErrorMessage={ErrorMessage}, ExceptionDetails={ExceptionDetails}.",
+                exception.GetType().Name,
+                SensitivePayloadSanitizer.SanitizeText(exception.Message),
+                SensitivePayloadSanitizer.SanitizeText(exception.ToString()));
             return;
         }
 
-        _logger.LogWarning(exception, "Exceção tratada pela API com status code {StatusCode}.", statusCode);
+        _logger.LogWarning(
+            "Exceção tratada pela API com status code {StatusCode}. ExceptionType={ExceptionType}, ErrorMessage={ErrorMessage}, ExceptionDetails={ExceptionDetails}.",
+            statusCode,
+            exception.GetType().Name,
+            SensitivePayloadSanitizer.SanitizeText(exception.Message),
+            SensitivePayloadSanitizer.SanitizeText(exception.ToString()));
     }
 
     /// <summary>
@@ -99,7 +109,7 @@ public sealed class ApiExceptionHandler : IExceptionHandler
     /// <returns>Lista com as mensagens de erro da exceção.</returns>
     private static IList<string> GetErrors(Exception exception)
     {
-        return [exception.Message];
+        return [SensitivePayloadSanitizer.SanitizeText(exception.Message)];
     }
 
     #endregion

@@ -1,89 +1,182 @@
 services:
-  # AuthCore API
-  api:
+  authcore-api:
     build:
-      context: ./AuthCore
-      dockerfile: AuthCore.Api/Dockerfile
+      context: ..
+      dockerfile: Backend/AuthCore/AuthCore.Api/Dockerfile
     ports:
-      - "${API_PORT}:8080"
+      - "${AUTHCORE_API_PORT}:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
-      - ASPNETCORE_HTTP_PORTS=8080
-      # Connection strings
-      - CONNECTIONSTRINGS__POSTGRESQL=Host=postgres;Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Pooling=true
-      - REDIS__CONNECTIONSTRING=redis:${REDIS_PORT},password=${REDIS_PASSWORD},abortConnect=false
-      - REDIS__KEYPREFIX=${REDIS__KEYPREFIX}
-      # JWT
-      - AUTHENTICATION__JWT__ISSUER=${AUTHENTICATION__JWT__ISSUER}
-      - AUTHENTICATION__JWT__AUDIENCE=${AUTHENTICATION__JWT__AUDIENCE}
-      - AUTHENTICATION__JWT__SIGNINGKEY=${AUTHENTICATION__JWT__SIGNINGKEY}
-      - AUTHENTICATION__JWT__ACCESSTOKENLIFETIMEMINUTES=${AUTHENTICATION__JWT__ACCESSTOKENLIFETIMEMINUTES}
-      # RabbitMQ
-      - RABBITMQ__HOST=rabbitmq
-      - RABBITMQ__PORT=5672
-      - RABBITMQ__USERNAME=${RABBITMQ__USERNAME}
-      - RABBITMQ__PASSWORD=${RABBITMQ__PASSWORD}
-      - RABBITMQ__EMAILVERIFICATIONQUEUE=${RABBITMQ__EMAILVERIFICATIONQUEUE}
-    volumes:
-      # Chaves locais do desenvolvedor fora do repositório
-      - ${HOME}/.authcore/key:/app/key:ro
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ASPNETCORE_HTTP_PORTS: 8080
+      CONNECTIONSTRINGS__POSTGRESQL: Host=authcore-postgres;Port=5432;Database=${AUTHCORE_POSTGRES_DB};Username=${AUTHCORE_POSTGRES_USER};Password=${AUTHCORE_POSTGRES_PASSWORD};Pooling=true
+      DATABASE__MIGRATIONS__AUTOMIGRATEONSTARTUP: ${AUTHCORE_DATABASE_MIGRATIONS_AUTOMIGRATEONSTARTUP}
+      DATABASE__MIGRATIONS__ENSUREDATABASECREATED: ${AUTHCORE_DATABASE_MIGRATIONS_ENSUREDATABASECREATED}
+      DATABASE__MIGRATIONS__ADMINDATABASE: postgres
+      REDIS__CONNECTIONSTRING: redis:6379,password=${REDIS_PASSWORD},abortConnect=false
+      REDIS__KEYPREFIX: ${AUTHCORE_REDIS_KEYPREFIX}
+      AUTHENTICATION__JWT__ISSUER: ${AUTHENTICATION_JWT_ISSUER}
+      AUTHENTICATION__JWT__AUDIENCE: ${AUTHENTICATION_JWT_AUDIENCE}
+      AUTHENTICATION__JWT__SIGNINGKEY: ${AUTHENTICATION_JWT_SIGNINGKEY}
+      AUTHENTICATION__JWT__ACCESSTOKENLIFETIMEMINUTES: ${AUTHENTICATION_JWT_ACCESSTOKENLIFETIMEMINUTES}
+      AUTHENTICATION__JWT__REFRESHTOKENLIFETIMEDAYS: ${AUTHENTICATION_JWT_REFRESHTOKENLIFETIMEDAYS}
+      AUTHENTICATION__JWT__CLOCKSKEWSECONDS: ${AUTHENTICATION_JWT_CLOCKSKEWSECONDS}
+      RABBITMQ__HOST: rabbitmq
+      RABBITMQ__PORT: 5672
+      RABBITMQ__VIRTUALHOST: /
+      RABBITMQ__USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ__PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ__EXCHANGE: ${RABBITMQ_EXCHANGE}
+      RABBITMQ__ROUTINGKEY: ${RABBITMQ_ROUTING_KEY}
+      RABBITMQ__QUEUE: ${RABBITMQ_QUEUE}
+      RABBITMQ__DEADLETTERQUEUE: ${RABBITMQ_DEAD_LETTER_QUEUE}
+      OUTBOX__ENABLED: ${AUTHCORE_OUTBOX_ENABLED}
+      OUTBOX__BATCHSIZE: ${AUTHCORE_OUTBOX_BATCH_SIZE}
+      OUTBOX__POLLINGINTERVALSECONDS: ${AUTHCORE_OUTBOX_POLLING_INTERVAL_SECONDS}
+      OUTBOX__MAXATTEMPTS: ${AUTHCORE_OUTBOX_MAX_ATTEMPTS}
+      AUTH__COOKIE__SECURE: false
     depends_on:
-      postgres:
+      authcore-postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
     networks:
-      - authcore-net
+      - notificationcore-local
     restart: unless-stopped
 
-  # PostgreSQL
-  postgres:
-    image: postgres:17-alpine
-    command: postgres -p ${POSTGRES_PORT}
-    ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+  notificationcore-api:
+    build:
+      context: ..
+      dockerfile: Backend/NotificationCore/NotificationCore.Api/Dockerfile
+    expose:
+      - "8080"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ASPNETCORE_HTTP_PORTS: 8080
+      CONNECTIONSTRINGS__POSTGRESQL: Host=notificationcore-postgres;Port=5432;Database=${NOTIFICATIONCORE_POSTGRES_DB};Username=${NOTIFICATIONCORE_POSTGRES_USER};Password=${NOTIFICATIONCORE_POSTGRES_PASSWORD};Pooling=true
+      DATABASE__MIGRATIONS__AUTOMIGRATEONSTARTUP: ${NOTIFICATIONCORE_DATABASE_MIGRATIONS_AUTOMIGRATEONSTARTUP}
+      DATABASE__MIGRATIONS__ENSUREDATABASECREATED: ${NOTIFICATIONCORE_DATABASE_MIGRATIONS_ENSUREDATABASECREATED}
+      DATABASE__MIGRATIONS__ADMINDATABASE: postgres
+      RABBITMQ__ENABLED: ${NOTIFICATIONCORE_RABBITMQ_CONSUMER_ENABLED}
+      RABBITMQ__HOST: rabbitmq
+      RABBITMQ__PORT: 5672
+      RABBITMQ__VIRTUALHOST: /
+      RABBITMQ__USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ__PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ__EXCHANGE: ${RABBITMQ_EXCHANGE}
+      RABBITMQ__ROUTINGKEY: ${RABBITMQ_ROUTING_KEY}
+      RABBITMQ__QUEUE: ${RABBITMQ_QUEUE}
+      RABBITMQ__DEADLETTERQUEUE: ${RABBITMQ_DEAD_LETTER_QUEUE}
+      SMTP__HOST: ${SMTP_HOST}
+      SMTP__PORT: ${SMTP_CONTAINER_PORT}
+      SMTP__USERNAME: ${SMTP_USERNAME}
+      SMTP__PASSWORD: ${SMTP_PASSWORD}
+      SMTP__USETLS: ${SMTP_USE_TLS}
+      SMTP__SENDEREMAIL: ${SMTP_SENDER_EMAIL}
+      SMTP__SENDERNAME: ${SMTP_SENDER_NAME}
+      SMTP__TIMEOUTSECONDS: ${SMTP_TIMEOUT_SECONDS}
+      NOTIFICATIONDISPATCHER__ENABLED: ${NOTIFICATIONCORE_DISPATCHER_ENABLED}
+      NOTIFICATIONDISPATCHER__BATCHSIZE: ${NOTIFICATIONCORE_DISPATCHER_BATCH_SIZE}
+      NOTIFICATIONDISPATCHER__POLLINGINTERVALSECONDS: ${NOTIFICATIONCORE_DISPATCHER_POLLING_INTERVAL_SECONDS}
+      NOTIFICATIONDISPATCHER__RETRYDELAYSECONDS: ${NOTIFICATIONCORE_DISPATCHER_RETRY_DELAY_SECONDS}
+      NOTIFICATIONDISPATCHER__PROCESSINGTIMEOUTSECONDS: ${NOTIFICATIONCORE_DISPATCHER_PROCESSING_TIMEOUT_SECONDS}
+    depends_on:
+      notificationcore-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      smtp:
+        condition: service_started
+    networks:
+      - notificationcore-local
+    restart: unless-stopped
+
+  gateway-api:
+    build:
+      context: ..
+      dockerfile: Backend/Gateway/Gateway.Api/Dockerfile
+    ports:
+      - "${GATEWAY_API_PORT}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ASPNETCORE_HTTP_PORTS: 8080
+      AUTHENTICATION__JWT__ISSUER: ${AUTHENTICATION_JWT_ISSUER}
+      AUTHENTICATION__JWT__AUDIENCE: ${AUTHENTICATION_JWT_AUDIENCE}
+      AUTHENTICATION__JWT__SIGNINGKEY: ${AUTHENTICATION_JWT_SIGNINGKEY}
+      AUTHENTICATION__JWT__CLOCKSKEWSECONDS: ${AUTHENTICATION_JWT_CLOCKSKEWSECONDS}
+      AUTHENTICATION__JWT__REQUIREHTTPSMETADATA: false
+    depends_on:
+      authcore-api:
+        condition: service_started
+      notificationcore-api:
+        condition: service_started
+    networks:
+      - notificationcore-local
+    restart: unless-stopped
+
+  authcore-postgres:
+    image: postgres:17-alpine
+    ports:
+      - "${AUTHCORE_POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${AUTHCORE_POSTGRES_DB}
+      POSTGRES_USER: ${AUTHCORE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTHCORE_POSTGRES_PASSWORD}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - authcore-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -p ${POSTGRES_PORT} -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U ${AUTHCORE_POSTGRES_USER} -d ${AUTHCORE_POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     networks:
-      - authcore-net
+      - notificationcore-local
     restart: unless-stopped
 
-  # Redis
+  notificationcore-postgres:
+    image: postgres:17-alpine
+    ports:
+      - "${NOTIFICATIONCORE_POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${NOTIFICATIONCORE_POSTGRES_DB}
+      POSTGRES_USER: ${NOTIFICATIONCORE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATIONCORE_POSTGRES_PASSWORD}
+    volumes:
+      - notificationcore-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U ${NOTIFICATIONCORE_POSTGRES_USER} -d ${NOTIFICATIONCORE_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - notificationcore-local
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT}:${REDIS_PORT}"
-    command: redis-server --port ${REDIS_PORT} --requirepass ${REDIS_PASSWORD} --appendonly yes
+      - "${REDIS_PORT}:6379"
+    command: redis-server --port 6379 --requirepass ${REDIS_PASSWORD} --appendonly yes
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-p", "${REDIS_PORT}", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-p", "6379", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s
     networks:
-      - authcore-net
+      - notificationcore-local
     restart: unless-stopped
 
-  # RabbitMQ
   rabbitmq:
     image: rabbitmq:3-management-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ__USERNAME}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ__PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
       - "${RABBITMQ_PORT}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT}:15672"
@@ -96,14 +189,24 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - authcore-net
+      - notificationcore-local
+    restart: unless-stopped
+
+  smtp:
+    image: rnwood/smtp4dev:3
+    ports:
+      - "${SMTP_PORT}:${SMTP_CONTAINER_PORT}"
+      - "${SMTP_WEB_PORT}:80"
+    networks:
+      - notificationcore-local
     restart: unless-stopped
 
 volumes:
-  postgres-data:
+  authcore-postgres-data:
+  notificationcore-postgres-data:
   redis-data:
   rabbitmq-data:
 
 networks:
-  authcore-net:
+  notificationcore-local:
     driver: bridge

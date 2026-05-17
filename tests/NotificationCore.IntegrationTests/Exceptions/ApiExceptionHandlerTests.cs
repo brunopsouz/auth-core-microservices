@@ -45,6 +45,25 @@ public sealed class ApiExceptionHandlerTests
         Assert.Equal(["Ocorreu um erro interno inesperado."], response.Errors);
     }
 
+    [Fact]
+    public async Task TryHandleAsync_WhenDomainExceptionHasSensitiveData_ShouldReturnSanitizedError()
+    {
+        var httpContext = CreateHttpContext();
+
+        var wasHandled = await _exceptionHandler.TryHandleAsync(
+            httpContext,
+            new DomainException("Falha no confirmationCode=123456."),
+            CancellationToken.None);
+
+        var response = await ReadResponseAsync(httpContext);
+        var error = Assert.Single(response.Errors);
+
+        Assert.True(wasHandled);
+        Assert.Equal(StatusCodes.Status400BadRequest, httpContext.Response.StatusCode);
+        Assert.DoesNotContain("123456", error);
+        Assert.Contains("confirmationCode=[REDACTED]", error);
+    }
+
     #region Helpers
 
     private static DefaultHttpContext CreateHttpContext()

@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\NotificationCore.Domain\NotificationCore.Domain.csproj" />
+    <ProjectReference Include="../../../BuildingBlocks/BuildingBlocks.Messaging.Contracts/BuildingBlocks.Messaging.Contracts.csproj" />
+    <ProjectReference Include="../NotificationCore.Domain/NotificationCore.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

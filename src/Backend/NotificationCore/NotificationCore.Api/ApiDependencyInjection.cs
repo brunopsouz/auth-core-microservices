@@ -27,7 +27,9 @@ public static class ApiDependencyInjection
         services.AddEndpointsApiExplorer();
         services.AddRouting(options => options.LowercaseUrls = true);
         services.AddHealthChecks()
-            .AddCheck<DatabaseHealthCheck>("postgresql");
+            .AddCheck<DatabaseHealthCheck>("postgresql")
+            .AddCheck<RabbitMqHealthCheck>("rabbitmq")
+            .AddCheck<NotificationDispatcherHealthCheck>("dispatcher");
         services.AddHostedService<RabbitMqNotificationConsumerHostedService>();
         services.AddHostedService<NotificationDispatcherHostedService>();
         AddSwagger(services);

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using NotificationCore.Api.Workers;
 using NotificationCore.Application.Notifications.UseCases.DispatchPendingNotification;
 using NotificationCore.Infrastructure.Configurations;
+using NotificationCore.Infrastructure.Observability;
 
 namespace NotificationCore.IntegrationTests.Api;
 
@@ -76,6 +77,7 @@ public sealed class NotificationDispatcherHostedServiceTests
         return new NotificationDispatcherHostedService(
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(options),
+            new NotificationMetrics(),
             NullLogger<NotificationDispatcherHostedService>.Instance);
     }
 

@@ -1,8 +1,8 @@
+using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Passports.Services;
 using AuthCore.Domain.Security.Cryptography;
-using AuthCore.Domain.Security.Emails;
 using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Domain.Users.Repositories;
 using AuthCore.Infrastructure.Abstractions.Data;
@@ -101,7 +101,8 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<IEmailVerificationService, Sha256EmailVerificationService>();
-        services.AddScoped<IEmailSender, LoggingEmailSender>();
+        services.AddScoped<IEmailVerificationNotificationOutboxFactory, EmailVerificationNotificationOutboxFactory>();
+        services.AddScoped<INotificationRequestPublisher, RabbitMqNotificationRequestPublisher>();
         services.AddSingleton<OutboxMetrics>();
         services.AddScoped<IOutboxProcessor, OutboxProcessor>();
     }

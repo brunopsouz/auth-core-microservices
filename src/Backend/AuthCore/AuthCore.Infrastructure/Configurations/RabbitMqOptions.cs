@@ -21,7 +21,14 @@ public sealed class RabbitMqOptions
     /// <summary>
     /// Porta de conexão do RabbitMQ.
     /// </summary>
+    [Range(1, 65535)]
     public int Port { get; init; } = 5672;
+
+    /// <summary>
+    /// Host virtual usado na conexão.
+    /// </summary>
+    [Required]
+    public string VirtualHost { get; init; } = "/";
 
     /// <summary>
     /// Nome do usuário de acesso.
@@ -36,8 +43,26 @@ public sealed class RabbitMqOptions
     public string Password { get; init; } = string.Empty;
 
     /// <summary>
-    /// Nome da fila de verificação de e-mail.
+    /// Exchange que recebe solicitações de notificação.
     /// </summary>
     [Required]
-    public string EmailVerificationQueue { get; init; } = "auth.email-verification";
+    public string Exchange { get; init; } = "notification.requests";
+
+    /// <summary>
+    /// Chave de roteamento para solicitações de e-mail.
+    /// </summary>
+    [Required]
+    public string RoutingKey { get; init; } = "notification.email.requested";
+
+    /// <summary>
+    /// Fila principal para solicitações de e-mail.
+    /// </summary>
+    [Required]
+    public string Queue { get; init; } = "notification.email.requests";
+
+    /// <summary>
+    /// Fila de mensagens rejeitadas.
+    /// </summary>
+    [Required]
+    public string DeadLetterQueue { get; init; } = "notification.email.requests.dlq";
 }

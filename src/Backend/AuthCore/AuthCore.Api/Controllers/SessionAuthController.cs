@@ -142,7 +142,8 @@ public sealed class SessionAuthController : AuthControllerBase
         {
             _csrfRequestValidator.Validate(Request);
             var sessionId = GetAuthenticatedSessionId();
-            var userIdentifier = GetAuthenticatedUserIdentifier();
+            var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
+            var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
 
             await useCase.Execute(new LogoutCurrentSessionCommand
             {
@@ -150,8 +151,9 @@ public sealed class SessionAuthController : AuthControllerBase
             });
             DeleteSessionCookie(authCookieOptions.Value);
             _logger.LogInformation(
-                "Sessão atual encerrada. UserIdentifier={UserIdentifier}",
-                userIdentifier);
+                "Sessão atual encerrada. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier}",
+                userIdentifierForLog,
+                hasUserIdentifier);
 
             return NoContent();
         }
@@ -215,7 +217,8 @@ public sealed class SessionAuthController : AuthControllerBase
             var normalizedSessionId = NormalizeSessionId(sid);
             var currentSessionId = GetAuthenticatedSessionId();
             var internalUserId = GetAuthenticatedInternalUserId();
-            var userIdentifier = GetAuthenticatedUserIdentifier();
+            var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
+            var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
 
             await useCase.Execute(new RevokeUserSessionCommand
             {
@@ -227,8 +230,9 @@ public sealed class SessionAuthController : AuthControllerBase
                 DeleteSessionCookie(authCookieOptions.Value);
 
             _logger.LogInformation(
-                "Sessão revogada pelo usuário autenticado. UserIdentifier={UserIdentifier} SessaoAtualRevogada={SessaoAtualRevogada}",
-                userIdentifier,
+                "Sessão revogada pelo usuário autenticado. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier} SessaoAtualRevogada={SessaoAtualRevogada}",
+                userIdentifierForLog,
+                hasUserIdentifier,
                 string.Equals(currentSessionId, normalizedSessionId, StringComparison.Ordinal));
 
             return NoContent();
@@ -259,7 +263,8 @@ public sealed class SessionAuthController : AuthControllerBase
         {
             _csrfRequestValidator.Validate(Request);
             var internalUserId = GetAuthenticatedInternalUserId();
-            var userIdentifier = GetAuthenticatedUserIdentifier();
+            var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
+            var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
 
             await useCase.Execute(new LogoutAllSessionsCommand
             {
@@ -267,8 +272,9 @@ public sealed class SessionAuthController : AuthControllerBase
             });
             DeleteSessionCookie(authCookieOptions.Value);
             _logger.LogInformation(
-                "Todas as sessões do usuário foram revogadas. UserIdentifier={UserIdentifier}",
-                userIdentifier);
+                "Todas as sessões do usuário foram revogadas. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier}",
+                userIdentifierForLog,
+                hasUserIdentifier);
 
             return NoContent();
         }

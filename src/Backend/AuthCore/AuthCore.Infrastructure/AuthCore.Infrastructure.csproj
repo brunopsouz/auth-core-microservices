@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\AuthCore.Domain\AuthCore.Domain.csproj" />
+    <ProjectReference Include="../../../BuildingBlocks/BuildingBlocks.Messaging.Contracts/BuildingBlocks.Messaging.Contracts.csproj" />
+    <ProjectReference Include="../AuthCore.Domain/AuthCore.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,6 +18,7 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="8.0.0" />
     <PackageReference Include="Npgsql" Version="10.0.2" />
+    <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
     <PackageReference Include="StackExchange.Redis" Version="2.8.31" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
   </ItemGroup>

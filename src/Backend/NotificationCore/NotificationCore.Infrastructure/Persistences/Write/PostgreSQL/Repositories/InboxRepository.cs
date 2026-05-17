@@ -1,3 +1,4 @@
+using BuildingBlocks.Messaging.Contracts.Security;
 using NotificationCore.Domain.Common.Messaging;
 using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Infrastructure.Abstractions.Data;
@@ -317,7 +318,7 @@ public sealed class InboxRepository : IInboxRepository
         command.Parameters.AddWithValue("ReceivedAtUtc", message.ReceivedAtUtc);
         command.Parameters.AddWithValue("ProcessedAtUtc", message.ProcessedAtUtc ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("Status", (int)message.Status);
-        command.Parameters.AddWithValue("Error", string.IsNullOrWhiteSpace(message.Error) ? DBNull.Value : message.Error);
+        command.Parameters.AddWithValue("Error", string.IsNullOrWhiteSpace(message.Error) ? DBNull.Value : SensitivePayloadSanitizer.SanitizeText(message.Error));
     }
 
     /// <summary>

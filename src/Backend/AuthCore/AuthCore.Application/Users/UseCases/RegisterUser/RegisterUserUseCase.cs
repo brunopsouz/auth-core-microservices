@@ -1,4 +1,3 @@
-using System.Text.Json;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
@@ -19,6 +18,7 @@ namespace AuthCore.Application.Users.UseCases.RegisterUser;
 public sealed class RegisterUserUseCase : IRegisterUserUseCase
 {
     private readonly IEmailVerificationRepository _emailVerificationRepository;
+    private readonly IEmailVerificationNotificationOutboxFactory _emailVerificationNotificationOutboxFactory;
     private readonly IEmailVerificationService _emailVerificationService;
     private readonly IOutboxRepository _outboxRepository;
     private readonly IPasswordEncripter _passwordEncripter;
@@ -35,6 +35,10 @@ public sealed class RegisterUserUseCase : IRegisterUserUseCase
     /// <param name="userRepository">Repositório de escrita de usuário.</param>
     /// <param name="userReadRepository">Repositório de leitura de usuário.</param>
     /// <param name="passwordRepository">Repositório de senha.</param>
+    /// <param name="emailVerificationRepository">Repositório de verificação de e-mail.</param>
+    /// <param name="emailVerificationService">Serviço de verificação de e-mail.</param>
+    /// <param name="emailVerificationNotificationOutboxFactory">Factory de mensagem de outbox.</param>
+    /// <param name="outboxRepository">Repositório de outbox.</param>
     /// <param name="passwordEncripter">Serviço de criptografia de senha.</param>
     /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
     public RegisterUserUseCase(
@@ -43,6 +47,7 @@ public sealed class RegisterUserUseCase : IRegisterUserUseCase
         IPasswordRepository passwordRepository,
         IEmailVerificationRepository emailVerificationRepository,
         IEmailVerificationService emailVerificationService,
+        IEmailVerificationNotificationOutboxFactory emailVerificationNotificationOutboxFactory,
         IOutboxRepository outboxRepository,
         IPasswordEncripter passwordEncripter,
         IUnitOfWork unitOfWork)
@@ -52,6 +57,7 @@ public sealed class RegisterUserUseCase : IRegisterUserUseCase
         _passwordRepository = passwordRepository;
         _emailVerificationRepository = emailVerificationRepository;
         _emailVerificationService = emailVerificationService;
+        _emailVerificationNotificationOutboxFactory = emailVerificationNotificationOutboxFactory;
         _outboxRepository = outboxRepository;
         _passwordEncripter = passwordEncripter;
         _unitOfWork = unitOfWork;
@@ -93,17 +99,9 @@ public sealed class RegisterUserUseCase : IRegisterUserUseCase
             _emailVerificationService.GetMaxAttempts(),
             _emailVerificationService.GetCooldownUntilUtc(),
             nowUtc);
-        var outboxEvent = new EmailVerificationRequested
-        {
-            UserId = user.Id,
-            Email = user.Email.Value,
-            Code = emailVerificationMaterial.Code,
-            RequestedAtUtc = nowUtc
-        };
-        outboxEvent.Validate();
-        var outboxMessage = OutboxMessage.Create(
-            nameof(EmailVerificationRequested),
-            JsonSerializer.Serialize(outboxEvent),
+        var outboxMessage = _emailVerificationNotificationOutboxFactory.Create(
+            emailVerification,
+            emailVerificationMaterial.Code,
             nowUtc);
 
         await _unitOfWork.BeginTransactionAsync();

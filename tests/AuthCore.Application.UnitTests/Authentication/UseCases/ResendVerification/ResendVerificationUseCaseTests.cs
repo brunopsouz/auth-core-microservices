@@ -1,7 +1,7 @@
 using System.Text.Json;
 using global::AuthCore.Application.UnitTests.Authentication.Support;
 using AuthCore.Application.Authentication.UseCases.ResendVerification;
-using AuthCore.Domain.Common.DomainEvents;
+using BuildingBlocks.Messaging.Contracts.Notifications;
 
 namespace AuthCore.Application.UnitTests.Authentication.UseCases.ResendVerification;
 
@@ -20,6 +20,7 @@ public sealed class ResendVerificationUseCaseTests
                 Hash = "777777-hash"
             }
         };
+        var outboxFactory = new FakeEmailVerificationNotificationOutboxFactory();
         var outboxRepository = new FakeOutboxRepository();
         var unitOfWork = new SpyUnitOfWork();
         var user = AuthenticationFixtures.CreateUnverifiedUser();
@@ -35,6 +36,7 @@ public sealed class ResendVerificationUseCaseTests
             userReadRepository,
             emailVerificationRepository,
             emailVerificationService,
+            outboxFactory,
             outboxRepository,
             unitOfWork);
 
@@ -48,13 +50,23 @@ public sealed class ResendVerificationUseCaseTests
 
         var updatedVerification = Assert.Single(emailVerificationRepository.UpdatedVerifications);
         var outboxMessage = Assert.Single(outboxRepository.AddedMessages);
-        var outboxEvent = JsonSerializer.Deserialize<EmailVerificationRequested>(outboxMessage.Content);
+        var notificationRequest = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(outboxMessage.Content);
 
         Assert.Equal(emailVerificationService.Material.Hash, updatedVerification.CodeHash);
         Assert.Equal(user.Id, updatedVerification.UserId);
-        Assert.NotNull(outboxEvent);
-        Assert.Equal(user.Id, outboxEvent!.UserId);
-        Assert.Equal(emailVerificationService.Material.Code, outboxEvent.Code);
+        Assert.Equal(nameof(SendTransactionalNotificationRequested), outboxMessage.Type);
+        Assert.NotNull(notificationRequest);
+        Assert.NotEqual(Guid.Empty, notificationRequest!.MessageId);
+        Assert.False(string.IsNullOrWhiteSpace(notificationRequest.CorrelationId));
+        Assert.Equal("AuthCore", notificationRequest.Source);
+        Assert.Equal("Email", notificationRequest.Channel);
+        Assert.Equal(user.Email.Value, notificationRequest.Recipient);
+        Assert.Equal("auth.email-confirmation", notificationRequest.TemplateKey);
+        Assert.Equal("High", notificationRequest.Priority);
+        Assert.StartsWith($"auth-email-confirmation:{updatedVerification.Id:D}:", notificationRequest.IdempotencyKey);
+        Assert.Equal(emailVerificationService.Material.Code, notificationRequest.Variables["confirmationCode"]);
+        Assert.Equal("15", notificationRequest.Variables["expiresInMinutes"]);
+        Assert.DoesNotContain("\"Code\"", outboxMessage.Content);
         Assert.Equal(1, unitOfWork.BegunTransactions);
         Assert.Equal(1, unitOfWork.CommittedTransactions);
         Assert.Equal(0, unitOfWork.RolledBackTransactions);
@@ -66,6 +78,7 @@ public sealed class ResendVerificationUseCaseTests
         var userReadRepository = new FakeUserReadRepository();
         var emailVerificationRepository = new FakeEmailVerificationRepository();
         var emailVerificationService = new FakeEmailVerificationService();
+        var outboxFactory = new FakeEmailVerificationNotificationOutboxFactory();
         var outboxRepository = new FakeOutboxRepository();
         var unitOfWork = new SpyUnitOfWork();
         var user = AuthenticationFixtures.CreateUnverifiedUser();
@@ -81,6 +94,7 @@ public sealed class ResendVerificationUseCaseTests
             userReadRepository,
             emailVerificationRepository,
             emailVerificationService,
+            outboxFactory,
             outboxRepository,
             unitOfWork);
 

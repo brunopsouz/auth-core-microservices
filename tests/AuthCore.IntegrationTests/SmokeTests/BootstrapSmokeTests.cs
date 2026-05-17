@@ -39,9 +39,13 @@ public sealed class BootstrapSmokeTests
             ["Redis:KeyPrefix"] = "authcore-tests",
             ["RabbitMq:Host"] = "localhost",
             ["RabbitMq:Port"] = "5672",
+            ["RabbitMq:VirtualHost"] = "/",
             ["RabbitMq:Username"] = "guest",
             ["RabbitMq:Password"] = "guest",
-            ["RabbitMq:EmailVerificationQueue"] = "auth.email-verification",
+            ["RabbitMq:Exchange"] = "notification.requests",
+            ["RabbitMq:RoutingKey"] = "notification.email.requested",
+            ["RabbitMq:Queue"] = "notification.email.requests",
+            ["RabbitMq:DeadLetterQueue"] = "notification.email.requests.dlq",
             ["Outbox:Enabled"] = "false",
             ["Outbox:BatchSize"] = "20",
             ["Outbox:PollingIntervalSeconds"] = "10",
@@ -65,6 +69,7 @@ public sealed class BootstrapSmokeTests
         var authenticationSchemeProvider = scope.ServiceProvider.GetService<IAuthenticationSchemeProvider>();
         var healthCheckService = scope.ServiceProvider.GetService<HealthCheckService>();
         var outboxProcessor = scope.ServiceProvider.GetService<IOutboxProcessor>();
+        var notificationRequestPublisher = scope.ServiceProvider.GetService<INotificationRequestPublisher>();
         var hostedServices = app.Services.GetServices<IHostedService>();
 
         Assert.Equal("authcore-tests", jwtOptions.Issuer);
@@ -76,6 +81,7 @@ public sealed class BootstrapSmokeTests
         Assert.NotNull(authenticationSchemeProvider);
         Assert.NotNull(healthCheckService);
         Assert.NotNull(outboxProcessor);
+        Assert.NotNull(notificationRequestPublisher);
         Assert.Contains(hostedServices, service => service.GetType().Name == "OutboxHostedService");
     }
 }

@@ -1,3 +1,4 @@
+using BuildingBlocks.Messaging.Contracts.Security;
 using Microsoft.AspNetCore.Mvc;
 using NotificationCore.Api.Contracts.Requests;
 using NotificationCore.Api.Contracts.Responses;
@@ -104,7 +105,7 @@ public sealed class NotificationsController : ControllerBase
             WasSent = result.WasSent,
             IsTemporaryFailure = result.IsTemporaryFailure,
             ErrorCode = result.ErrorCode,
-            ErrorMessage = result.ErrorMessage,
+            ErrorMessage = SensitivePayloadSanitizer.SanitizeText(result.ErrorMessage),
             ProviderMessageId = result.ProviderMessageId
         });
     }
@@ -134,7 +135,7 @@ public sealed class NotificationsController : ControllerBase
             CreatedAtUtc = notification.CreatedAtUtc,
             SentAtUtc = notification.SentAtUtc,
             FailedAtUtc = notification.FailedAtUtc,
-            LastError = notification.LastError,
+            LastError = SensitivePayloadSanitizer.SanitizeText(notification.LastError),
             DeliveryAttempts = notification.DeliveryAttempts
                 .Select(MapDeliveryAttempt)
                 .ToList()
@@ -158,7 +159,7 @@ public sealed class NotificationsController : ControllerBase
             StartedAtUtc = deliveryAttempt.StartedAtUtc,
             FinishedAtUtc = deliveryAttempt.FinishedAtUtc,
             ErrorCode = deliveryAttempt.ErrorCode,
-            ErrorMessage = deliveryAttempt.ErrorMessage,
+            ErrorMessage = SensitivePayloadSanitizer.SanitizeText(deliveryAttempt.ErrorMessage),
             ProviderMessageId = deliveryAttempt.ProviderMessageId
         };
     }

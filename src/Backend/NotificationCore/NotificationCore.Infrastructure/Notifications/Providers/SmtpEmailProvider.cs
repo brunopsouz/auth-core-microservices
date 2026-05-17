@@ -1,14 +1,18 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
 using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using MimeKit.Utils;
 using NotificationCore.Domain.Notifications.Providers;
 using NotificationCore.Infrastructure.Configurations;
+using NotificationCore.Infrastructure.Observability;
 
 namespace NotificationCore.Infrastructure.Notifications.Providers;
 
@@ -30,6 +34,8 @@ public sealed class SmtpEmailProvider : IEmailProvider
     private const int MAX_PROVIDER_MESSAGE_ID_LENGTH = 300;
 
     private readonly IOptions<SmtpOptions> _options;
+    private readonly ILogger<SmtpEmailProvider> _logger;
+    private readonly NotificationMetrics _notificationMetrics;
     private readonly ISmtpClientFactory _smtpClientFactory;
 
     #region Constructors
@@ -46,12 +52,29 @@ public sealed class SmtpEmailProvider : IEmailProvider
     internal SmtpEmailProvider(
         IOptions<SmtpOptions> options,
         ISmtpClientFactory smtpClientFactory)
+        : this(
+            options,
+            smtpClientFactory,
+            new NotificationMetrics(),
+            NullLogger<SmtpEmailProvider>.Instance)
+    {
+    }
+
+    internal SmtpEmailProvider(
+        IOptions<SmtpOptions> options,
+        ISmtpClientFactory smtpClientFactory,
+        NotificationMetrics notificationMetrics,
+        ILogger<SmtpEmailProvider> logger)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(smtpClientFactory);
+        ArgumentNullException.ThrowIfNull(notificationMetrics);
+        ArgumentNullException.ThrowIfNull(logger);
 
         _options = options;
         _smtpClientFactory = smtpClientFactory;
+        _notificationMetrics = notificationMetrics;
+        _logger = logger;
     }
 
     #endregion
@@ -67,6 +90,14 @@ public sealed class SmtpEmailProvider : IEmailProvider
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
+
+        var stopwatch = Stopwatch.StartNew();
+        using var scope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["correlationId"] = message.CorrelationId,
+            ["notificationId"] = message.NotificationId,
+            ["provider"] = PROVIDER
+        });
 
         try
         {
@@ -94,10 +125,23 @@ public sealed class SmtpEmailProvider : IEmailProvider
             _ = await client.SendAsync(mimeMessage, cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);
 
+            _logger.LogInformation(
+                "E-mail enviado via SMTP. NotificationId={NotificationId}, CorrelationId={CorrelationId}, Provider={Provider}.",
+                message.NotificationId,
+                message.CorrelationId,
+                PROVIDER);
+
             return EmailProviderResult.Success(PROVIDER, NormalizeProviderMessageId(mimeMessage.MessageId));
         }
         catch (Exception exception) when (IsPermanentFailure(exception))
         {
+            _logger.LogWarning(
+                "Falha permanente no envio SMTP. NotificationId={NotificationId}, CorrelationId={CorrelationId}, Provider={Provider}, ExceptionType={ExceptionType}.",
+                message.NotificationId,
+                message.CorrelationId,
+                PROVIDER,
+                exception.GetType().Name);
+
             return EmailProviderResult.PermanentFailure(
                 PROVIDER,
                 GetErrorCode(exception),
@@ -105,6 +149,13 @@ public sealed class SmtpEmailProvider : IEmailProvider
         }
         catch (Exception exception) when (IsTemporaryFailure(exception))
         {
+            _logger.LogWarning(
+                "Falha temporária no envio SMTP. NotificationId={NotificationId}, CorrelationId={CorrelationId}, Provider={Provider}, ExceptionType={ExceptionType}.",
+                message.NotificationId,
+                message.CorrelationId,
+                PROVIDER,
+                exception.GetType().Name);
+
             return EmailProviderResult.TemporaryFailure(
                 PROVIDER,
                 GetErrorCode(exception),
@@ -112,10 +163,21 @@ public sealed class SmtpEmailProvider : IEmailProvider
         }
         catch
         {
+            _logger.LogWarning(
+                "Falha permanente não classificada no envio SMTP. NotificationId={NotificationId}, CorrelationId={CorrelationId}, Provider={Provider}.",
+                message.NotificationId,
+                message.CorrelationId,
+                PROVIDER);
+
             return EmailProviderResult.PermanentFailure(
                 PROVIDER,
                 PERMANENT_FAILURE_CODE,
                 PERMANENT_FAILURE_MESSAGE);
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _notificationMetrics.RecordSendDuration(stopwatch.Elapsed, PROVIDER);
         }
     }
 

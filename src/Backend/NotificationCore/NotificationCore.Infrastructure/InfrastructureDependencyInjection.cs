@@ -12,6 +12,7 @@ using NotificationCore.Infrastructure.Messaging.RabbitMq;
 using NotificationCore.Infrastructure.Notifications.Providers;
 using NotificationCore.Infrastructure.Notifications.Rendering;
 using NotificationCore.Infrastructure.Notifications.Templates;
+using NotificationCore.Infrastructure.Observability;
 using NotificationCore.Infrastructure.Persistences.Migrations.Versions;
 using NotificationCore.Infrastructure.Persistences.Read.PostgreSQL.Repositories;
 using NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.Connections;
@@ -44,6 +45,7 @@ public static class InfrastructureDependencyInjection
         AddRendering(services);
         AddProviders(services);
         AddMessaging(services);
+        AddObservability(services);
         AddMigrations(services, configuration);
 
         return services;
@@ -106,7 +108,9 @@ public static class InfrastructureDependencyInjection
         services.AddSingleton<ISmtpClientFactory, MailKitSmtpClientFactory>();
         services.AddScoped<IEmailProvider>(serviceProvider => new SmtpEmailProvider(
             serviceProvider.GetRequiredService<IOptions<SmtpOptions>>(),
-            serviceProvider.GetRequiredService<ISmtpClientFactory>()));
+            serviceProvider.GetRequiredService<ISmtpClientFactory>(),
+            serviceProvider.GetRequiredService<NotificationMetrics>(),
+            serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<SmtpEmailProvider>>()));
     }
 
     /// <summary>
@@ -116,6 +120,15 @@ public static class InfrastructureDependencyInjection
     private static void AddMessaging(IServiceCollection services)
     {
         services.AddSingleton<IRabbitMqNotificationConsumer, RabbitMqNotificationConsumer>();
+    }
+
+    /// <summary>
+    /// Operação para adicionar serviços de observabilidade.
+    /// </summary>
+    /// <param name="services">Coleção de serviços da aplicação.</param>
+    private static void AddObservability(IServiceCollection services)
+    {
+        services.AddSingleton<NotificationMetrics>();
     }
 
     /// <summary>

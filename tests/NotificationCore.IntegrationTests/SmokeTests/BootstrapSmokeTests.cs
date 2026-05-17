@@ -26,6 +26,7 @@ using NotificationCore.Infrastructure.Messaging.RabbitMq;
 using NotificationCore.Infrastructure.Notifications.Providers;
 using NotificationCore.Infrastructure.Notifications.Rendering;
 using NotificationCore.Infrastructure.Notifications.Templates;
+using NotificationCore.Infrastructure.Observability;
 using NotificationCore.Infrastructure.Persistences.Read.PostgreSQL.Repositories;
 using NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 using NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.UnitOfWork;
@@ -61,6 +62,7 @@ public sealed class BootstrapSmokeTests
         Assert.IsType<MailKitSmtpClientFactory>(scope.ServiceProvider.GetRequiredService<ISmtpClientFactory>());
         Assert.IsType<SmtpEmailProvider>(scope.ServiceProvider.GetRequiredService<IEmailProvider>());
         Assert.IsType<RabbitMqNotificationConsumer>(scope.ServiceProvider.GetRequiredService<IRabbitMqNotificationConsumer>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<NotificationMetrics>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<IMigrationRunner>());
     }
 
@@ -107,6 +109,7 @@ public sealed class BootstrapSmokeTests
         var emailProvider = scope.ServiceProvider.GetRequiredService<IEmailProvider>();
         var rabbitMqConsumer = scope.ServiceProvider.GetRequiredService<IRabbitMqNotificationConsumer>();
         var hostedServices = scope.ServiceProvider.GetServices<IHostedService>();
+        var healthCheckOptions = scope.ServiceProvider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
 
         Assert.Contains("notification_core_tests", databaseOptions.PostgreSql);
         Assert.False(migrationOptions.AutoMigrateOnStartup);
@@ -133,6 +136,9 @@ public sealed class BootstrapSmokeTests
         Assert.IsType<RabbitMqNotificationConsumer>(rabbitMqConsumer);
         Assert.Contains(hostedServices, hostedService => hostedService is RabbitMqNotificationConsumerHostedService);
         Assert.Contains(hostedServices, hostedService => hostedService is NotificationDispatcherHostedService);
+        Assert.Contains(healthCheckOptions.Registrations, registration => registration.Name == "postgresql");
+        Assert.Contains(healthCheckOptions.Registrations, registration => registration.Name == "rabbitmq");
+        Assert.Contains(healthCheckOptions.Registrations, registration => registration.Name == "dispatcher");
     }
 
     [Fact]

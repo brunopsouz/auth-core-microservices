@@ -109,6 +109,11 @@ public sealed class SimpleTemplateRendererTests
     {
         private readonly List<NotificationTemplate> _templates = [];
 
+        public Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync()
+        {
+            return Task.FromResult<IReadOnlyCollection<NotificationTemplate>>(_templates);
+        }
+
         public Task<NotificationTemplate?> GetActiveAsync(string templateKey, NotificationChannel channel)
         {
             var template = _templates.FirstOrDefault(current =>

@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using NotificationCore.Application.Notifications.UseCases.DispatchPendingNotification;
 using NotificationCore.Infrastructure.Configurations;
+using NotificationCore.Infrastructure.Observability;
 
 namespace NotificationCore.Api.Workers;
 
@@ -10,6 +12,7 @@ namespace NotificationCore.Api.Workers;
 public sealed class NotificationDispatcherHostedService : BackgroundService
 {
     private readonly ILogger<NotificationDispatcherHostedService> _logger;
+    private readonly NotificationMetrics _notificationMetrics;
     private readonly NotificationDispatcherOptions _notificationDispatcherOptions;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
@@ -20,18 +23,22 @@ public sealed class NotificationDispatcherHostedService : BackgroundService
     /// </summary>
     /// <param name="serviceScopeFactory">Fábrica de escopos da aplicação.</param>
     /// <param name="notificationDispatcherOptions">Opções do despachante de notificações.</param>
+    /// <param name="notificationMetrics">Métricas de notificações.</param>
     /// <param name="logger">Serviço de logging.</param>
     public NotificationDispatcherHostedService(
         IServiceScopeFactory serviceScopeFactory,
         IOptions<NotificationDispatcherOptions> notificationDispatcherOptions,
+        NotificationMetrics notificationMetrics,
         ILogger<NotificationDispatcherHostedService> logger)
     {
         ArgumentNullException.ThrowIfNull(serviceScopeFactory);
         ArgumentNullException.ThrowIfNull(notificationDispatcherOptions);
+        ArgumentNullException.ThrowIfNull(notificationMetrics);
         ArgumentNullException.ThrowIfNull(logger);
 
         _serviceScopeFactory = serviceScopeFactory;
         _notificationDispatcherOptions = notificationDispatcherOptions.Value;
+        _notificationMetrics = notificationMetrics;
         _logger = logger;
     }
 
@@ -53,13 +60,20 @@ public sealed class NotificationDispatcherHostedService : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            Stopwatch? stopwatch = null;
+
             try
             {
                 stoppingToken.ThrowIfCancellationRequested();
+                stopwatch = Stopwatch.StartNew();
 
                 await using var scope = _serviceScopeFactory.CreateAsyncScope();
                 var useCase = scope.ServiceProvider.GetRequiredService<IDispatchPendingNotificationUseCase>();
                 var result = await useCase.Execute(CreateCommand());
+
+                _notificationMetrics.RecordPending(result.Found);
+                _notificationMetrics.RecordSent(result.Sent);
+                _notificationMetrics.RecordFailed(result.DeadLettered);
 
                 _logger.LogInformation(
                     "Ciclo de despacho de notificações concluído. Found={Found}, Sent={Sent}, RetryScheduled={RetryScheduled}, DeadLettered={DeadLettered}.",
@@ -75,6 +89,14 @@ public sealed class NotificationDispatcherHostedService : BackgroundService
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Falha no ciclo do worker de despacho de notificações.");
+            }
+            finally
+            {
+                if (stopwatch is not null)
+                {
+                    stopwatch.Stop();
+                    _notificationMetrics.RecordDispatchDuration(stopwatch.Elapsed);
+                }
             }
 
             await DelayUntilNextCycleAsync(stoppingToken);

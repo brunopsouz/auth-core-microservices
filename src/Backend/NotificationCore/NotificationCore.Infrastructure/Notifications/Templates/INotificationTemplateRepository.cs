@@ -8,6 +8,12 @@ namespace NotificationCore.Infrastructure.Notifications.Templates;
 public interface INotificationTemplateRepository
 {
     /// <summary>
+    /// Operação para listar templates ativos.
+    /// </summary>
+    /// <returns>Lista de templates ativos.</returns>
+    Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync();
+
+    /// <summary>
     /// Operação para obter o template ativo mais recente.
     /// </summary>
     /// <param name="templateKey">Chave do template.</param>

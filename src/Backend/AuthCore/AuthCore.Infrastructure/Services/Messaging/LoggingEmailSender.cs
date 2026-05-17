@@ -35,9 +35,8 @@ public sealed class LoggingEmailSender : IEmailSender
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Simulando envio de e-mail de verificação para {Email} com código {Code}.",
-            email,
-            code);
+            "Simulando envio de e-mail de verificação para {Email}.",
+            email);
 
         return Task.CompletedTask;
     }

@@ -101,21 +101,20 @@ public abstract class AuthControllerBase : ControllerBase
     /// <returns>Identificador público do usuário autenticado.</returns>
     protected Guid GetAuthenticatedUserIdentifier()
     {
-        var claimValues = new[]
-        {
-            User.FindFirstValue(ClaimTypes.NameIdentifier),
-            User.FindFirstValue("sub"),
-            User.FindFirstValue("user_identifier"),
-            User.FindFirstValue("userIdentifier")
-        };
-
-        foreach (var claimValue in claimValues)
-        {
-            if (Guid.TryParse(claimValue, out var userIdentifier))
-                return userIdentifier;
-        }
+        if (TryGetAuthenticatedUserIdentifier(out var userIdentifier))
+            return userIdentifier;
 
         throw new UnauthorizedAccessException("O identificador do usuário autenticado não foi encontrado.");
+    }
+
+    /// <summary>
+    /// Operação para tentar obter o identificador público do usuário autenticado.
+    /// </summary>
+    /// <param name="userIdentifier">Identificador público do usuário autenticado.</param>
+    /// <returns>Verdadeiro quando o identificador foi encontrado.</returns>
+    protected bool TryGetAuthenticatedUserIdentifier(out Guid userIdentifier)
+    {
+        return TryReadAuthenticatedUserIdentifier(User, out userIdentifier);
     }
 
     /// <summary>
@@ -350,6 +349,32 @@ public abstract class AuthControllerBase : ControllerBase
             return userIsActive;
 
         throw new UnauthorizedAccessException("O estado de atividade do usuário autenticado não foi encontrado.");
+    }
+
+    /// <summary>
+    /// Operação para tentar ler o identificador público do usuário autenticado.
+    /// </summary>
+    /// <param name="user">Principal autenticado.</param>
+    /// <param name="userIdentifier">Identificador público do usuário autenticado.</param>
+    /// <returns>Verdadeiro quando o identificador foi encontrado.</returns>
+    private static bool TryReadAuthenticatedUserIdentifier(ClaimsPrincipal user, out Guid userIdentifier)
+    {
+        var claimValues = new[]
+        {
+            user.FindFirstValue(ClaimTypes.NameIdentifier),
+            user.FindFirstValue("sub"),
+            user.FindFirstValue("user_identifier"),
+            user.FindFirstValue("userIdentifier")
+        };
+
+        foreach (var claimValue in claimValues)
+        {
+            if (Guid.TryParse(claimValue, out userIdentifier))
+                return true;
+        }
+
+        userIdentifier = Guid.Empty;
+        return false;
     }
 
     /// <summary>
