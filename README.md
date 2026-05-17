@@ -7,18 +7,20 @@
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3-FF6600?logo=rabbitmq&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-AuthCore é uma API de autenticação e gestão de usuários desenvolvida em .NET 8. O projeto implementa registro, login, sessões, renovação de tokens, verificação de e-mail, troca de senha e gerenciamento de perfil com uma arquitetura em camadas inspirada em Clean Architecture e DDD tático.
+AuthCore é uma solução backend em .NET 8 para autenticação, gestão de usuários e notificações transacionais. O projeto evoluiu para uma arquitetura com microserviços, API Gateway, mensageria assíncrona e serviços organizados por camadas com influência de Clean Architecture e DDD tático.
 
-O objetivo do projeto é servir como um núcleo de autenticação robusto para aplicações backend, mantendo regras de negócio no domínio, casos de uso na aplicação e detalhes técnicos isolados na infraestrutura.
+O objetivo é oferecer um núcleo de autenticação robusto para aplicações backend, mantendo regras de negócio no domínio, casos de uso na aplicação, detalhes técnicos na infraestrutura e comunicação entre serviços por contratos explícitos.
 
 ## Sumário
 
 - [Funcionalidades](#funcionalidades)
+- [Serviços](#serviços)
 - [Tecnologias](#tecnologias)
 - [Arquitetura](#arquitetura)
 - [Requisitos](#requisitos)
 - [Instalação](#instalação)
 - [Uso](#uso)
+- [Configuração](#configuração)
 - [Endpoints principais](#endpoints-principais)
 - [Testes](#testes)
 - [Estrutura do projeto](#estrutura-do-projeto)
@@ -36,18 +38,29 @@ O objetivo do projeto é servir como um núcleo de autenticação robusto para a
 - Consulta e atualização do perfil autenticado.
 - Troca de senha.
 - Exclusão de usuário autenticado.
-- Rate limiting de tentativas de login.
+- Rate limiting de rotas sensíveis no Gateway.
 - Proteção CSRF para mutações autenticadas por cookie.
-- Health check de banco, Redis e componentes de infraestrutura.
-- Processamento assíncrono de verificações de e-mail via Outbox e sender de log em desenvolvimento.
+- Health checks por serviço.
+- Publicação assíncrona de solicitações de notificação pelo AuthCore.
+- Consumo, registro, renderização e despacho de notificações transacionais pelo NotificationCore.
+- SMTP local para testes de envio de e-mail em desenvolvimento.
+
+## Serviços
+
+- `Gateway.Api`: API Gateway com Ocelot, autenticação JWT e roteamento para os serviços internos.
+- `AuthCore.Api`: serviço de autenticação e usuários.
+- `NotificationCore.Api`: serviço de notificações transacionais, templates e envio de e-mail.
+- `BuildingBlocks.Messaging.Contracts`: contratos compartilhados de mensageria e utilitários de payload sensível.
 
 ## Tecnologias
 
 - .NET 8
 - ASP.NET Core Web API
+- Ocelot
 - PostgreSQL 17
 - Redis 7
-- RabbitMQ 3, com configuração e container preparados para integração de mensageria
+- RabbitMQ 3
+- SMTP4Dev
 - Docker e Docker Compose
 - Npgsql
 - FluentMigrator
@@ -58,26 +71,48 @@ O objetivo do projeto é servir como um núcleo de autenticação robusto para a
 
 ## Arquitetura
 
-A solução segue uma arquitetura em camadas:
+A solução combina microserviços e organização em camadas dentro de cada serviço de negócio:
 
 ```mermaid
 flowchart TD
-    Api[AuthCore.Api] --> Application[AuthCore.Application]
-    Api --> Infrastructure[AuthCore.Infrastructure]
-    Application[AuthCore.Application] --> Domain[AuthCore.Domain]
-    Infrastructure[AuthCore.Infrastructure] --> Domain
-    DomainTests[AuthCore.Domain.UnitTests] --> Domain
-    AppTests[AuthCore.Application.UnitTests] --> Application
-    IntegrationTests[AuthCore.IntegrationTests] --> Api
+    Client[Cliente HTTP] --> Gateway[Gateway.Api]
+    Gateway --> AuthApi[AuthCore.Api]
+    Gateway --> NotificationApi[NotificationCore.Api]
+
+    AuthApi --> AuthApplication[AuthCore.Application]
+    AuthApi --> AuthInfrastructure[AuthCore.Infrastructure]
+    AuthApplication --> AuthDomain[AuthCore.Domain]
+    AuthInfrastructure --> AuthDomain
+    AuthInfrastructure --> Contracts[BuildingBlocks.Messaging.Contracts]
+
+    NotificationApi --> NotificationApplication[NotificationCore.Application]
+    NotificationApi --> NotificationInfrastructure[NotificationCore.Infrastructure]
+    NotificationApplication --> NotificationDomain[NotificationCore.Domain]
+    NotificationApplication --> Contracts
+    NotificationInfrastructure --> NotificationDomain
+    NotificationInfrastructure --> Contracts
+
+    AuthInfrastructure --> RabbitMQ[(RabbitMQ)]
+    RabbitMQ --> NotificationInfrastructure
+    AuthInfrastructure --> AuthPostgres[(AuthCore PostgreSQL)]
+    AuthInfrastructure --> Redis[(Redis)]
+    NotificationInfrastructure --> NotificationPostgres[(NotificationCore PostgreSQL)]
+    NotificationInfrastructure --> SMTP[SMTP4Dev/SMTP]
 ```
 
 Responsabilidades principais:
 
+- `Gateway.Api`: borda pública em Docker Compose, roteamento, rate limiting e validação JWT para rotas protegidas.
 - `AuthCore.Api`: controllers HTTP, contratos JSON, autenticação, autorização, Swagger e health checks.
-- `AuthCore.Application`: orquestração dos casos de uso.
-- `AuthCore.Domain`: agregados, entidades, value objects, invariantes, eventos e contratos centrais.
-- `AuthCore.Infrastructure`: persistência PostgreSQL, Redis, configuração de RabbitMQ, criptografia, tokens, migrações e Outbox.
-- `tests`: testes unitários de domínio, aplicação e testes de integração.
+- `AuthCore.Application`: orquestração dos casos de uso de autenticação e usuários.
+- `AuthCore.Domain`: agregados, entidades, value objects, invariantes, eventos e contratos centrais de autenticação.
+- `AuthCore.Infrastructure`: persistência PostgreSQL, Redis, criptografia, tokens, migrações, Outbox e publicação RabbitMQ.
+- `NotificationCore.Api`: controllers HTTP administrativos, contratos JSON, Swagger e health checks.
+- `NotificationCore.Application`: orquestração de consultas, busca e solicitações de envio de notificações.
+- `NotificationCore.Domain`: entidades, value objects, enums e regras de notificação.
+- `NotificationCore.Infrastructure`: persistência PostgreSQL, consumo RabbitMQ, Inbox, templates, renderização e envio SMTP.
+- `BuildingBlocks.Messaging.Contracts`: mensagens compartilhadas entre serviços.
+- `tests`: testes unitários de domínio, aplicação e testes de integração por serviço.
 
 ## Requisitos
 
@@ -113,27 +148,27 @@ dotnet build AuthCore.sln
 
 O projeto possui um script principal para facilitar a execução local.
 
-### Executar API local com infraestrutura em Docker
+### Executar AuthCore local com infraestrutura em Docker
 
 ```bash
 ./run.sh dev
 ```
 
-Esse comando sobe PostgreSQL, Redis e RabbitMQ via Docker Compose e executa a API localmente com o profile `http`.
+Esse comando sobe PostgreSQL, Redis, RabbitMQ e SMTP4Dev via Docker Compose e executa `AuthCore.Api` localmente com o profile `http`.
 
-A API fica disponível em:
+O AuthCore local fica disponível em:
 
 ```text
 http://localhost:5012
 ```
 
-Em ambiente de desenvolvimento, o Swagger fica disponível em:
+Em ambiente de desenvolvimento, o Swagger do AuthCore fica disponível em:
 
 ```text
 http://localhost:5012/swagger
 ```
 
-### Executar com hot reload
+### Executar AuthCore com hot reload
 
 ```bash
 ./run.sh watch
@@ -145,17 +180,27 @@ http://localhost:5012/swagger
 ./run.sh infra
 ```
 
+Esse comando sobe bancos, Redis, RabbitMQ e SMTP4Dev. Ele não executa as APIs.
+
 ### Executar toda a aplicação com Docker Compose
 
 ```bash
 ./run.sh docker
 ```
 
-Por padrão, nesse modo a API fica exposta em:
+Nesse modo, o ponto de entrada público é o Gateway:
 
 ```text
 http://localhost:8080
 ```
+
+O AuthCore também fica exposto diretamente para depuração local:
+
+```text
+http://localhost:8081
+```
+
+O NotificationCore roda dentro da rede Docker e é acessado pelo Gateway.
 
 ### Encerrar containers
 
@@ -170,8 +215,10 @@ As configurações de desenvolvimento estão em:
 - `src/Backend/.env.development.example`, modelo versionado sem segredos
 - `src/Backend/.env.development`, arquivo local ignorado pelo Git
 - `src/Backend/AuthCore/AuthCore.Api/appsettings.Development.json`
+- `src/Backend/NotificationCore/NotificationCore.Api/appsettings.Development.json`
+- `src/Backend/Gateway/Gateway.Api/ocelot.json`
 
-Antes de executar o projeto pela primeira vez, crie o arquivo local a partir do modelo e preencha os valores vazios:
+Antes de executar o projeto pela primeira vez, crie o arquivo local a partir do modelo e preencha os valores vazios quando necessário:
 
 ```bash
 cp src/Backend/.env.development.example src/Backend/.env.development
@@ -181,16 +228,24 @@ Serviços padrão em desenvolvimento:
 
 | Serviço | Host | Porta |
 | --- | --- | --- |
-| API local | `localhost` | `5012` |
-| API Docker | `localhost` | `8080` |
-| PostgreSQL | `localhost` | `5432` |
+| Gateway Docker | `localhost` | `8080` |
+| AuthCore Docker | `localhost` | `8081` |
+| AuthCore local | `localhost` | `5012` |
+| PostgreSQL AuthCore | `localhost` | `5432` |
+| PostgreSQL NotificationCore | `localhost` | `5433` |
 | Redis | `localhost` | `6379` |
 | RabbitMQ | `localhost` | `5672` |
 | RabbitMQ Management | `localhost` | `15672` |
+| SMTP local | `localhost` | `1025` |
+| SMTP4Dev UI | `localhost` | `1080` |
 
 Credenciais, senhas e chave de assinatura JWT devem ficar no `.env.development` local ou no mecanismo de segredos do ambiente de deploy. O `docker-compose.yml` apenas referencia essas variáveis.
 
 ## Endpoints principais
+
+Quando a aplicação completa está em Docker, prefira acessar as rotas publicadas pelo Gateway em `http://localhost:8080`.
+
+### AuthCore
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
@@ -206,17 +261,33 @@ Credenciais, senhas e chave de assinatura JWT devem ficar no `.env.development` 
 | `POST` | `/api/auth/token/login` | Autentica por JWT e refresh token |
 | `POST` | `/api/auth/token/refresh` | Renova uma sessão token-based |
 | `POST` | `/api/auth/token/logout` | Revoga refresh token |
-| `POST` | `/api/users` | Registra usuário |
 | `GET` | `/api/users/profile` | Consulta perfil autenticado |
 | `PUT` | `/api/users/profile` | Atualiza perfil autenticado |
 | `PUT` | `/api/users/change-password` | Altera senha |
 | `DELETE` | `/api/users` | Exclui usuário autenticado |
-| `GET` | `/health` | Health check da aplicação |
 
-### Exemplo: registrar usuário
+### NotificationCore
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `GET` | `/api/notifications/{id}` | Consulta uma notificação pelo identificador |
+| `POST` | `/api/notifications/test-email` | Envia uma notificação de teste |
+
+As rotas administrativas `GET /api/notifications` e `GET /api/templates` existem no `NotificationCore.Api`, mas não possuem rota base publicada no Gateway atual. Para usá-las via Gateway, adicione rotas explícitas no `ocelot.json` ou exponha o serviço de notificação diretamente em um ambiente controlado.
+
+### Health checks
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `GET` | `/health` | Health check do Gateway |
+| `GET` | `/authcore/health` | Health check do AuthCore via Gateway |
+| `GET` | `/notificationcore/health` | Health check do NotificationCore via Gateway |
+| `GET` | `/health` | Health check direto de cada API quando acessada fora do Gateway |
+
+### Exemplo: registrar usuário via Gateway
 
 ```bash
-curl -X POST http://localhost:5012/api/auth/register \
+curl -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "firstName": "Ana",
@@ -228,12 +299,16 @@ curl -X POST http://localhost:5012/api/auth/register \
   }'
 ```
 
-Em desenvolvimento, o código OTP de verificação é registrado nos logs da API pelo `LoggingEmailSender`.
+Em desenvolvimento, a solicitação de verificação de e-mail é publicada pelo AuthCore e processada pelo NotificationCore quando a aplicação completa está em execução. As mensagens enviadas por SMTP local podem ser consultadas na UI do SMTP4Dev:
+
+```text
+http://localhost:1080
+```
 
 ### Exemplo: verificar e-mail
 
 ```bash
-curl -X POST http://localhost:5012/api/auth/verify-email \
+curl -X POST http://localhost:8080/api/auth/verify-email \
   -H "Content-Type: application/json" \
   -d '{
     "email": "ana.silva@example.com",
@@ -244,7 +319,7 @@ curl -X POST http://localhost:5012/api/auth/verify-email \
 ### Exemplo: login com token
 
 ```bash
-curl -X POST http://localhost:5012/api/auth/token/login \
+curl -X POST http://localhost:8080/api/auth/token/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "ana.silva@example.com",
@@ -255,8 +330,20 @@ curl -X POST http://localhost:5012/api/auth/token/login \
 ### Exemplo: consultar perfil autenticado
 
 ```bash
-curl http://localhost:5012/api/users/profile \
+curl http://localhost:8080/api/users/profile \
   -H "Authorization: Bearer <access-token>"
+```
+
+### Exemplo: enviar e-mail de teste
+
+```bash
+curl -X POST http://localhost:8080/api/notifications/test-email \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{
+    "recipient": "ana.silva@example.com",
+    "correlationId": "manual-test-001"
+  }'
 ```
 
 ## Testes
@@ -273,10 +360,16 @@ Ou diretamente com o .NET CLI:
 dotnet test AuthCore.sln
 ```
 
-Para executar apenas testes de domínio:
+Para executar testes por área:
 
 ```bash
 dotnet test tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj
+dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.csproj
+dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
+dotnet test tests/NotificationCore.Domain.UnitTests/NotificationCore.Domain.UnitTests.csproj
+dotnet test tests/NotificationCore.Application.UnitTests/NotificationCore.Application.UnitTests.csproj
+dotnet test tests/NotificationCore.IntegrationTests/NotificationCore.IntegrationTests.csproj
+dotnet test tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj
 ```
 
 ## Estrutura do projeto
@@ -286,21 +379,32 @@ dotnet test tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj
 ├── AuthCore.sln
 ├── run.sh
 ├── src
-│   └── Backend
-│       ├── docker-compose.yml
-│       └── AuthCore
-│           ├── AuthCore.Api
-│           ├── AuthCore.Application
-│           ├── AuthCore.Domain
-│           └── AuthCore.Infrastructure
+│   ├── Backend
+│   │   ├── docker-compose.yml
+│   │   ├── AuthCore
+│   │   │   ├── AuthCore.Api
+│   │   │   ├── AuthCore.Application
+│   │   │   ├── AuthCore.Domain
+│   │   │   └── AuthCore.Infrastructure
+│   │   ├── Gateway
+│   │   │   └── Gateway.Api
+│   │   └── NotificationCore
+│   │       ├── NotificationCore.Api
+│   │       ├── NotificationCore.Application
+│   │       ├── NotificationCore.Domain
+│   │       └── NotificationCore.Infrastructure
+│   ├── BuildingBlocks
+│   │   └── BuildingBlocks.Messaging.Contracts
+│   └── Frontend
 └── tests
     ├── AuthCore.Application.UnitTests
     ├── AuthCore.Domain.UnitTests
     ├── AuthCore.IntegrationTests
-    └── AuthCore.ArchitectureTests
+    ├── Gateway.IntegrationTests
+    ├── NotificationCore.Application.UnitTests
+    ├── NotificationCore.Domain.UnitTests
+    └── NotificationCore.IntegrationTests
 ```
-
-`AuthCore.ArchitectureTests` existe hoje apenas como diretório reservado para testes arquiteturais futuros.
 
 ## Licença
 
