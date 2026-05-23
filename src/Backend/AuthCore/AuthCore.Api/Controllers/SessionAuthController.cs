@@ -73,28 +73,20 @@ public sealed class SessionAuthController : AuthControllerBase
         if (rateLimitResult is not null)
             return rateLimitResult;
 
-        try
+        var result = await useCase.Execute(new LoginSessionCommand
         {
-            var result = await useCase.Execute(new LoginSessionCommand
-            {
-                Email = request.Email,
-                Password = request.Password,
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                UserAgent = Request.Headers.UserAgent.ToString()
-            });
+            Email = request.Email,
+            Password = request.Password,
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = Request.Headers.UserAgent.ToString()
+        });
 
-            AppendSessionCookie(result.SessionId, result.ExpiresAtUtc, authCookieOptions.Value);
-            _logger.LogInformation(
-                "Login por sessão realizado com sucesso. UserIdentifier={UserIdentifier}",
-                result.UserIdentifier);
+        AppendSessionCookie(result.SessionId, result.ExpiresAtUtc, authCookieOptions.Value);
+        _logger.LogInformation(
+            "Login por sessão realizado com sucesso. UserIdentifier={UserIdentifier}",
+            result.UserIdentifier);
 
-            return Ok(CreateAuthenticatedUserResponse(result.UserIdentifier, result.Email));
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            LogLoginFailure(exception, request.Email);
-            return actionResult;
-        }
+        return Ok(CreateAuthenticatedUserResponse(result.UserIdentifier, result.Email));
     }
 
     /// <summary>
@@ -108,19 +100,11 @@ public sealed class SessionAuthController : AuthControllerBase
     [ProducesResponseType(typeof(ResponseErrorJson), StatusCodes.Status403Forbidden)]
     public ActionResult<ResponseAuthenticatedUserJson> Me()
     {
-        try
-        {
-            EnsureAuthenticatedSessionAllowsAccess();
+        EnsureAuthenticatedSessionAllowsAccess();
 
-            return Ok(CreateAuthenticatedUserResponse(
-                GetAuthenticatedUserIdentifier(),
-                GetAuthenticatedEmail()));
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            LogKnownAuthenticationFailure(exception, "me-session");
-            return actionResult;
-        }
+        return Ok(CreateAuthenticatedUserResponse(
+            GetAuthenticatedUserIdentifier(),
+            GetAuthenticatedEmail()));
     }
 
     /// <summary>
@@ -138,30 +122,22 @@ public sealed class SessionAuthController : AuthControllerBase
         [FromServices] ILogoutCurrentSessionUseCase useCase,
         [FromServices] IOptions<AuthCookieOptions> authCookieOptions)
     {
-        try
-        {
-            _csrfRequestValidator.Validate(Request);
-            var sessionId = GetAuthenticatedSessionId();
-            var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
-            var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
+        _csrfRequestValidator.Validate(Request);
+        var sessionId = GetAuthenticatedSessionId();
+        var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
+        var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
 
-            await useCase.Execute(new LogoutCurrentSessionCommand
-            {
-                SessionId = sessionId
-            });
-            DeleteSessionCookie(authCookieOptions.Value);
-            _logger.LogInformation(
-                "Sessão atual encerrada. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier}",
-                userIdentifierForLog,
-                hasUserIdentifier);
-
-            return NoContent();
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
+        await useCase.Execute(new LogoutCurrentSessionCommand
         {
-            LogKnownAuthenticationFailure(exception, "logout-session");
-            return actionResult;
-        }
+            SessionId = sessionId
+        });
+        DeleteSessionCookie(authCookieOptions.Value);
+        _logger.LogInformation(
+            "Sessão atual encerrada. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier}",
+            userIdentifierForLog,
+            hasUserIdentifier);
+
+        return NoContent();
     }
 
     /// <summary>
@@ -176,21 +152,13 @@ public sealed class SessionAuthController : AuthControllerBase
     public async Task<ActionResult<ResponseUserSessionsJson>> GetSessions(
         [FromServices] IGetUserSessionsUseCase useCase)
     {
-        try
+        var result = await useCase.Execute(new GetUserSessionsQuery
         {
-            var result = await useCase.Execute(new GetUserSessionsQuery
-            {
-                UserId = GetAuthenticatedInternalUserId(),
-                CurrentSessionId = GetAuthenticatedSessionId()
-            });
+            UserId = GetAuthenticatedInternalUserId(),
+            CurrentSessionId = GetAuthenticatedSessionId()
+        });
 
-            return Ok(CreateUserSessionsResponse(result));
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            LogKnownAuthenticationFailure(exception, "list-sessions");
-            return actionResult;
-        }
+        return Ok(CreateUserSessionsResponse(result));
     }
 
     /// <summary>
@@ -211,37 +179,29 @@ public sealed class SessionAuthController : AuthControllerBase
         [FromServices] IRevokeUserSessionUseCase useCase,
         [FromServices] IOptions<AuthCookieOptions> authCookieOptions)
     {
-        try
+        _csrfRequestValidator.Validate(Request);
+        var normalizedSessionId = NormalizeSessionId(sid);
+        var currentSessionId = GetAuthenticatedSessionId();
+        var internalUserId = GetAuthenticatedInternalUserId();
+        var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
+        var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
+
+        await useCase.Execute(new RevokeUserSessionCommand
         {
-            _csrfRequestValidator.Validate(Request);
-            var normalizedSessionId = NormalizeSessionId(sid);
-            var currentSessionId = GetAuthenticatedSessionId();
-            var internalUserId = GetAuthenticatedInternalUserId();
-            var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
-            var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
+            UserId = internalUserId,
+            SessionId = normalizedSessionId
+        });
 
-            await useCase.Execute(new RevokeUserSessionCommand
-            {
-                UserId = internalUserId,
-                SessionId = normalizedSessionId
-            });
+        if (string.Equals(currentSessionId, normalizedSessionId, StringComparison.Ordinal))
+            DeleteSessionCookie(authCookieOptions.Value);
 
-            if (string.Equals(currentSessionId, normalizedSessionId, StringComparison.Ordinal))
-                DeleteSessionCookie(authCookieOptions.Value);
+        _logger.LogInformation(
+            "Sessão revogada pelo usuário autenticado. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier} SessaoAtualRevogada={SessaoAtualRevogada}",
+            userIdentifierForLog,
+            hasUserIdentifier,
+            string.Equals(currentSessionId, normalizedSessionId, StringComparison.Ordinal));
 
-            _logger.LogInformation(
-                "Sessão revogada pelo usuário autenticado. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier} SessaoAtualRevogada={SessaoAtualRevogada}",
-                userIdentifierForLog,
-                hasUserIdentifier,
-                string.Equals(currentSessionId, normalizedSessionId, StringComparison.Ordinal));
-
-            return NoContent();
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            LogKnownAuthenticationFailure(exception, "revoke-session");
-            return actionResult;
-        }
+        return NoContent();
     }
 
     /// <summary>
@@ -259,29 +219,21 @@ public sealed class SessionAuthController : AuthControllerBase
         [FromServices] ILogoutAllSessionsUseCase useCase,
         [FromServices] IOptions<AuthCookieOptions> authCookieOptions)
     {
-        try
-        {
-            _csrfRequestValidator.Validate(Request);
-            var internalUserId = GetAuthenticatedInternalUserId();
-            var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
-            var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
+        _csrfRequestValidator.Validate(Request);
+        var internalUserId = GetAuthenticatedInternalUserId();
+        var hasUserIdentifier = TryGetAuthenticatedUserIdentifier(out var userIdentifier);
+        var userIdentifierForLog = hasUserIdentifier ? userIdentifier : (Guid?)null;
 
-            await useCase.Execute(new LogoutAllSessionsCommand
-            {
-                UserId = internalUserId
-            });
-            DeleteSessionCookie(authCookieOptions.Value);
-            _logger.LogInformation(
-                "Todas as sessões do usuário foram revogadas. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier}",
-                userIdentifierForLog,
-                hasUserIdentifier);
-
-            return NoContent();
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
+        await useCase.Execute(new LogoutAllSessionsCommand
         {
-            LogKnownAuthenticationFailure(exception, "logout-all-sessions");
-            return actionResult;
-        }
+            UserId = internalUserId
+        });
+        DeleteSessionCookie(authCookieOptions.Value);
+        _logger.LogInformation(
+            "Todas as sessões do usuário foram revogadas. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier}",
+            userIdentifierForLog,
+            hasUserIdentifier);
+
+        return NoContent();
     }
 }

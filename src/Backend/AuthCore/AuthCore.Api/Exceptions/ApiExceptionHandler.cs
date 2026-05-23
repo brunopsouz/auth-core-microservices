@@ -68,6 +68,7 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
     {
         return exception switch
         {
+            ArgumentException argumentException => (StatusCodes.Status400BadRequest, GetErrors(argumentException)),
             UnauthorizedAccessException unauthorizedAccessException => (StatusCodes.Status401Unauthorized, GetErrors(unauthorizedAccessException)),
             ForbiddenException forbiddenException => (StatusCodes.Status403Forbidden, GetErrors(forbiddenException)),
             NotFoundException notFoundException => (StatusCodes.Status404NotFound, GetErrors(notFoundException)),

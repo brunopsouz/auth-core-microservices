@@ -61,25 +61,17 @@ public sealed class TokenAuthController : AuthControllerBase
         if (rateLimitResult is not null)
             return rateLimitResult;
 
-        try
+        var result = await useCase.Execute(new LoginCommand
         {
-            var result = await useCase.Execute(new LoginCommand
-            {
-                Email = request.Email,
-                Password = request.Password
-            });
+            Email = request.Email,
+            Password = request.Password
+        });
 
-            _logger.LogInformation(
-                "Login no modo token realizado com sucesso. TraceId={TraceId}",
-                HttpContext.TraceIdentifier);
+        _logger.LogInformation(
+            "Login no modo token realizado com sucesso. TraceId={TraceId}",
+            HttpContext.TraceIdentifier);
 
-            return Ok(CreateAuthenticatedSessionResponse(result));
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            LogLoginFailure(exception, request.Email);
-            return actionResult;
-        }
+        return Ok(CreateAuthenticatedSessionResponse(result));
     }
 
     /// <summary>
@@ -99,20 +91,12 @@ public sealed class TokenAuthController : AuthControllerBase
         [FromServices] IRefreshSessionUseCase useCase,
         [FromBody] RequestRefreshSessionJson request)
     {
-        try
+        var result = await useCase.Execute(new RefreshSessionCommand
         {
-            var result = await useCase.Execute(new RefreshSessionCommand
-            {
-                RefreshToken = request.RefreshToken
-            });
+            RefreshToken = request.RefreshToken
+        });
 
-            return Ok(CreateAuthenticatedSessionResponse(result));
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            LogKnownAuthenticationFailure(exception, "refresh-token");
-            return actionResult;
-        }
+        return Ok(CreateAuthenticatedSessionResponse(result));
     }
 
     /// <summary>
@@ -130,23 +114,15 @@ public sealed class TokenAuthController : AuthControllerBase
         [FromServices] ILogoutSessionUseCase useCase,
         [FromBody] RequestTokenLogoutJson request)
     {
-        try
+        await useCase.Execute(new LogoutSessionCommand
         {
-            await useCase.Execute(new LogoutSessionCommand
-            {
-                RefreshToken = request.RefreshToken
-            });
+            RefreshToken = request.RefreshToken
+        });
 
-            _logger.LogInformation(
-                "Logout do modo token concluído. TraceId={TraceId}",
-                HttpContext.TraceIdentifier);
+        _logger.LogInformation(
+            "Logout do modo token concluído. TraceId={TraceId}",
+            HttpContext.TraceIdentifier);
 
-            return NoContent();
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            LogKnownAuthenticationFailure(exception, "logout-token");
-            return actionResult;
-        }
+        return NoContent();
     }
 }
