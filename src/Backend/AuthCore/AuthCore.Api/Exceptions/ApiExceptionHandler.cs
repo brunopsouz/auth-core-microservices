@@ -8,7 +8,7 @@ namespace AuthCore.Api.Exceptions;
 /// <summary>
 /// Representa handler global para exceções da API.
 /// </summary>
-public sealed class ApiExceptionHandler : IExceptionHandler
+internal sealed class ApiExceptionHandler : IExceptionHandler
 {
     private const string UNKNOWN_ERROR_MESSAGE = "Ocorreu um erro interno inesperado.";
 

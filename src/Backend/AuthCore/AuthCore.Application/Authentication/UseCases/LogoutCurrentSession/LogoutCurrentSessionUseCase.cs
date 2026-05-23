@@ -5,7 +5,7 @@ namespace AuthCore.Application.Authentication.UseCases.LogoutCurrentSession;
 /// <summary>
 /// Representa caso de uso para encerrar a sessão atual do usuário.
 /// </summary>
-public sealed class LogoutCurrentSessionUseCase : ILogoutCurrentSessionUseCase
+internal sealed class LogoutCurrentSessionUseCase : ILogoutCurrentSessionUseCase
 {
     private readonly ISessionStore _sessionStore;
 

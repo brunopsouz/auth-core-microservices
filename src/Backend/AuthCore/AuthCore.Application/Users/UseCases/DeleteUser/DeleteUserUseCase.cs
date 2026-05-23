@@ -8,7 +8,7 @@ namespace AuthCore.Application.Users.UseCases.DeleteUser;
 /// <summary>
 /// Representa caso de uso para excluir o usuário autenticado.
 /// </summary>
-public sealed class DeleteUserUseCase : IDeleteUserUseCase
+internal sealed class DeleteUserUseCase : IDeleteUserUseCase
 {
     private const string USER_DEACTIVATED_REASON = "user-deactivated";
 

@@ -9,7 +9,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Representa factory de mensagem de outbox para notificação de verificação de e-mail.
 /// </summary>
-public sealed class EmailVerificationNotificationOutboxFactory : IEmailVerificationNotificationOutboxFactory
+internal sealed class EmailVerificationNotificationOutboxFactory : IEmailVerificationNotificationOutboxFactory
 {
     private const string SOURCE = "AuthCore";
     private const string CHANNEL = "Email";

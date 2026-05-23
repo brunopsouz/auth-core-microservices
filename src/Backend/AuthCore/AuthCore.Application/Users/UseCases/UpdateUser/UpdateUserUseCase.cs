@@ -6,7 +6,7 @@ namespace AuthCore.Application.Users.UseCases.UpdateUser;
 /// <summary>
 /// Representa caso de uso para atualizar o perfil do usuário autenticado.
 /// </summary>
-public sealed class UpdateUserUseCase : IUpdateUserUseCase
+internal sealed class UpdateUserUseCase : IUpdateUserUseCase
 {
     private readonly IUserReadRepository _userReadRepository;
     private readonly IUserRepository _userRepository;

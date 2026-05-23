@@ -7,7 +7,7 @@ namespace NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.UnitOfWo
 /// <summary>
 /// Representa unidade de trabalho transacional do PostgreSQL.
 /// </summary>
-public sealed class NpgsqlUnitOfWork : IUnitOfWork, IDatabaseSession, IAsyncDisposable
+internal sealed class NpgsqlUnitOfWork : IUnitOfWork, IDatabaseSession, IAsyncDisposable
 {
     private readonly IDbConnectionFactory _dbConnectionFactory;
 

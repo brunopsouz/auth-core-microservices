@@ -6,7 +6,7 @@ namespace AuthCore.Api.HealthChecks;
 /// <summary>
 /// Representa health check para a conectividade com o Redis.
 /// </summary>
-public sealed class RedisHealthCheck : IHealthCheck
+internal sealed class RedisHealthCheck : IHealthCheck
 {
     private readonly IConnectionMultiplexer _connectionMultiplexer;
 

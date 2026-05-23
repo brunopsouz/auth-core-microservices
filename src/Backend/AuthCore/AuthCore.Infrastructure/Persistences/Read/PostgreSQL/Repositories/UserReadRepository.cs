@@ -9,7 +9,7 @@ namespace AuthCore.Infrastructure.Persistences.Read.PostgreSQL.Repositories;
 /// <summary>
 /// Representa repositório PostgreSQL de leitura de usuário.
 /// </summary>
-public sealed class UserReadRepository : IUserReadRepository
+internal sealed class UserReadRepository : IUserReadRepository
 {
     private readonly IDatabaseSession _databaseSession;
 

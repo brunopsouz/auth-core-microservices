@@ -6,7 +6,7 @@ namespace AuthCore.Application.Authentication.UseCases.GetUserSessions;
 /// <summary>
 /// Representa caso de uso para listar as sessões ativas do usuário.
 /// </summary>
-public sealed class GetUserSessionsUseCase : IGetUserSessionsUseCase
+internal sealed class GetUserSessionsUseCase : IGetUserSessionsUseCase
 {
     private readonly ISessionStore _sessionStore;
 

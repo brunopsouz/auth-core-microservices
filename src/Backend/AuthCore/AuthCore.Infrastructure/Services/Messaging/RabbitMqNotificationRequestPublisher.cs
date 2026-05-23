@@ -10,7 +10,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Representa publisher RabbitMQ de solicitações de notificação.
 /// </summary>
-public sealed class RabbitMqNotificationRequestPublisher : INotificationRequestPublisher
+internal sealed class RabbitMqNotificationRequestPublisher : INotificationRequestPublisher
 {
     private static readonly TimeSpan PublishConfirmationTimeout = TimeSpan.FromSeconds(5);
 

@@ -7,7 +7,7 @@ namespace AuthCore.Api.Security;
 /// <summary>
 /// Representa validador de origem para mutações autenticadas por cookie.
 /// </summary>
-public sealed class CookieCsrfRequestValidator : ICsrfRequestValidator
+internal sealed class CookieCsrfRequestValidator : ICsrfRequestValidator
 {
     private readonly ILogger<CookieCsrfRequestValidator> _logger;
     private readonly CsrfOptions _csrfOptions;

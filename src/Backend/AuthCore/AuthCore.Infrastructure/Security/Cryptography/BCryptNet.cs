@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Security.Cryptography;
 /// <summary>
 /// Representa implementação de criptografia de senha com BCrypt.
 /// </summary>
-public sealed class BCryptNet : IPasswordEncripter
+internal sealed class BCryptNet : IPasswordEncripter
 {
     /// <summary>
     /// Operação para criptografar uma senha.

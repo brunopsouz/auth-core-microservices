@@ -14,7 +14,7 @@ namespace AuthCore.Application.Authentication.UseCases.LoginSession;
 /// <summary>
 /// Representa caso de uso para autenticar um usuário por sessão.
 /// </summary>
-public sealed class LoginSessionUseCase : ILoginSessionUseCase
+internal sealed class LoginSessionUseCase : ILoginSessionUseCase
 {
     private const string INVALID_CREDENTIALS_MESSAGE = "As credenciais informadas são inválidas.";
 

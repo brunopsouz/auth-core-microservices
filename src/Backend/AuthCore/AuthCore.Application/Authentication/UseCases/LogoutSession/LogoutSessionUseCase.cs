@@ -6,7 +6,7 @@ namespace AuthCore.Application.Authentication.UseCases.LogoutSession;
 /// <summary>
 /// Representa caso de uso para encerrar uma autenticação do modo token.
 /// </summary>
-public sealed class LogoutSessionUseCase : ILogoutSessionUseCase
+internal sealed class LogoutSessionUseCase : ILogoutSessionUseCase
 {
     private const string LOGOUT_REASON = "logout";
 

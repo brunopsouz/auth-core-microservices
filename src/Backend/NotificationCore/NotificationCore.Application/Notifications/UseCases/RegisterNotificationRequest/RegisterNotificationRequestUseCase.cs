@@ -12,7 +12,7 @@ namespace NotificationCore.Application.Notifications.UseCases.RegisterNotificati
 /// <summary>
 /// Representa caso de uso para registrar solicitação de notificação.
 /// </summary>
-public sealed class RegisterNotificationRequestUseCase : IRegisterNotificationRequestUseCase
+internal sealed class RegisterNotificationRequestUseCase : IRegisterNotificationRequestUseCase
 {
     private readonly IInboxRepository _inboxRepository;
     private readonly INotificationRepository _notificationRepository;

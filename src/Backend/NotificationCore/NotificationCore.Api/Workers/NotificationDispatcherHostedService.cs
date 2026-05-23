@@ -9,7 +9,7 @@ namespace NotificationCore.Api.Workers;
 /// <summary>
 /// Representa worker hospedado para despacho de notificações pendentes.
 /// </summary>
-public sealed class NotificationDispatcherHostedService : BackgroundService
+internal sealed class NotificationDispatcherHostedService : BackgroundService
 {
     private readonly ILogger<NotificationDispatcherHostedService> _logger;
     private readonly NotificationMetrics _notificationMetrics;

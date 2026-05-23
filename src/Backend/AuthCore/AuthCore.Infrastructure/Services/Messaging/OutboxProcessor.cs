@@ -14,7 +14,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Representa processor das mensagens pendentes da outbox.
 /// </summary>
-public sealed class OutboxProcessor : IOutboxProcessor
+internal sealed class OutboxProcessor : IOutboxProcessor
 {
     private const string SOURCE = "AuthCore";
     private const string CHANNEL = "Email";

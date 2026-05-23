@@ -11,7 +11,7 @@ namespace AuthCore.Application.Authentication.UseCases.RefreshSession;
 /// <summary>
 /// Representa caso de uso para renovar uma autenticação do modo token.
 /// </summary>
-public sealed class RefreshSessionUseCase : IRefreshSessionUseCase
+internal sealed class RefreshSessionUseCase : IRefreshSessionUseCase
 {
     private const string INVALID_SESSION_MESSAGE = "A sessão informada é inválida ou expirou.";
     private const string REUSE_DETECTED_REASON = "reuse-detected";

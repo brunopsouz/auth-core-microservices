@@ -7,7 +7,7 @@ namespace NotificationCore.Application.Notifications.UseCases.GetNotification;
 /// <summary>
 /// Representa caso de uso para consultar notificação por identificador.
 /// </summary>
-public sealed class GetNotificationUseCase : IGetNotificationUseCase
+internal sealed class GetNotificationUseCase : IGetNotificationUseCase
 {
     private readonly INotificationRepository _notificationRepository;
 

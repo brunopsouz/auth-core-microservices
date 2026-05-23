@@ -7,7 +7,7 @@ namespace AuthCore.Infrastructure.Services.Caching;
 /// <summary>
 /// Representa serviço para cálculo de expiração de sessão.
 /// </summary>
-public sealed class SessionService : ISessionService
+internal sealed class SessionService : ISessionService
 {
     private readonly SessionOptions _sessionOptions;
 

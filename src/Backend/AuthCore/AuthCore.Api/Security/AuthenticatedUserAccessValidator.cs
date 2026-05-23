@@ -8,7 +8,7 @@ namespace AuthCore.Api.Security;
 /// <summary>
 /// Representa validador do acesso do usuário autenticado por bearer.
 /// </summary>
-public sealed class AuthenticatedUserAccessValidator : IAuthenticatedUserAccessValidator
+internal sealed class AuthenticatedUserAccessValidator : IAuthenticatedUserAccessValidator
 {
     private readonly IUserReadRepository _userReadRepository;
 

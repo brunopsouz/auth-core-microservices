@@ -10,7 +10,7 @@ namespace AuthCore.Application.Authentication.UseCases.VerifyEmail;
 /// <summary>
 /// Representa caso de uso para verificar o e-mail do usuário.
 /// </summary>
-public sealed class VerifyEmailUseCase : IVerifyEmailUseCase
+internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
 {
     private const string INVALID_VERIFICATION_MESSAGE = "Não foi possível validar o código de verificação informado.";
 

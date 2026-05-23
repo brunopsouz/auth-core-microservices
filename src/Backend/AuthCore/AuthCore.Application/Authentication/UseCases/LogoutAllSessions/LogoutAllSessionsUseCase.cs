@@ -5,7 +5,7 @@ namespace AuthCore.Application.Authentication.UseCases.LogoutAllSessions;
 /// <summary>
 /// Representa caso de uso para revogar todas as sessões do usuário.
 /// </summary>
-public sealed class LogoutAllSessionsUseCase : ILogoutAllSessionsUseCase
+internal sealed class LogoutAllSessionsUseCase : ILogoutAllSessionsUseCase
 {
     private readonly ISessionStore _sessionStore;
 

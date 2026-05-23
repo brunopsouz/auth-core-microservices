@@ -14,7 +14,7 @@ namespace NotificationCore.Application.Notifications.UseCases.DispatchPendingNot
 /// <summary>
 /// Representa caso de uso para despachar notificações pendentes.
 /// </summary>
-public sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotificationUseCase
+internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotificationUseCase
 {
     private const string TEMPLATE_RENDERER_PROVIDER = "TemplateRenderer";
     private const string TEMPLATE_RENDERING_FAILED_CODE = "TEMPLATE_RENDERING_FAILED";

@@ -8,7 +8,7 @@ namespace NotificationCore.Infrastructure.Persistences.Read.PostgreSQL.Repositor
 /// <summary>
 /// Representa repositório PostgreSQL de leitura de templates de notificação.
 /// </summary>
-public sealed class NotificationTemplateRepository : INotificationTemplateRepository
+internal sealed class NotificationTemplateRepository : INotificationTemplateRepository
 {
     private readonly IDatabaseSession _databaseSession;
 

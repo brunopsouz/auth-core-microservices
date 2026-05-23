@@ -8,7 +8,7 @@ namespace NotificationCore.Api.HealthChecks;
 /// <summary>
 /// Representa health check para a conectividade com o RabbitMQ.
 /// </summary>
-public sealed class RabbitMqHealthCheck : IHealthCheck
+internal sealed class RabbitMqHealthCheck : IHealthCheck
 {
     private readonly RabbitMqOptions _options;
 

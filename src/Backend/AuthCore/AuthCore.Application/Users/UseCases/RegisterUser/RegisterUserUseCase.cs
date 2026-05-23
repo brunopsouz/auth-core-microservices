@@ -15,7 +15,7 @@ namespace AuthCore.Application.Users.UseCases.RegisterUser;
 /// <summary>
 /// Representa caso de uso para registrar um usuário.
 /// </summary>
-public sealed class RegisterUserUseCase : IRegisterUserUseCase
+internal sealed class RegisterUserUseCase : IRegisterUserUseCase
 {
     private readonly IEmailVerificationRepository _emailVerificationRepository;
     private readonly IEmailVerificationNotificationOutboxFactory _emailVerificationNotificationOutboxFactory;

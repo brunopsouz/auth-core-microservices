@@ -9,7 +9,7 @@ namespace NotificationCore.Infrastructure.Notifications.Rendering;
 /// <summary>
 /// Representa renderizador simples de templates de notificação.
 /// </summary>
-public sealed class SimpleTemplateRenderer : ITemplateRenderer
+internal sealed class SimpleTemplateRenderer : ITemplateRenderer
 {
     private const string TEMPLATE_NOT_FOUND_MESSAGE = "Template ativo não encontrado.";
     private const string INVALID_VARIABLE_MESSAGE = "Template possui variável inválida.";

@@ -11,7 +11,7 @@ namespace NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.Reposito
 /// <summary>
 /// Representa repositório PostgreSQL de notificações.
 /// </summary>
-public sealed class NotificationRepository : INotificationRepository
+internal sealed class NotificationRepository : INotificationRepository
 {
     private readonly IDatabaseSession _databaseSession;
 

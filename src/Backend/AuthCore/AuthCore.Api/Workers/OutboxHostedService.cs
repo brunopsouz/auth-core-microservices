@@ -7,7 +7,7 @@ namespace AuthCore.Api.Workers;
 /// <summary>
 /// Representa worker hospedado para processamento da outbox.
 /// </summary>
-public sealed class OutboxHostedService : BackgroundService
+internal sealed class OutboxHostedService : BackgroundService
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly OutboxOptions _outboxOptions;

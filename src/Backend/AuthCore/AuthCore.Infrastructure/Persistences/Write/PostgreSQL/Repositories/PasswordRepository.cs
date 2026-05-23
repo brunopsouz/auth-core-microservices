@@ -9,7 +9,7 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// <summary>
 /// Representa repositório PostgreSQL de senha.
 /// </summary>
-public sealed class PasswordRepository : IPasswordRepository
+internal sealed class PasswordRepository : IPasswordRepository
 {
     private readonly IDatabaseSession _databaseSession;
 

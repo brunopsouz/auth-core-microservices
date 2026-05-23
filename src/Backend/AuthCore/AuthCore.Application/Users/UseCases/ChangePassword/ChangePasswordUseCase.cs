@@ -11,7 +11,7 @@ namespace AuthCore.Application.Users.UseCases.ChangePassword;
 /// <summary>
 /// Representa caso de uso para alterar a senha do usuário autenticado.
 /// </summary>
-public sealed class ChangePasswordUseCase : IChangePasswordUseCase
+internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
 {
     private const string PASSWORD_CHANGED_REASON = "password-changed";
 

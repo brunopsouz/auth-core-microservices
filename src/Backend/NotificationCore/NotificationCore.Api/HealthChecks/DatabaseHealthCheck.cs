@@ -7,7 +7,7 @@ namespace NotificationCore.Api.HealthChecks;
 /// <summary>
 /// Representa health check para a conectividade com o banco de dados.
 /// </summary>
-public sealed class DatabaseHealthCheck : IHealthCheck
+internal sealed class DatabaseHealthCheck : IHealthCheck
 {
     private readonly IDbConnectionFactory _dbConnectionFactory;
 

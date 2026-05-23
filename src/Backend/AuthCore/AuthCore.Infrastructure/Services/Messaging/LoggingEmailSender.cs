@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Representa sender inicial de e-mail com logging.
 /// </summary>
-public sealed class LoggingEmailSender : IEmailSender
+internal sealed class LoggingEmailSender : IEmailSender
 {
     private readonly ILogger<LoggingEmailSender> _logger;
 

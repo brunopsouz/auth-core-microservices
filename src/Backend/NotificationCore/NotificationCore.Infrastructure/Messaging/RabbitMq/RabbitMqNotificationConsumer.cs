@@ -9,7 +9,7 @@ namespace NotificationCore.Infrastructure.Messaging.RabbitMq;
 /// <summary>
 /// Representa consumidor RabbitMQ de solicitações de notificação.
 /// </summary>
-public sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsumer
+internal sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsumer
 {
     private readonly ILogger<RabbitMqNotificationConsumer> _logger;
     private readonly RabbitMqOptions _options;

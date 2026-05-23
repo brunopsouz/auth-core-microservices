@@ -13,7 +13,7 @@ namespace NotificationCore.Api.Workers;
 /// <summary>
 /// Representa worker hospedado para consumo de solicitações de notificação.
 /// </summary>
-public sealed class RabbitMqNotificationConsumerHostedService : BackgroundService
+internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundService
 {
     private static readonly JsonSerializerOptions _jsonSerializerOptions = new()
     {

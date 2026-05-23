@@ -14,7 +14,7 @@ namespace AuthCore.Infrastructure.Security.Tokens;
 /// <summary>
 /// Representa gerador JWT de access token.
 /// </summary>
-public sealed class JwtAccessTokenGenerator : IAccessTokenGenerator
+internal sealed class JwtAccessTokenGenerator : IAccessTokenGenerator
 {
     private readonly JwtOptions _jwtOptions;
     private readonly SigningCredentials _signingCredentials;

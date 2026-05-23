@@ -8,7 +8,7 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// <summary>
 /// Representa repositório PostgreSQL de verificação de e-mail.
 /// </summary>
-public sealed class EmailVerificationRepository : IEmailVerificationRepository
+internal sealed class EmailVerificationRepository : IEmailVerificationRepository
 {
     private readonly IDatabaseSession _databaseSession;
 

@@ -9,7 +9,7 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Connections;
 /// <summary>
 /// Representa a fábrica de conexões PostgreSQL.
 /// </summary>
-public sealed class NpgsqlConnectionFactory : IDbConnectionFactory
+internal sealed class NpgsqlConnectionFactory : IDbConnectionFactory
 {
     private readonly string _connectionString;
 

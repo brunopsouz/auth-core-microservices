@@ -6,7 +6,7 @@ namespace AuthCore.Api.Security;
 /// <summary>
 /// Representa limitador em memória para tentativas de login.
 /// </summary>
-public sealed class InMemoryLoginRateLimiter : ILoginRateLimiter
+internal sealed class InMemoryLoginRateLimiter : ILoginRateLimiter
 {
     private readonly Dictionary<string, RateLimitEntry> _entries = [];
     private readonly object _sync = new();

@@ -8,7 +8,7 @@ namespace NotificationCore.Application.Notifications.UseCases.SearchNotification
 /// <summary>
 /// Representa caso de uso para buscar notificações por filtros administrativos.
 /// </summary>
-public sealed class SearchNotificationsUseCase : ISearchNotificationsUseCase
+internal sealed class SearchNotificationsUseCase : ISearchNotificationsUseCase
 {
     private const int MAX_TAKE = 100;
 

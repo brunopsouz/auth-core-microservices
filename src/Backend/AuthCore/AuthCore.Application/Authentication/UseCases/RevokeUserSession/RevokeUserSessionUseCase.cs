@@ -6,7 +6,7 @@ namespace AuthCore.Application.Authentication.UseCases.RevokeUserSession;
 /// <summary>
 /// Representa caso de uso para revogar uma sessão específica do usuário.
 /// </summary>
-public sealed class RevokeUserSessionUseCase : IRevokeUserSessionUseCase
+internal sealed class RevokeUserSessionUseCase : IRevokeUserSessionUseCase
 {
     private readonly ISessionStore _sessionStore;
 

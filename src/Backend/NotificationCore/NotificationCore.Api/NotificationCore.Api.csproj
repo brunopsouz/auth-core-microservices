@@ -17,4 +17,10 @@
     <ProjectReference Include="..\NotificationCore.Infrastructure\NotificationCore.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NotificationCore.IntegrationTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

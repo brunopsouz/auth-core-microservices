@@ -16,7 +16,7 @@ namespace AuthCore.Application.Authentication.UseCases.Login;
 /// <summary>
 /// Representa caso de uso para autenticar um usuário no modo token.
 /// </summary>
-public sealed class LoginUseCase : ILoginUseCase
+internal sealed class LoginUseCase : ILoginUseCase
 {
     private const string INVALID_CREDENTIALS_MESSAGE = "As credenciais informadas são inválidas.";
 

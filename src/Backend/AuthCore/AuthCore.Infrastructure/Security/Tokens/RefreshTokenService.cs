@@ -10,7 +10,7 @@ namespace AuthCore.Infrastructure.Security.Tokens;
 /// <summary>
 /// Representa serviço para geração e hashing de refresh token.
 /// </summary>
-public sealed class RefreshTokenService : IRefreshTokenService
+internal sealed class RefreshTokenService : IRefreshTokenService
 {
     private const int TOKEN_SIZE_IN_BYTES = 32;
 

@@ -11,7 +11,7 @@ namespace AuthCore.Infrastructure.Security.Emails;
 /// <summary>
 /// Representa serviço de geração de verificação de e-mail com SHA-256.
 /// </summary>
-public sealed class Sha256EmailVerificationService : IEmailVerificationService
+internal sealed class Sha256EmailVerificationService : IEmailVerificationService
 {
     private readonly EmailVerificationOptions _emailVerificationOptions;
 

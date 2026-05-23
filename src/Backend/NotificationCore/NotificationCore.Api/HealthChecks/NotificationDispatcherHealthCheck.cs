@@ -7,7 +7,7 @@ namespace NotificationCore.Api.HealthChecks;
 /// <summary>
 /// Representa health check para a configuração do despachante de notificações.
 /// </summary>
-public sealed class NotificationDispatcherHealthCheck : IHealthCheck
+internal sealed class NotificationDispatcherHealthCheck : IHealthCheck
 {
     private readonly NotificationDispatcherOptions _options;
 

@@ -10,7 +10,7 @@ namespace AuthCore.Infrastructure.Services.Caching;
 /// <summary>
 /// Representa store Redis de sessões autenticadas.
 /// </summary>
-public sealed class RedisSessionStore : ISessionStore
+internal sealed class RedisSessionStore : ISessionStore
 {
     private readonly IDatabase _database;
     private readonly RedisOptions _redisOptions;

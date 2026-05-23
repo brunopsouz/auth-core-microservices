@@ -8,7 +8,7 @@ namespace AuthCore.Api.HealthChecks;
 /// <summary>
 /// Representa health check para a consulta da outbox.
 /// </summary>
-public sealed class OutboxHealthCheck : IHealthCheck
+internal sealed class OutboxHealthCheck : IHealthCheck
 {
     private readonly IOutboxRepository _outboxRepository;
     private readonly OutboxOptions _outboxOptions;

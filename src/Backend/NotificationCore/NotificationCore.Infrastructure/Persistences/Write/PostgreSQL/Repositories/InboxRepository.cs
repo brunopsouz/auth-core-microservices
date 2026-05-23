@@ -9,7 +9,7 @@ namespace NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.Reposito
 /// <summary>
 /// Representa repositório PostgreSQL da inbox.
 /// </summary>
-public sealed class InboxRepository : IInboxRepository
+internal sealed class InboxRepository : IInboxRepository
 {
     private readonly IDatabaseSession _databaseSession;
 

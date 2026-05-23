@@ -6,7 +6,7 @@ namespace AuthCore.Application.Users.UseCases.GetUserProfile;
 /// <summary>
 /// Representa caso de uso para obter o perfil do usuário autenticado.
 /// </summary>
-public sealed class GetUserProfileUseCase : IGetUserProfileUseCase
+internal sealed class GetUserProfileUseCase : IGetUserProfileUseCase
 {
     private readonly IUserReadRepository _userReadRepository;
 

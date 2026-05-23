@@ -6,7 +6,7 @@ namespace NotificationCore.Application.Notifications.UseCases.SendTestEmailNotif
 /// <summary>
 /// Representa caso de uso para enviar e-mail de teste.
 /// </summary>
-public sealed class SendTestEmailNotificationUseCase : ISendTestEmailNotificationUseCase
+internal sealed class SendTestEmailNotificationUseCase : ISendTestEmailNotificationUseCase
 {
     private const string DEFAULT_PROVIDER = "EmailProvider";
     private const string TEST_SUBJECT = "Teste de notificação";

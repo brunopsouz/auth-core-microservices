@@ -13,7 +13,7 @@ namespace AuthCore.Api.Authentication;
 /// <summary>
 /// Representa handler de autenticação por cookie de sessão.
 /// </summary>
-public sealed class SessionAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+internal sealed class SessionAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     private readonly AuthCookieOptions _authCookieOptions;
     private readonly ISessionService _sessionService;

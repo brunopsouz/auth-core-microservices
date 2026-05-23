@@ -8,7 +8,7 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// <summary>
 /// Representa repositório PostgreSQL da outbox.
 /// </summary>
-public sealed class OutboxRepository : IOutboxRepository
+internal sealed class OutboxRepository : IOutboxRepository
 {
     private readonly IDatabaseSession _databaseSession;
 

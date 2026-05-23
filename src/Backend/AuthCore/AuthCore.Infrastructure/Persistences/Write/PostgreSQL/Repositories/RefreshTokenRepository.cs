@@ -8,7 +8,7 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// <summary>
 /// Representa repositório PostgreSQL de refresh token.
 /// </summary>
-public sealed class RefreshTokenRepository : IRefreshTokenRepository
+internal sealed class RefreshTokenRepository : IRefreshTokenRepository
 {
     private readonly IDatabaseSession _databaseSession;
 

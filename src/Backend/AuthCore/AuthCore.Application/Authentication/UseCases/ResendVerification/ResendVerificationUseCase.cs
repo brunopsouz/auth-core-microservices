@@ -11,7 +11,7 @@ namespace AuthCore.Application.Authentication.UseCases.ResendVerification;
 /// <summary>
 /// Representa caso de uso para reenviar a verificação de e-mail.
 /// </summary>
-public sealed class ResendVerificationUseCase : IResendVerificationUseCase
+internal sealed class ResendVerificationUseCase : IResendVerificationUseCase
 {
     private readonly IEmailVerificationRepository _emailVerificationRepository;
     private readonly IEmailVerificationNotificationOutboxFactory _emailVerificationNotificationOutboxFactory;

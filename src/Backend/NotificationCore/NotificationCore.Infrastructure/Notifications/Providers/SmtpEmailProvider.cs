@@ -22,7 +22,7 @@ using SystemAuthenticationException = System.Security.Authentication.Authenticat
 /// <summary>
 /// Representa provedor SMTP para envio de e-mails.
 /// </summary>
-public sealed class SmtpEmailProvider : IEmailProvider
+internal sealed class SmtpEmailProvider : IEmailProvider
 {
     private const string PROVIDER = "Smtp";
     private const string TEMPORARY_FAILURE_MESSAGE = "Falha temporária no SMTP.";

@@ -9,7 +9,7 @@ namespace AuthCore.Api.Security;
 /// <summary>
 /// Representa limitador Redis para tentativas de login.
 /// </summary>
-public sealed class RedisLoginRateLimiter : ILoginRateLimiter
+internal sealed class RedisLoginRateLimiter : ILoginRateLimiter
 {
     private readonly IDatabase _database;
     private readonly RedisOptions _redisOptions;
