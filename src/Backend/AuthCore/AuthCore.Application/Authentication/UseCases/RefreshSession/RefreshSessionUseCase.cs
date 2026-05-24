@@ -1,9 +1,9 @@
 using AuthCore.Application.Authentication.Models;
 using AuthCore.Domain.Common.Repositories;
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Security.Tokens.Services;
-using AuthCore.Domain.Users.Aggregates;
+using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 
 namespace AuthCore.Application.Authentication.UseCases.RefreshSession;

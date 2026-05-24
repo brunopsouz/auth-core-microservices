@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using AuthCore.Domain.Common.Exceptions;
-using AuthCore.Domain.Users.Enums;
+using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 
 namespace AuthCore.Api.Security;

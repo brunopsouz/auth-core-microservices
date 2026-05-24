@@ -1,4 +1,4 @@
-using AuthCore.Domain.Passports.Services;
+using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Options;
 

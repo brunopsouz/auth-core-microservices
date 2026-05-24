@@ -1,4 +1,4 @@
-using AuthCore.Domain.Users.Aggregates;
+using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 using AuthCore.Infrastructure.Abstractions.Data;
 using Npgsql;

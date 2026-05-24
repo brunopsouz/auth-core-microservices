@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using AuthCore.Domain.Common.Exceptions;
 
-namespace AuthCore.Domain.Passports.Aggregates;
+namespace AuthCore.Domain.Passports;
 
 /// <summary>
 /// Representa uma sessão autenticada do usuário.
@@ -48,7 +48,6 @@ public sealed class Session
     /// </summary>
     public DateTime? RevokedAtUtc { get; private set; }
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -90,9 +89,7 @@ public sealed class Session
         Validate();
     }
 
-    #endregion
 
-    #region Factory
 
     /// <summary>
     /// Operação para emitir uma nova sessão autenticada.
@@ -154,7 +151,6 @@ public sealed class Session
             revokedAtUtc);
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para indicar se a sessão está utilizável no instante informado.
@@ -208,7 +204,6 @@ public sealed class Session
             revokedAtUtc);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para validar a consistência da sessão.
@@ -265,5 +260,4 @@ public sealed class Session
             : value.Trim();
     }
 
-    #endregion
 }

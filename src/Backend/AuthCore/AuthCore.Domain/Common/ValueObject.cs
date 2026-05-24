@@ -1,4 +1,4 @@
-namespace AuthCore.Domain.Common.ValueObjects;
+namespace AuthCore.Domain.Common;
 
 /// <summary>
 /// Representa o tipo base para objetos de valor.

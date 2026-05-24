@@ -1,5 +1,5 @@
 using AuthCore.Domain.Security.Tokens.Models;
-using AuthCore.Domain.Users.Aggregates;
+using AuthCore.Domain.Users;
 
 namespace AuthCore.Domain.Security.Tokens.Services;
 

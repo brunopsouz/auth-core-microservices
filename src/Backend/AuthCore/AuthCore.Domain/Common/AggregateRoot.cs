@@ -1,13 +1,12 @@
-using AuthCore.Domain.Common.Entities;
+using AuthCore.Domain.Common;
 
-namespace AuthCore.Domain.Common.Aggregates;
+namespace AuthCore.Domain.Common;
 
 /// <summary>
 /// Representa o tipo base para raízes de agregado.
 /// </summary>
 public abstract class AggregateRoot : EntityBase
 {
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -40,5 +39,4 @@ public abstract class AggregateRoot : EntityBase
     {
     }
 
-    #endregion
 }

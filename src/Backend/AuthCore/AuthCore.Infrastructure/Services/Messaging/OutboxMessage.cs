@@ -1,6 +1,4 @@
-using AuthCore.Domain.Common.Exceptions;
-
-namespace AuthCore.Domain.Common.DomainEvents;
+namespace AuthCore.Infrastructure.Services.Messaging;
 
 /// <summary>
 /// Representa uma mensagem persistida na outbox.
@@ -42,8 +40,6 @@ public sealed class OutboxMessage
     /// </summary>
     public string? LastError { get; private set; }
 
-    #region Constructors
-
     /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
@@ -80,10 +76,6 @@ public sealed class OutboxMessage
 
         Validate();
     }
-
-    #endregion
-
-    #region Factory
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -134,8 +126,6 @@ public sealed class OutboxMessage
             lastError);
     }
 
-    #endregion
-
     /// <summary>
     /// Operação para marcar a mensagem como processada.
     /// </summary>
@@ -143,7 +133,8 @@ public sealed class OutboxMessage
     /// <returns>Mensagem processada.</returns>
     public OutboxMessage MarkAsProcessed(DateTime processedAtUtc)
     {
-        DomainException.When(processedAtUtc == default, "A data de processamento da outbox é obrigatória.");
+        if (processedAtUtc == default)
+            throw new InvalidOperationException("A data de processamento da outbox é obrigatória.");
 
         return new OutboxMessage(
             Id,
@@ -172,18 +163,21 @@ public sealed class OutboxMessage
             errorMessage);
     }
 
-    #region Helpers
-
     /// <summary>
     /// Operação para validar a consistência da mensagem.
     /// </summary>
     private void Validate()
     {
-        DomainException.When(Id == Guid.Empty, "O identificador da mensagem de outbox é obrigatório.");
-        DomainException.When(string.IsNullOrWhiteSpace(Type), "O tipo da mensagem de outbox é obrigatório.");
-        DomainException.When(string.IsNullOrWhiteSpace(Content), "O conteúdo da mensagem de outbox é obrigatório.");
-        DomainException.When(OccurredAtUtc == default, "A data de ocorrência da mensagem de outbox é obrigatória.");
-        DomainException.When(AttemptCount < 0, "A quantidade de tentativas da outbox não pode ser negativa.");
+        if (Id == Guid.Empty)
+            throw new InvalidOperationException("O identificador da mensagem de outbox é obrigatório.");
+        if (string.IsNullOrWhiteSpace(Type))
+            throw new InvalidOperationException("O tipo da mensagem de outbox é obrigatório.");
+        if (string.IsNullOrWhiteSpace(Content))
+            throw new InvalidOperationException("O conteúdo da mensagem de outbox é obrigatório.");
+        if (OccurredAtUtc == default)
+            throw new InvalidOperationException("A data de ocorrência da mensagem de outbox é obrigatória.");
+        if (AttemptCount < 0)
+            throw new InvalidOperationException("A quantidade de tentativas da outbox não pode ser negativa.");
     }
 
     /// <summary>
@@ -209,6 +203,4 @@ public sealed class OutboxMessage
             ? null
             : value.Trim();
     }
-
-    #endregion
 }

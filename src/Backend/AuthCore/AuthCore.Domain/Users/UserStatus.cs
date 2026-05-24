@@ -1,4 +1,4 @@
-namespace AuthCore.Domain.Users.Enums;
+namespace AuthCore.Domain.Users;
 
 /// <summary>
 /// Representa o status funcional do usuário.

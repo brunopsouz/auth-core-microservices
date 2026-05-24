@@ -1,9 +1,9 @@
 using System.Text.RegularExpressions;
-using AuthCore.Domain.Common.Aggregates;
+using AuthCore.Domain.Common;
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.Exceptions;
 
-namespace AuthCore.Domain.Passports.Aggregates;
+namespace AuthCore.Domain.Passports;
 
 /// <summary>
 /// Representa a credencial de autenticação do usuário.
@@ -57,16 +57,13 @@ public sealed class Password : AggregateRoot
         LoginAttempt = attempts;
     }
 
-    #region Constructors
 
     /// <summary>
     /// Construtor sem parâmetros utilizado por ferramentas de materialização.
     /// </summary>
     private Password() { }
 
-    #endregion
 
-    #region Factory
 
     /// <summary>
     /// Cria a senha com o valor já criptografado.
@@ -105,7 +102,6 @@ public sealed class Password : AggregateRoot
         return new Password(userId, hashedPassword, attempts, status);
     }
 
-    #endregion
 
     /// <summary>
     /// Valida os critérios mínimos da senha.
@@ -210,7 +206,6 @@ public sealed class Password : AggregateRoot
         return LoginAttempt.GetLockMessage();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Valida a consistência do estado interno da senha.
@@ -247,5 +242,4 @@ public sealed class Password : AggregateRoot
             throw new DomainException("O status bloqueado exige um bloqueio de login ativo.");
     }
 
-    #endregion
 }

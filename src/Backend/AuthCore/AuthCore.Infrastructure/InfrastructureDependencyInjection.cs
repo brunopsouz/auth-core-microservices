@@ -1,7 +1,5 @@
 using AuthCore.Domain.Common.DomainEvents;
-using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports.Repositories;
-using AuthCore.Domain.Passports.Services;
 using AuthCore.Domain.Security.Cryptography;
 using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Domain.Users.Repositories;
@@ -51,8 +49,6 @@ public static class InfrastructureDependencyInjection
         return services;
     }
 
-    #region Helpers
-
     /// <summary>
     /// Operação para adicionar as opções de configuração da infraestrutura.
     /// </summary>
@@ -101,7 +97,7 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<IEmailVerificationService, Sha256EmailVerificationService>();
-        services.AddScoped<IEmailVerificationNotificationOutboxFactory, EmailVerificationNotificationOutboxFactory>();
+        services.AddScoped<IEmailVerificationRequestedPublisher, EmailVerificationRequestedPublisher>();
         services.AddScoped<INotificationRequestPublisher, RabbitMqNotificationRequestPublisher>();
         services.AddSingleton<OutboxMetrics>();
         services.AddScoped<IOutboxProcessor, OutboxProcessor>();
@@ -120,7 +116,7 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IPasswordRepository, PasswordRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IEmailVerificationRepository, EmailVerificationRepository>();
-        services.AddScoped<IOutboxRepository, OutboxRepository>();
+        services.AddScoped<IOutboxMessageRepository, OutboxRepository>();
         services.AddScoped<ISessionStore, RedisSessionStore>();
     }
 
@@ -294,5 +290,4 @@ public static class InfrastructureDependencyInjection
             ?? string.Empty;
     }
 
-    #endregion
 }

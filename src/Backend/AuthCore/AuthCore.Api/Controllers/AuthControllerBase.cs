@@ -6,7 +6,7 @@ using AuthCore.Api.Security;
 using AuthCore.Application.Authentication.Models;
 using AuthCore.Application.Common.Models.Responses;
 using AuthCore.Domain.Common.Exceptions;
-using AuthCore.Domain.Users.Enums;
+using AuthCore.Domain.Users;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.AspNetCore.Mvc;
 

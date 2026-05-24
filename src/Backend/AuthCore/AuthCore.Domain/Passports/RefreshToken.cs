@@ -1,7 +1,7 @@
-using AuthCore.Domain.Common.Aggregates;
+using AuthCore.Domain.Common;
 using AuthCore.Domain.Common.Exceptions;
 
-namespace AuthCore.Domain.Passports.Aggregates;
+namespace AuthCore.Domain.Passports;
 
 /// <summary>
 /// Representa um token de renovação de sessão.
@@ -53,7 +53,6 @@ public sealed class RefreshToken : AggregateRoot
     /// </summary>
     public string? RevocationReason { get; private set; }
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -163,9 +162,7 @@ public sealed class RefreshToken : AggregateRoot
             RevocationReason);
     }
 
-    #endregion
 
-    #region Factory
 
     /// <summary>
     /// Operação para emitir o primeiro refresh token de uma sessão.
@@ -267,7 +264,6 @@ public sealed class RefreshToken : AggregateRoot
             revocationReason);
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para consumir o refresh token na rotação da sessão.
@@ -354,7 +350,6 @@ public sealed class RefreshToken : AggregateRoot
         return !ConsumedAtUtc.HasValue;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para validar a consistência do estado interno do refresh token.
@@ -422,5 +417,4 @@ public sealed class RefreshToken : AggregateRoot
             : reason.Trim();
     }
 
-    #endregion
 }

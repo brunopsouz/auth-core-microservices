@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
-using AuthCore.Domain.Common.Aggregates;
+using AuthCore.Domain.Common;
 using AuthCore.Domain.Common.Exceptions;
 
-namespace AuthCore.Domain.Passports.Aggregates;
+namespace AuthCore.Domain.Passports;
 
 /// <summary>
 /// Representa a verificação de e-mail pendente do usuário.
@@ -61,7 +61,6 @@ public sealed class EmailVerification : AggregateRoot
     /// </summary>
     public DateTime? RevokedAtUtc { get; private set; }
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -157,9 +156,7 @@ public sealed class EmailVerification : AggregateRoot
         Validate();
     }
 
-    #endregion
 
-    #region Factory
 
     /// <summary>
     /// Operação para emitir uma nova verificação de e-mail.
@@ -241,7 +238,6 @@ public sealed class EmailVerification : AggregateRoot
             revokedAtUtc);
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para indicar se a verificação está ativa no instante informado.
@@ -389,7 +385,6 @@ public sealed class EmailVerification : AggregateRoot
         return value.ToString($"D{CODE_LENGTH}");
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para validar a consistência da verificação.
@@ -432,5 +427,4 @@ public sealed class EmailVerification : AggregateRoot
             : codeHash.Trim();
     }
 
-    #endregion
 }

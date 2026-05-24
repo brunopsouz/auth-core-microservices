@@ -1,4 +1,4 @@
-using AuthCore.Domain.Users.Aggregates;
+using AuthCore.Domain.Users;
 
 namespace AuthCore.Domain.Users.Repositories;
 

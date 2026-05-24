@@ -4,7 +4,6 @@ using System.Text.Json;
 using BuildingBlocks.Messaging.Contracts.Notifications;
 using BuildingBlocks.Messaging.Contracts.Security;
 using AuthCore.Domain.Common.DomainEvents;
-using AuthCore.Domain.Common.Repositories;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,14 +23,12 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     private const string EXPIRES_IN_MINUTES_VARIABLE = "expiresInMinutes";
     private const string LEGACY_IDEMPOTENCY_KEY_PREFIX = "auth-email-confirmation-legacy";
 
-    private readonly IOutboxRepository _outboxRepository;
+    private readonly IOutboxMessageRepository _outboxRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationRequestPublisher _notificationRequestPublisher;
     private readonly OutboxOptions _outboxOptions;
     private readonly OutboxMetrics _outboxMetrics;
     private readonly ILogger<OutboxProcessor> _logger;
-
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -43,7 +40,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     /// <param name="outboxMetrics">Métricas da outbox.</param>
     /// <param name="logger">Serviço de logging.</param>
     public OutboxProcessor(
-        IOutboxRepository outboxRepository,
+        IOutboxMessageRepository outboxRepository,
         IUnitOfWork unitOfWork,
         INotificationRequestPublisher notificationRequestPublisher,
         IOptions<OutboxOptions> outboxOptions,
@@ -57,8 +54,6 @@ internal sealed class OutboxProcessor : IOutboxProcessor
         _outboxMetrics = outboxMetrics;
         _logger = logger;
     }
-
-    #endregion
 
     /// <summary>
     /// Operação para processar mensagens pendentes da outbox.
@@ -116,8 +111,6 @@ internal sealed class OutboxProcessor : IOutboxProcessor
             _outboxMetrics.RecordDuration(stopwatch.Elapsed);
         }
     }
-
-    #region Helpers
 
     /// <summary>
     /// Operação para processar uma mensagem da outbox.
@@ -297,5 +290,4 @@ internal sealed class OutboxProcessor : IOutboxProcessor
         return SensitivePayloadSanitizer.SanitizeText(message);
     }
 
-    #endregion
 }

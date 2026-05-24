@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
 using AuthCore.Domain.Common.Exceptions;
-using AuthCore.Domain.Common.ValueObjects;
+using AuthCore.Domain.Common;
 
-namespace AuthCore.Domain.Users.ValueObjects;
+namespace AuthCore.Domain.Users;
 
 /// <summary>
 /// Representa um endereço de e-mail validado do domínio.
@@ -14,7 +14,6 @@ public sealed class Email : ValueObject
     /// </summary>
     public string Value { get; } = null!;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -32,7 +31,6 @@ public sealed class Email : ValueObject
     {
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para criar o e-mail validado.
@@ -137,7 +135,6 @@ public sealed class Email : ValueObject
         return !Equals(left, right);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para obter os componentes usados na igualdade.
@@ -148,5 +145,4 @@ public sealed class Email : ValueObject
         yield return Value;
     }
 
-    #endregion
 }

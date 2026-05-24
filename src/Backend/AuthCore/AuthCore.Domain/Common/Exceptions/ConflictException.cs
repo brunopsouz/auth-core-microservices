@@ -5,7 +5,6 @@ namespace AuthCore.Domain.Common.Exceptions;
 /// </summary>
 public sealed class ConflictException : DomainException
 {
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -13,5 +12,4 @@ public sealed class ConflictException : DomainException
     /// <param name="message">Mensagem que descreve o erro.</param>
     public ConflictException(string message) : base(message) { }
 
-    #endregion
 }

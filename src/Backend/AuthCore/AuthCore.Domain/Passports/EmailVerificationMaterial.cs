@@ -1,4 +1,4 @@
-namespace AuthCore.Domain.Passports.Models;
+namespace AuthCore.Domain.Passports;
 
 /// <summary>
 /// Representa o material gerado para verificação de e-mail.

@@ -1,4 +1,4 @@
-namespace AuthCore.Domain.Passports.Services;
+namespace AuthCore.Domain.Passports.Repositories;
 
 /// <summary>
 /// Define operações para cálculo de expiração de sessão.

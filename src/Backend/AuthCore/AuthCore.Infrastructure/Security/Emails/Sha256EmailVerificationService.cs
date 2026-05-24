@@ -1,8 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
-using AuthCore.Domain.Passports.Aggregates;
-using AuthCore.Domain.Passports.Models;
-using AuthCore.Domain.Passports.Services;
+using AuthCore.Domain.Passports;
+using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Options;
 

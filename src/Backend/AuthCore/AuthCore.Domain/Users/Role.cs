@@ -1,4 +1,4 @@
-namespace AuthCore.Domain.Users.Enums;
+namespace AuthCore.Domain.Users;
 
 /// <summary>Perfis de usuário.</summary>
 public enum Role

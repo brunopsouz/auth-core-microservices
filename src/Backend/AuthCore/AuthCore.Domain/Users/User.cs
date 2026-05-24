@@ -1,9 +1,7 @@
-using AuthCore.Domain.Common.Aggregates;
+using AuthCore.Domain.Common;
 using AuthCore.Domain.Common.Exceptions;
-using AuthCore.Domain.Users.Enums;
-using AuthCore.Domain.Users.ValueObjects;
 
-namespace AuthCore.Domain.Users.Aggregates;
+namespace AuthCore.Domain.Users;
 
 /// <summary>
 /// Representa uma conta de usuário.
@@ -65,7 +63,6 @@ public sealed class User : AggregateRoot
     /// </summary>
     public bool CanSignIn => IsActive && Status == UserStatus.Active && IsEmailVerified;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -153,9 +150,7 @@ public sealed class User : AggregateRoot
         Validate();
     }
 
-    #endregion
 
-    #region Factory
 
     /// <summary>
     /// Operação para registrar um novo usuário.
@@ -299,7 +294,6 @@ public sealed class User : AggregateRoot
             emailVerifiedAt);
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para verificar o e-mail do usuário.
@@ -369,7 +363,6 @@ public sealed class User : AggregateRoot
         SetUpdateData();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para montar o nome completo do usuário.
@@ -398,5 +391,4 @@ public sealed class User : AggregateRoot
         DomainException.When(Status == UserStatus.Active && !IsEmailVerified, "O usuário ativo deve possuir e-mail verificado.");
     }
 
-    #endregion
 }

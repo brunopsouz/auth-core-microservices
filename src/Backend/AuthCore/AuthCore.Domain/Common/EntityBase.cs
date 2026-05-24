@@ -1,4 +1,4 @@
-namespace AuthCore.Domain.Common.Entities; 
+namespace AuthCore.Domain.Common; 
 
 /// <summary>
 /// Classe para entidade base contendo propriedades em comum entre todas entidades.

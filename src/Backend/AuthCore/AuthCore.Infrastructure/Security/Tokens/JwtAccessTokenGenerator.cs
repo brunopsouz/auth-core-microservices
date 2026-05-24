@@ -4,7 +4,7 @@ using System.Text;
 using AuthCore.Domain.Security.Tokens;
 using AuthCore.Domain.Security.Tokens.Models;
 using AuthCore.Domain.Security.Tokens.Services;
-using AuthCore.Domain.Users.Aggregates;
+using AuthCore.Domain.Users;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;

@@ -1,5 +1,5 @@
 using AuthCore.Domain.Common.Enums;
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Infrastructure.Abstractions.Data;
 using Npgsql;

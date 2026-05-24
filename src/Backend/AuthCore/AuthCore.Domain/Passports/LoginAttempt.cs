@@ -1,7 +1,7 @@
 using AuthCore.Domain.Common.Exceptions;
-using AuthCore.Domain.Common.ValueObjects;
+using AuthCore.Domain.Common;
 
-namespace AuthCore.Domain.Passports.Aggregates;
+namespace AuthCore.Domain.Passports;
 
 /// <summary>
 /// Representa o controle de tentativas de login.
@@ -9,7 +9,6 @@ namespace AuthCore.Domain.Passports.Aggregates;
 public sealed class LoginAttempt : ValueObject
 {
 
-    #region Constants
 
     /// <summary>
     /// Quantidade máxima de falhas permitidas antes do bloqueio.
@@ -21,7 +20,6 @@ public sealed class LoginAttempt : ValueObject
     /// </summary>
     private static readonly TimeSpan LOCK_DURATION = TimeSpan.FromMinutes(15);
 
-    #endregion
 
     /// <summary>
     /// Quantidade atual de tentativas de login com falha.
@@ -60,7 +58,6 @@ public sealed class LoginAttempt : ValueObject
     /// </summary>
     private LoginAttempt() { }
 
-    #region Factory
 
     /// <summary>
     /// Cria um novo controle de tentativas.
@@ -86,7 +83,6 @@ public sealed class LoginAttempt : ValueObject
         return new LoginAttempt(failedAttempts, lastFailedAt, lockedUntil);
     }
 
-    #endregion
 
     /// <summary>
     /// Registra falha e aplica bloqueio quando necessário.
@@ -147,7 +143,6 @@ public sealed class LoginAttempt : ValueObject
         return $"A conta está temporariamente bloqueada. Tente novamente em {Math.Ceiling(remaining.TotalMinutes)} minutos.";
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para obter os componentes usados na igualdade.
@@ -211,5 +206,4 @@ public sealed class LoginAttempt : ValueObject
             throw new DomainException("A data de expiração do bloqueio deve ser posterior à última falha.");
     }
 
-    #endregion
 }

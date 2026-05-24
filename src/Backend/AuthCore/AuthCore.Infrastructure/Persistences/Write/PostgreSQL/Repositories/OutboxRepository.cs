@@ -1,6 +1,5 @@
-using AuthCore.Domain.Common.DomainEvents;
-using AuthCore.Domain.Common.Repositories;
 using AuthCore.Infrastructure.Abstractions.Data;
+using AuthCore.Infrastructure.Services.Messaging;
 using Npgsql;
 
 namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
@@ -8,11 +7,9 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// <summary>
 /// Representa repositório PostgreSQL da outbox.
 /// </summary>
-internal sealed class OutboxRepository : IOutboxRepository
+internal sealed class OutboxRepository : IOutboxMessageRepository
 {
     private readonly IDatabaseSession _databaseSession;
-
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -22,8 +19,6 @@ internal sealed class OutboxRepository : IOutboxRepository
     {
         _databaseSession = databaseSession;
     }
-
-    #endregion
 
     /// <summary>
     /// Operação para adicionar uma mensagem de outbox.
@@ -146,8 +141,6 @@ internal sealed class OutboxRepository : IOutboxRepository
         await command.ExecuteNonQueryAsync();
     }
 
-    #region Helpers
-
     /// <summary>
     /// Operação para adicionar os parâmetros da outbox ao comando SQL.
     /// </summary>
@@ -188,5 +181,4 @@ internal sealed class OutboxRepository : IOutboxRepository
         return new NpgsqlCommand(sql, connection, _databaseSession.CurrentTransaction);
     }
 
-    #endregion
 }

@@ -1,4 +1,4 @@
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 
 namespace AuthCore.Domain.Passports.Repositories;
 

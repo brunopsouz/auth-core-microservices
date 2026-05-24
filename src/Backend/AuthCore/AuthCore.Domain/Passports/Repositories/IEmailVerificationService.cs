@@ -1,6 +1,6 @@
-using AuthCore.Domain.Passports.Models;
+using AuthCore.Domain.Passports;
 
-namespace AuthCore.Domain.Passports.Services;
+namespace AuthCore.Domain.Passports.Repositories;
 
 /// <summary>
 /// Define operações para geração e validação de verificação de e-mail.

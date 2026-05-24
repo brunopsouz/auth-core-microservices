@@ -2,13 +2,12 @@ using AuthCore.Application.Authentication.Models;
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Security.Cryptography;
 using AuthCore.Domain.Security.Tokens.Models;
 using AuthCore.Domain.Security.Tokens.Services;
-using AuthCore.Domain.Users.Aggregates;
-using AuthCore.Domain.Users.Enums;
+using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 
 namespace AuthCore.Application.Authentication.UseCases.Login;

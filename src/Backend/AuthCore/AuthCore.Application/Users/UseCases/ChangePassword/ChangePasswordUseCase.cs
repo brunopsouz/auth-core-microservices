@@ -1,7 +1,7 @@
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Security.Cryptography;
 using AuthCore.Domain.Users.Repositories;

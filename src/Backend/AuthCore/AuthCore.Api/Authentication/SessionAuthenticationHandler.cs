@@ -1,8 +1,7 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
-using AuthCore.Domain.Passports.Services;
 using AuthCore.Domain.Users.Repositories;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.AspNetCore.Authentication;
