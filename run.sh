@@ -7,6 +7,11 @@ BACKEND_DIR="$ROOT_DIR/src/Backend"
 COMPOSE_FILE="$BACKEND_DIR/docker-compose.yml"
 ENV_FILE="$BACKEND_DIR/.env.development"
 AUTHCORE_API_PROJECT="$BACKEND_DIR/AuthCore/AuthCore.Api/AuthCore.Api.csproj"
+NOTIFICATIONCORE_API_PROJECT="$BACKEND_DIR/NotificationCore/NotificationCore.Api/NotificationCore.Api.csproj"
+GATEWAY_API_PROJECT="$BACKEND_DIR/Gateway/Gateway.Api/Gateway.Api.csproj"
+AUTHCORE_SERVICE_SOLUTION="$BACKEND_DIR/AuthCore/AuthCore.Service.sln"
+NOTIFICATIONCORE_SERVICE_SOLUTION="$BACKEND_DIR/NotificationCore/NotificationCore.Service.sln"
+GATEWAY_SERVICE_SOLUTION="$BACKEND_DIR/Gateway/Gateway.Service.sln"
 DEFAULT_COMMAND="${1:-dev}"
 
 GREEN='\033[1;32m'
@@ -187,8 +192,16 @@ Comandos:
   watch     Igual ao dev, mas usa dotnet watch.
   infra     Sobe apenas a infraestrutura em background.
   docker    Sobe toda a aplicacao com Docker Compose.
-  build     Compila a solucao.
-  test      Executa os testes da solucao.
+  build     Compila os projetos de producao dos microservicos, sem testes.
+  build-all Compila a solucao raiz agregadora.
+  test      Executa apenas os testes atualmente estaveis.
+  test-all  Executa os testes por solucao de microservico.
+  build-authcore Compila a API de producao do AuthCore.
+  build-notificationcore Compila a API de producao do NotificationCore.
+  build-gateway Compila a API de producao do Gateway.
+  test-authcore Executa os testes do AuthCore.
+  test-notificationcore Executa os testes do NotificationCore.
+  test-gateway Executa os testes do Gateway.
   down      Encerra os containers do docker compose.
   help      Exibe esta ajuda.
 
@@ -257,18 +270,83 @@ run_docker() {
 
 build_solution() {
     ensure_command dotnet
+
+    echo -e "${YELLOW}Compilando projetos de producao...${NC}"
+    build_authcore
+    build_notificationcore
+    build_gateway
+}
+
+build_all() {
+    ensure_command dotnet
     ensure_file "$SOLUTION_FILE"
 
-    echo -e "${YELLOW}Compilando solucao...${NC}"
+    echo -e "${YELLOW}Compilando solucao raiz agregadora...${NC}"
     dotnet build "$SOLUTION_FILE"
 }
 
 test_solution() {
     ensure_command dotnet
-    ensure_file "$SOLUTION_FILE"
 
-    echo -e "${YELLOW}Executando testes...${NC}"
-    dotnet test "$SOLUTION_FILE"
+    echo -e "${YELLOW}Executando testes atualmente estaveis...${NC}"
+    test_notificationcore
+}
+
+test_all() {
+    ensure_command dotnet
+
+    echo -e "${YELLOW}Executando testes por microservico...${NC}"
+    test_authcore
+    test_notificationcore
+    test_gateway
+}
+
+build_authcore() {
+    ensure_command dotnet
+    ensure_file "$AUTHCORE_API_PROJECT"
+
+    echo -e "${YELLOW}Compilando AuthCore.Api...${NC}"
+    dotnet build "$AUTHCORE_API_PROJECT" -c Release
+}
+
+build_notificationcore() {
+    ensure_command dotnet
+    ensure_file "$NOTIFICATIONCORE_API_PROJECT"
+
+    echo -e "${YELLOW}Compilando NotificationCore.Api...${NC}"
+    dotnet build "$NOTIFICATIONCORE_API_PROJECT" -c Release
+}
+
+build_gateway() {
+    ensure_command dotnet
+    ensure_file "$GATEWAY_API_PROJECT"
+
+    echo -e "${YELLOW}Compilando Gateway.Api...${NC}"
+    dotnet build "$GATEWAY_API_PROJECT" -c Release
+}
+
+test_authcore() {
+    ensure_command dotnet
+    ensure_file "$AUTHCORE_SERVICE_SOLUTION"
+
+    echo -e "${YELLOW}Executando testes do AuthCore...${NC}"
+    dotnet test "$AUTHCORE_SERVICE_SOLUTION" -c Release
+}
+
+test_notificationcore() {
+    ensure_command dotnet
+    ensure_file "$NOTIFICATIONCORE_SERVICE_SOLUTION"
+
+    echo -e "${YELLOW}Executando testes do NotificationCore...${NC}"
+    dotnet test "$NOTIFICATIONCORE_SERVICE_SOLUTION" -c Release
+}
+
+test_gateway() {
+    ensure_command dotnet
+    ensure_file "$GATEWAY_SERVICE_SOLUTION"
+
+    echo -e "${YELLOW}Executando testes do Gateway...${NC}"
+    dotnet test "$GATEWAY_SERVICE_SOLUTION" -c Release
 }
 
 stop_containers() {
@@ -303,8 +381,32 @@ case "$DEFAULT_COMMAND" in
     build)
         build_solution
         ;;
+    build-all)
+        build_all
+        ;;
     test)
         test_solution
+        ;;
+    test-all)
+        test_all
+        ;;
+    build-authcore)
+        build_authcore
+        ;;
+    build-notificationcore)
+        build_notificationcore
+        ;;
+    build-gateway)
+        build_gateway
+        ;;
+    test-authcore)
+        test_authcore
+        ;;
+    test-notificationcore)
+        test_notificationcore
+        ;;
+    test-gateway)
+        test_gateway
         ;;
     down)
         stop_containers

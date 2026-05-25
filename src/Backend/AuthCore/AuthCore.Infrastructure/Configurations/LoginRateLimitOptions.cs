@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de limitação do login.
 /// </summary>
-public sealed class LoginRateLimitOptions
+internal sealed class LoginRateLimitOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

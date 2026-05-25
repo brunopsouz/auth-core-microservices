@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Ocelot.DependencyInjection;
+using NetIPNetwork = System.Net.IPNetwork;
 
 namespace Gateway.Api;
 
@@ -80,7 +81,7 @@ public static class GatewayDependencyInjection
                 options.KnownProxies.Add(ParseIpAddress(knownProxy));
 
             foreach (var knownNetwork in proxyForwardingOptions.KnownNetworks)
-                options.KnownNetworks.Add(ParseNetwork(knownNetwork));
+                options.KnownIPNetworks.Add(ParseNetwork(knownNetwork));
         });
     }
 
@@ -157,7 +158,7 @@ public static class GatewayDependencyInjection
     /// </summary>
     /// <param name="network">Rede informada na configuração.</param>
     /// <returns>Rede válida para confiança dos headers encaminhados.</returns>
-    private static Microsoft.AspNetCore.HttpOverrides.IPNetwork ParseNetwork(string network)
+    private static NetIPNetwork ParseNetwork(string network)
     {
         var segments = (network ?? string.Empty)
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -169,7 +170,7 @@ public static class GatewayDependencyInjection
             throw new InvalidOperationException($"A rede confiável '{network}' não está em formato CIDR válido.");
         }
 
-        return new Microsoft.AspNetCore.HttpOverrides.IPNetwork(prefix, prefixLength);
+        return new NetIPNetwork(prefix, prefixLength);
     }
 
     #endregion

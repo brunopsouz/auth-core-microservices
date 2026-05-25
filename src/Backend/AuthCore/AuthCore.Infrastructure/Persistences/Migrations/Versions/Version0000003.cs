@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migração de inclusão da verificação de e-mail.
 /// </summary>
-public sealed class Version0000003 : ForwardOnlyMigration
+internal sealed class Version0000003 : ForwardOnlyMigration
 {
     /// <summary>
     /// Operação para aplicar a migração da versão atual.

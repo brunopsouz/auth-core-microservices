@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Representa métricas do processamento da outbox.
 /// </summary>
-public sealed class OutboxMetrics
+internal sealed class OutboxMetrics
 {
     private static readonly Meter Meter = new("AuthCore.Outbox", "1.0.0");
 

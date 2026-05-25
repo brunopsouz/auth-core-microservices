@@ -3,7 +3,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Define operação para processar mensagens pendentes da outbox.
 /// </summary>
-public interface IOutboxProcessor
+internal interface IOutboxProcessor
 {
     /// <summary>
     /// Operação para processar mensagens pendentes da outbox.

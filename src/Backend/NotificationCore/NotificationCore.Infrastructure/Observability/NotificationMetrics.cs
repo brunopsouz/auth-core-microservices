@@ -5,7 +5,7 @@ namespace NotificationCore.Infrastructure.Observability;
 /// <summary>
 /// Representa métricas do fluxo de notificações.
 /// </summary>
-public sealed class NotificationMetrics
+internal sealed class NotificationMetrics
 {
     private static readonly Meter Meter = new("NotificationCore.Notifications", "1.0.0");
     private static readonly Counter<long> PendingNotifications = Meter.CreateCounter<long>(

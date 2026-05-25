@@ -14,13 +14,14 @@ public sealed class TemplatesController : ControllerBase
     /// <summary>
     /// Operação para listar templates ativos.
     /// </summary>
-    /// <param name="templateRepository">Repositório responsável pela leitura de templates.</param>
+    /// <param name="serviceProvider">Provider de serviços da aplicação.</param>
     /// <returns>Resposta com templates ativos.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyCollection<ResponseNotificationTemplateJson>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<ResponseNotificationTemplateJson>>> ListActive(
-        [FromServices] INotificationTemplateRepository templateRepository)
+        [FromServices] IServiceProvider serviceProvider)
     {
+        var templateRepository = serviceProvider.GetRequiredService<INotificationTemplateRepository>();
         var templates = await templateRepository.ListActiveAsync();
 
         return Ok(templates

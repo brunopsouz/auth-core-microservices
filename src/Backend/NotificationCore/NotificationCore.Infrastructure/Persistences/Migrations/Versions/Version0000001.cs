@@ -6,7 +6,7 @@ namespace NotificationCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migração de criação do schema inicial de notificações.
 /// </summary>
-public sealed class Version0000001 : VersionBase
+internal sealed class Version0000001 : VersionBase
 {
     /// <summary>
     /// Operação para aplicar a migração da versão atual.

@@ -147,6 +147,7 @@ Controllers não devem assumir responsabilidade de regra de negócio.
 Na camada `AuthCore.Infrastructure`, o padrão dominante é:
 
 - classes técnicas explícitas e previsíveis
+- classes, interfaces e modelos auxiliares com acessibilidade `internal` por padrão
 - persistência com `Npgsql` e SQL explícito
 - uso de raw string para SQL quando o arquivo já segue esse padrão
 - materialização do domínio por factories como `Restore(...)`
@@ -155,11 +156,13 @@ Na camada `AuthCore.Infrastructure`, o padrão dominante é:
 
 A infraestrutura implementa detalhes, mas não redefine o modelo do domínio.
 
+A única classe pública esperada em `Infrastructure` é a classe responsável por registrar dependências no contêiner de injeção de dependência, como `InfrastructureDependencyInjection`. Options, migrações, repositórios, conexões, factories técnicas, implementações de serviços, métricas e modelos auxiliares não devem compor a superfície pública do assembly.
+
 ### Configurações e Options
 
 Nas classes de configuração, o padrão mais recorrente é:
 
-- tipo concreto `sealed`
+- tipo concreto `sealed` e `internal` quando estiver em `Infrastructure`
 - constante `SectionName` quando a seção de configuração precisa ser nomeada
 - propriedades com `init`
 - uso de `string.Empty` para defaults seguros
@@ -231,6 +234,7 @@ Antes de concluir uma alteração C# neste projeto, revise:
 
 - o arquivo usa `namespace` file-scoped
 - a classe, interface ou tipo segue a convenção dominante do módulo
+- tipos de `Infrastructure` permanecem `internal`, exceto a classe pública de registro de DI
 - a ordem de membros está alinhada ao padrão predominante
 - regiões foram usadas apenas quando realmente ajudam
 - a documentação XML está em português e segue o padrão textual do projeto

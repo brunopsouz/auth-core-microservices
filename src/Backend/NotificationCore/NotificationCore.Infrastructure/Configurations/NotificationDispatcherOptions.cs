@@ -5,7 +5,7 @@ namespace NotificationCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações do despachante de notificações.
 /// </summary>
-public sealed class NotificationDispatcherOptions
+internal sealed class NotificationDispatcherOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

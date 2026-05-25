@@ -5,7 +5,7 @@ namespace NotificationCore.Infrastructure.Notifications.Templates;
 /// <summary>
 /// Representa template de notificação carregado da infraestrutura.
 /// </summary>
-public sealed class NotificationTemplate
+internal sealed class NotificationTemplate
 {
     /// <summary>
     /// Chave do template.

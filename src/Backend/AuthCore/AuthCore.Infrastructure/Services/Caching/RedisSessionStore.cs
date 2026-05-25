@@ -78,7 +78,7 @@ internal sealed class RedisSessionStore : ISessionStore
         if (!sessionValue.HasValue)
             return null;
 
-        var sessionModel = JsonSerializer.Deserialize<SessionCacheModel>(sessionValue!, _serializerOptions);
+        var sessionModel = JsonSerializer.Deserialize<SessionCacheModel>(sessionValue.ToString(), _serializerOptions);
 
         if (sessionModel is null)
             return null;

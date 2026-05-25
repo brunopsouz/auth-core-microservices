@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de conexão com o Redis.
 /// </summary>
-public sealed class RedisOptions
+internal sealed class RedisOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

@@ -5,7 +5,7 @@ namespace NotificationCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de envio SMTP.
 /// </summary>
-public sealed class SmtpOptions
+internal sealed class SmtpOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

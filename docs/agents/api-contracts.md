@@ -46,6 +46,8 @@ Responsabilidades que não devem ir para controller:
 - persistência
 - composição complexa de infraestrutura
 
+Mesmo que a API referencie `Infrastructure` no projeto para permitir o bootstrap, controllers não devem expor tipos concretos da infraestrutura em contratos HTTP, responses, requests ou superfície pública das actions. Detalhes técnicos da infraestrutura devem permanecer encapsulados; o ponto público esperado da camada é apenas o registro de DI.
+
 O padrão atual está bem representado em:
 
 - `Controllers/UserController.cs`
@@ -110,6 +112,7 @@ Diretrizes:
 - usar classes `sealed`
 - retornar apenas dados relevantes para o consumidor
 - evitar expor detalhes internos de domínio ou infraestrutura
+- nunca usar classes, options, modelos ou entidades auxiliares da infraestrutura como response
 - preferir nomes descritivos e estáveis
 - quando a operação não precisa devolver corpo, usar `204 No Content`
 
@@ -171,7 +174,7 @@ O projeto usa JWT Bearer e marca endpoints protegidos com `[AuthenticatedUser]`.
 
 Padrões atuais:
 
-- o atributo `AuthenticatedUserAttribute` herda de `AuthorizeAttribute`
+- o atributo `AuthenticatedUserAttribute` herda de `AuthorizeAttribute` e fica em `AuthCore.Api.Authentication`
 - a autenticação é registrada em `ApiDependencyInjection`
 - o controller extrai o identificador do usuário autenticado pelas claims
 
@@ -256,6 +259,7 @@ Antes de concluir uma mudança em contrato HTTP, confirme:
 6. dados obtidos do token não foram duplicados no body
 7. nomes de rota, action e DTO estão consistentes com o caso de uso
 8. a mudança preserva compatibilidade com contratos já expostos ou trata claramente a evolução
+9. nenhum tipo concreto de `Infrastructure` foi exposto na assinatura pública do endpoint ou no contrato JSON
 
 ## Arquivos de referência
 
@@ -267,10 +271,10 @@ Arquivos mais úteis para seguir o padrão atual:
 - `src/Backend/AuthCore/AuthCore.Api/Controllers/UserController.cs`
 - `src/Backend/AuthCore/AuthCore.Api/Contracts/Requests`
 - `src/Backend/AuthCore/AuthCore.Api/Contracts/Responses`
-- `src/Backend/AuthCore/AuthCore.Api/Contracts/AuthenticatedUserAttribute.cs`
+- `src/Backend/AuthCore/AuthCore.Api/Authentication/AuthenticatedUserAttribute.cs`
 - `src/Backend/AuthCore/AuthCore.Api/ApiDependencyInjection.cs`
 - `src/Backend/AuthCore/AuthCore.Api/Exceptions/ApiExceptionHandler.cs`
-- `src/Backend/AuthCore/AuthCore.Application/Common/Models/Responses/ResponseErrorJson.cs`
+- `src/Backend/AuthCore/AuthCore.Api/Contracts/Responses/ResponseErrorJson.cs`
 - `tests/AuthCore.IntegrationTests/Authentication/AuthControllerIntegrationTests.cs`
 - `tests/AuthCore.IntegrationTests/Authentication/UserSecurityIntegrationTests.cs`
 - `tests/AuthCore.IntegrationTests/Exceptions/ApiExceptionHandlerTests.cs`

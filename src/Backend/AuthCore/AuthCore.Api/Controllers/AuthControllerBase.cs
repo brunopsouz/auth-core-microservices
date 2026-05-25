@@ -4,7 +4,7 @@ using AuthCore.Api.Authentication;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Security;
 using AuthCore.Application.Authentication.Models;
-using AuthCore.Application.Common.Models.Responses;
+using AuthCore.Api.Contracts.Responses;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Users;
 using AuthCore.Infrastructure.Configurations;
@@ -191,7 +191,7 @@ public abstract class AuthControllerBase : ControllerBase
     /// <param name="sessionId">Identificador público da sessão.</param>
     /// <param name="expiresAtUtc">Expiração da sessão em UTC.</param>
     /// <param name="authCookieOptions">Configurações do cookie da sessão.</param>
-    protected void AppendSessionCookie(string sessionId, DateTime expiresAtUtc, AuthCookieOptions authCookieOptions)
+    private protected void AppendSessionCookie(string sessionId, DateTime expiresAtUtc, AuthCookieOptions authCookieOptions)
     {
         Response.Cookies.Append(
             authCookieOptions.SessionCookieName,
@@ -203,7 +203,7 @@ public abstract class AuthControllerBase : ControllerBase
     /// Operação para remover o cookie da sessão autenticada.
     /// </summary>
     /// <param name="authCookieOptions">Configurações do cookie da sessão.</param>
-    protected void DeleteSessionCookie(AuthCookieOptions authCookieOptions)
+    private protected void DeleteSessionCookie(AuthCookieOptions authCookieOptions)
     {
         Response.Cookies.Delete(
             authCookieOptions.SessionCookieName,

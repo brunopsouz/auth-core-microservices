@@ -3,7 +3,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de banco de dados.
 /// </summary>
-public sealed class DatabaseOptions
+internal sealed class DatabaseOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

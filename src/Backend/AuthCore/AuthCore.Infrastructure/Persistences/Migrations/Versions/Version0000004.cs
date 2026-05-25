@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migração de criação da tabela de tokens de verificação de e-mail.
 /// </summary>
-public sealed class Version0000004 : VersionBase
+internal sealed class Version0000004 : VersionBase
 {
     /// <summary>
     /// Operação para aplicar a migração da versão atual.

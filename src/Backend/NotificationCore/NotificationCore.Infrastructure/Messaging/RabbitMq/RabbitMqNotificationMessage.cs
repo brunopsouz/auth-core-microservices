@@ -3,7 +3,7 @@ namespace NotificationCore.Infrastructure.Messaging.RabbitMq;
 /// <summary>
 /// Representa mensagem de notificação consumida do RabbitMQ.
 /// </summary>
-public sealed class RabbitMqNotificationMessage
+internal sealed class RabbitMqNotificationMessage
 {
     /// <summary>
     /// Corpo bruto da mensagem.

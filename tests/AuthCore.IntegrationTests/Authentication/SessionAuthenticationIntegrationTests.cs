@@ -70,7 +70,7 @@ public sealed class SessionAuthenticationIntegrationTests
         var sessionAuthenticationScheme = await authenticationSchemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
 
         var loginController = CreateController(serviceProvider);
-        var loginResult = await loginController.Login(loginUseCase, authCookieOptions, new RequestSessionLoginJson
+        var loginResult = await loginController.Login(loginUseCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
         {
             Email = user.Email.Value,
             Password = "ValidPassword#2026"
@@ -110,7 +110,7 @@ public sealed class SessionAuthenticationIntegrationTests
             User = authenticateBeforeLogout.Principal!
         };
         var logoutController = CreateController(serviceProvider, logoutContext);
-        var logoutResult = await logoutController.Logout(logoutUseCase, authCookieOptions);
+        var logoutResult = await logoutController.Logout(logoutUseCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(logoutResult);
         Assert.Contains(sessionId, sessionStore.RevokedSessionIds);
@@ -269,7 +269,7 @@ public sealed class SessionAuthenticationIntegrationTests
         var sessionAuthenticationScheme = await authenticationSchemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
 
         var loginController = CreateController(serviceProvider);
-        var loginResult = await loginController.Login(loginUseCase, authCookieOptions, new RequestSessionLoginJson
+        var loginResult = await loginController.Login(loginUseCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
         {
             Email = user.Email.Value,
             Password = "ValidPassword#2026"
@@ -306,7 +306,7 @@ public sealed class SessionAuthenticationIntegrationTests
             User = authenticateResult.Principal!
         };
         var revokeController = CreateController(serviceProvider, revokeContext);
-        var revokeResult = await revokeController.RevokeSession(sessionId, revokeUserSessionUseCase, authCookieOptions);
+        var revokeResult = await revokeController.RevokeSession(sessionId, revokeUserSessionUseCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(revokeResult);
         Assert.Contains(sessionId, sessionStore.RevokedSessionIds);
@@ -370,7 +370,7 @@ public sealed class SessionAuthenticationIntegrationTests
         };
 
         var controller = CreateController(serviceProvider, httpContext);
-        var result = await controller.LogoutAll(logoutAllUseCase, authCookieOptions);
+        var result = await controller.LogoutAll(logoutAllUseCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(result);
         Assert.Contains(currentSession.SessionId, sessionStore.RevokedSessionIds);
@@ -433,6 +433,13 @@ public sealed class SessionAuthenticationIntegrationTests
                 HttpContext = resolvedHttpContext
             }
         };
+    }
+
+    private static IServiceProvider CreateServiceProvider(IOptions<AuthCookieOptions> authCookieOptions)
+    {
+        return new ServiceCollection()
+            .AddSingleton(authCookieOptions)
+            .BuildServiceProvider();
     }
 
     private static string ExtractCookieValue(string setCookieHeader, string cookieName)

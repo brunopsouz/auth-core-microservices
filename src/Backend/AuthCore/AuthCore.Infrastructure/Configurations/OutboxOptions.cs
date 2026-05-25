@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações do processamento da outbox.
 /// </summary>
-public sealed class OutboxOptions
+internal sealed class OutboxOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

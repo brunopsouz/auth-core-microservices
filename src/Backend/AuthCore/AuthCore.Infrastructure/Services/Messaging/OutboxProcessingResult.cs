@@ -3,7 +3,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Representa o resultado de um ciclo de processamento da outbox.
 /// </summary>
-public sealed class OutboxProcessingResult
+internal sealed class OutboxProcessingResult
 {
     /// <summary>
     /// Quantidade de mensagens processadas com sucesso.

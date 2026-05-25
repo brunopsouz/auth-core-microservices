@@ -5,7 +5,7 @@ namespace NotificationCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de conexão com o RabbitMQ.
 /// </summary>
-public sealed class RabbitMqOptions
+internal sealed class RabbitMqOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

@@ -10,7 +10,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations;
 /// <summary>
 /// Define operações para aplicar migrações do banco de dados.
 /// </summary>
-public static class DatabaseMigration
+internal static class DatabaseMigration
 {
     /// <summary>
     /// Operação para criar o banco de dados e aplicar as migrações configuradas.

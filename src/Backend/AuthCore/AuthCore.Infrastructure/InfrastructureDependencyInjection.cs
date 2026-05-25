@@ -1,4 +1,5 @@
 using AuthCore.Domain.Common.DomainEvents;
+using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Security.Cryptography;
 using AuthCore.Domain.Security.Tokens.Services;

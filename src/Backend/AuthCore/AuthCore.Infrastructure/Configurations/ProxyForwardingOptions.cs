@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de encaminhamento por proxy reverso.
 /// </summary>
-public sealed class ProxyForwardingOptions
+internal sealed class ProxyForwardingOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

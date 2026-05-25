@@ -1,4 +1,4 @@
-using AuthCore.Application.Common.Models.Responses;
+using AuthCore.Api.Contracts.Responses;
 using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using System.Net.Mime;

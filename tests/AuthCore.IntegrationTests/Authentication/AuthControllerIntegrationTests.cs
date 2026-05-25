@@ -142,7 +142,7 @@ public sealed class AuthControllerIntegrationTests
         });
         var controller = CreateSessionController();
 
-        var result = await controller.Login(useCase, authCookieOptions, new RequestSessionLoginJson
+        var result = await controller.Login(useCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
         {
             Email = "bruno@authcore.dev",
             Password = "ValidPassword#2026"
@@ -168,7 +168,7 @@ public sealed class AuthControllerIntegrationTests
         var useCase = new ThrowingLoginSessionUseCase(new ForbiddenException("O usuário precisa verificar o e-mail antes de autenticar."));
         var controller = CreateSessionController();
 
-        var result = await controller.Login(useCase, Options.Create(new AuthCookieOptions()), new RequestSessionLoginJson
+        var result = await controller.Login(useCase, CreateServiceProvider(Options.Create(new AuthCookieOptions())), new RequestSessionLoginJson
         {
             Email = "pending@authcore.dev",
             Password = "ValidPassword#2026"
@@ -348,7 +348,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
 
-        var result = await controller.Logout(useCase, authCookieOptions);
+        var result = await controller.Logout(useCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("session-123", useCase.LastCommand!.SessionId);
@@ -373,7 +373,7 @@ public sealed class AuthControllerIntegrationTests
 
         controller.Request.Headers.Origin = "https://evil.authcore.dev";
 
-        var result = await controller.Logout(useCase, authCookieOptions);
+        var result = await controller.Logout(useCase, CreateServiceProvider(authCookieOptions));
 
         var forbiddenResult = Assert.IsType<ObjectResult>(result);
         var response = Assert.IsType<ResponseErrorJson>(forbiddenResult.Value);
@@ -441,7 +441,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
 
-        var result = await controller.RevokeSession("session-123", useCase, authCookieOptions);
+        var result = await controller.RevokeSession("session-123", useCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal(userId, useCase.LastCommand!.UserId);
@@ -465,7 +465,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
 
-        var result = await controller.RevokeSession("  session-123  ", useCase, authCookieOptions);
+        var result = await controller.RevokeSession("  session-123  ", useCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("session-123", useCase.LastCommand!.SessionId);
@@ -491,7 +491,7 @@ public sealed class AuthControllerIntegrationTests
 
         controller.Request.Headers.Referer = "https://app.authcore.dev/seguranca/sessoes";
 
-        var result = await controller.RevokeSession("session-other", useCase, authCookieOptions);
+        var result = await controller.RevokeSession("session-other", useCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal(userId, useCase.LastCommand!.UserId);
@@ -514,7 +514,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-current")
         });
 
-        var result = await controller.RevokeSession("session-other", useCase, authCookieOptions);
+        var result = await controller.RevokeSession("session-other", useCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("session-other", useCase.LastCommand!.SessionId);
@@ -537,7 +537,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-current")
         });
 
-        var result = await controller.RevokeSession("session-other", useCase, authCookieOptions);
+        var result = await controller.RevokeSession("session-other", useCase, CreateServiceProvider(authCookieOptions));
 
         var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
         var response = Assert.IsType<ResponseErrorJson>(notFoundResult.Value);
@@ -562,7 +562,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
 
-        var result = await controller.LogoutAll(useCase, authCookieOptions);
+        var result = await controller.LogoutAll(useCase, CreateServiceProvider(authCookieOptions));
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal(userId, useCase.LastCommand!.UserId);
@@ -586,7 +586,7 @@ public sealed class AuthControllerIntegrationTests
             ],
             csrfRequestValidator: CreateCsrfRequestValidator("https://app.authcore.dev"));
 
-        var result = await controller.LogoutAll(useCase, authCookieOptions);
+        var result = await controller.LogoutAll(useCase, CreateServiceProvider(authCookieOptions));
 
         var forbiddenResult = Assert.IsType<ObjectResult>(result);
         var response = Assert.IsType<ResponseErrorJson>(forbiddenResult.Value);
@@ -624,13 +624,13 @@ public sealed class AuthControllerIntegrationTests
 
         controller.HttpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("127.0.0.1");
 
-        _ = await controller.Login(useCase, authCookieOptions, new RequestSessionLoginJson
+        _ = await controller.Login(useCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
         {
             Email = "blocked@authcore.dev",
             Password = "ValidPassword#2026"
         });
 
-        var blockedResult = await controller.Login(useCase, authCookieOptions, new RequestSessionLoginJson
+        var blockedResult = await controller.Login(useCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
         {
             Email = "blocked@authcore.dev",
             Password = "ValidPassword#2026"
@@ -850,6 +850,13 @@ public sealed class AuthControllerIntegrationTests
         return new InMemoryLoginRateLimiter(
             new FakeTimeProvider(new DateTimeOffset(2026, 4, 19, 12, 0, 0, TimeSpan.Zero)),
             Options.Create(options));
+    }
+
+    private static IServiceProvider CreateServiceProvider(IOptions<AuthCookieOptions> authCookieOptions)
+    {
+        return new ServiceCollection()
+            .AddSingleton(authCookieOptions)
+            .BuildServiceProvider();
     }
 
     private sealed class SpyLoginSessionUseCase : ILoginSessionUseCase

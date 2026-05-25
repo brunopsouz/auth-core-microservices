@@ -1,7 +1,6 @@
-using AuthCore.Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
 
-namespace AuthCore.Api.Contracts;
+namespace AuthCore.Api.Authentication;
 
 /// <summary>
 /// Representa atributo para exigir sessão autenticada por cookie.

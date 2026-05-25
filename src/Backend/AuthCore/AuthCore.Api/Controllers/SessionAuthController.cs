@@ -1,4 +1,4 @@
-using AuthCore.Api.Contracts;
+using AuthCore.Api.Authentication;
 using AuthCore.Api.Contracts.Requests;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Security;
@@ -7,7 +7,6 @@ using AuthCore.Application.Authentication.UseCases.LoginSession;
 using AuthCore.Application.Authentication.UseCases.LogoutAllSessions;
 using AuthCore.Application.Authentication.UseCases.LogoutCurrentSession;
 using AuthCore.Application.Authentication.UseCases.RevokeUserSession;
-using AuthCore.Application.Common.Models.Responses;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -54,7 +53,7 @@ public sealed class SessionAuthController : AuthControllerBase
     /// Operação para autenticar um usuário por sessão.
     /// </summary>
     /// <param name="useCase">Caso de uso responsável pela autenticação por sessão.</param>
-    /// <param name="authCookieOptions">Configurações do cookie de autenticação.</param>
+    /// <param name="serviceProvider">Provider de serviços da aplicação.</param>
     /// <param name="request">Dados da requisição de login.</param>
     /// <returns>Resposta com os dados do usuário autenticado.</returns>
     [HttpPost("login")]
@@ -65,7 +64,7 @@ public sealed class SessionAuthController : AuthControllerBase
     [ProducesResponseType(typeof(ResponseErrorJson), StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<ResponseAuthenticatedUserJson>> Login(
         [FromServices] ILoginSessionUseCase useCase,
-        [FromServices] IOptions<AuthCookieOptions> authCookieOptions,
+        [FromServices] IServiceProvider serviceProvider,
         [FromBody] RequestSessionLoginJson request)
     {
         var rateLimitResult = await TryAcquireLoginRateLimitAsync(_loginRateLimiter, request.Email);
@@ -81,7 +80,8 @@ public sealed class SessionAuthController : AuthControllerBase
             UserAgent = Request.Headers.UserAgent.ToString()
         });
 
-        AppendSessionCookie(result.SessionId, result.ExpiresAtUtc, authCookieOptions.Value);
+        var authCookieOptions = serviceProvider.GetRequiredService<IOptions<AuthCookieOptions>>().Value;
+        AppendSessionCookie(result.SessionId, result.ExpiresAtUtc, authCookieOptions);
         _logger.LogInformation(
             "Login por sessão realizado com sucesso. UserIdentifier={UserIdentifier}",
             result.UserIdentifier);
@@ -111,7 +111,7 @@ public sealed class SessionAuthController : AuthControllerBase
     /// Operação para encerrar a sessão autenticada atual.
     /// </summary>
     /// <param name="useCase">Caso de uso responsável pelo encerramento da sessão atual.</param>
-    /// <param name="authCookieOptions">Configurações do cookie de autenticação.</param>
+    /// <param name="serviceProvider">Provider de serviços da aplicação.</param>
     /// <returns>Resposta sem conteúdo após o encerramento da sessão.</returns>
     [HttpPost("logout")]
     [AuthenticatedSession]
@@ -120,7 +120,7 @@ public sealed class SessionAuthController : AuthControllerBase
     [ProducesResponseType(typeof(ResponseErrorJson), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> Logout(
         [FromServices] ILogoutCurrentSessionUseCase useCase,
-        [FromServices] IOptions<AuthCookieOptions> authCookieOptions)
+        [FromServices] IServiceProvider serviceProvider)
     {
         _csrfRequestValidator.Validate(Request);
         var sessionId = GetAuthenticatedSessionId();
@@ -131,7 +131,8 @@ public sealed class SessionAuthController : AuthControllerBase
         {
             SessionId = sessionId
         });
-        DeleteSessionCookie(authCookieOptions.Value);
+        var authCookieOptions = serviceProvider.GetRequiredService<IOptions<AuthCookieOptions>>().Value;
+        DeleteSessionCookie(authCookieOptions);
         _logger.LogInformation(
             "Sessão atual encerrada. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier}",
             userIdentifierForLog,
@@ -166,7 +167,7 @@ public sealed class SessionAuthController : AuthControllerBase
     /// </summary>
     /// <param name="sid">Identificador público da sessão alvo.</param>
     /// <param name="useCase">Caso de uso responsável pela revogação da sessão.</param>
-    /// <param name="authCookieOptions">Configurações do cookie de autenticação.</param>
+    /// <param name="serviceProvider">Provider de serviços da aplicação.</param>
     /// <returns>Resposta sem conteúdo após a revogação da sessão.</returns>
     [HttpDelete("sessions/{sid}")]
     [AuthenticatedSession]
@@ -177,7 +178,7 @@ public sealed class SessionAuthController : AuthControllerBase
     public async Task<ActionResult> RevokeSession(
         [FromRoute] string sid,
         [FromServices] IRevokeUserSessionUseCase useCase,
-        [FromServices] IOptions<AuthCookieOptions> authCookieOptions)
+        [FromServices] IServiceProvider serviceProvider)
     {
         _csrfRequestValidator.Validate(Request);
         var normalizedSessionId = NormalizeSessionId(sid);
@@ -192,8 +193,9 @@ public sealed class SessionAuthController : AuthControllerBase
             SessionId = normalizedSessionId
         });
 
+        var authCookieOptions = serviceProvider.GetRequiredService<IOptions<AuthCookieOptions>>().Value;
         if (string.Equals(currentSessionId, normalizedSessionId, StringComparison.Ordinal))
-            DeleteSessionCookie(authCookieOptions.Value);
+            DeleteSessionCookie(authCookieOptions);
 
         _logger.LogInformation(
             "Sessão revogada pelo usuário autenticado. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier} SessaoAtualRevogada={SessaoAtualRevogada}",
@@ -208,7 +210,7 @@ public sealed class SessionAuthController : AuthControllerBase
     /// Operação para revogar todas as sessões do usuário autenticado.
     /// </summary>
     /// <param name="useCase">Caso de uso responsável pela revogação global das sessões.</param>
-    /// <param name="authCookieOptions">Configurações do cookie de autenticação.</param>
+    /// <param name="serviceProvider">Provider de serviços da aplicação.</param>
     /// <returns>Resposta sem conteúdo após a revogação global.</returns>
     [HttpPost("logout-all")]
     [AuthenticatedSession]
@@ -217,7 +219,7 @@ public sealed class SessionAuthController : AuthControllerBase
     [ProducesResponseType(typeof(ResponseErrorJson), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> LogoutAll(
         [FromServices] ILogoutAllSessionsUseCase useCase,
-        [FromServices] IOptions<AuthCookieOptions> authCookieOptions)
+        [FromServices] IServiceProvider serviceProvider)
     {
         _csrfRequestValidator.Validate(Request);
         var internalUserId = GetAuthenticatedInternalUserId();
@@ -228,7 +230,8 @@ public sealed class SessionAuthController : AuthControllerBase
         {
             UserId = internalUserId
         });
-        DeleteSessionCookie(authCookieOptions.Value);
+        var authCookieOptions = serviceProvider.GetRequiredService<IOptions<AuthCookieOptions>>().Value;
+        DeleteSessionCookie(authCookieOptions);
         _logger.LogInformation(
             "Todas as sessões do usuário foram revogadas. UserIdentifier={UserIdentifier} PossuiUserIdentifier={PossuiUserIdentifier}",
             userIdentifierForLog,

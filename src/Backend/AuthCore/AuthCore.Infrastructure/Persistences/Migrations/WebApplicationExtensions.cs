@@ -3,7 +3,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations;
 /// <summary>
 /// Define operações para aplicar migrações da infraestrutura.
 /// </summary>
-public static class ServiceProviderExtensions
+internal static class ServiceProviderExtensions
 {
     /// <summary>
     /// Operação para aplicar as migrações de infraestrutura.

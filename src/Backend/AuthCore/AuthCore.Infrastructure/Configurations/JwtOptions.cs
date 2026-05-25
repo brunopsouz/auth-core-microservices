@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de emissão do token JWT.
 /// </summary>
-public sealed class JwtOptions
+internal sealed class JwtOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

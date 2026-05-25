@@ -1,8 +1,7 @@
-using AuthCore.Api.Contracts;
+using AuthCore.Api.Authentication;
 using AuthCore.Api.Contracts.Requests;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Security;
-using AuthCore.Application.Common.Models.Responses;
 using AuthCore.Application.Users.UseCases.ChangePassword;
 using AuthCore.Application.Users.UseCases.DeleteUser;
 using AuthCore.Application.Users.UseCases.GetUserProfile;

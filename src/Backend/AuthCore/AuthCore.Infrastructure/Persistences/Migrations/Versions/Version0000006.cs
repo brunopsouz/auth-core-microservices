@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migração de inclusão do status funcional do usuário.
 /// </summary>
-public sealed class Version0000006 : ForwardOnlyMigration
+internal sealed class Version0000006 : ForwardOnlyMigration
 {
     /// <summary>
     /// Operação para aplicar a migração da versão atual.

@@ -3,7 +3,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Define operações de persistência para mensagens de outbox.
 /// </summary>
-public interface IOutboxMessageRepository
+internal interface IOutboxMessageRepository
 {
     /// <summary>
     /// Operação para adicionar uma mensagem de outbox.

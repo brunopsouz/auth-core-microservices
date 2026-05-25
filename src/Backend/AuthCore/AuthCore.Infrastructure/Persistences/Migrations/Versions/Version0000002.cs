@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migração de criação da tabela de senhas.
 /// </summary>
-public sealed class Version0000002 : ForwardOnlyMigration
+internal sealed class Version0000002 : ForwardOnlyMigration
 {
     /// <summary>
     /// Operação para aplicar a migração da versão atual.

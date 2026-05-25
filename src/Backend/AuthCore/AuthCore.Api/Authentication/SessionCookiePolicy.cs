@@ -5,7 +5,7 @@ namespace AuthCore.Api.Authentication;
 /// <summary>
 /// Define operações para padronizar a política do cookie de sessão.
 /// </summary>
-public static class SessionCookiePolicy
+internal static class SessionCookiePolicy
 {
     /// <summary>
     /// Operação para criar as opções de emissão do cookie da sessão.

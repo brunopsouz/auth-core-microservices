@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações do cookie de autenticação.
 /// </summary>
-public sealed class AuthCookieOptions
+internal sealed class AuthCookieOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

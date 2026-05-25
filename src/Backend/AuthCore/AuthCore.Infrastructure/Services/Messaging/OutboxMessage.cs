@@ -3,7 +3,7 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// <summary>
 /// Representa uma mensagem persistida na outbox.
 /// </summary>
-public sealed class OutboxMessage
+internal sealed class OutboxMessage
 {
     /// <summary>
     /// Identificador da mensagem.

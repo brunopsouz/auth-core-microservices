@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using NotificationCore.Api.Contracts.Responses;
 using NotificationCore.Api.Controllers;
 using NotificationCore.Domain.Notifications.Enums;
@@ -26,8 +27,11 @@ public sealed class TemplatesControllerTests
             ]
         };
         var controller = new TemplatesController();
+        using var serviceProvider = new ServiceCollection()
+            .AddSingleton<INotificationTemplateRepository>(repository)
+            .BuildServiceProvider();
 
-        var actionResult = await controller.ListActive(repository);
+        var actionResult = await controller.ListActive(serviceProvider);
 
         var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
         var response = Assert.IsAssignableFrom<IReadOnlyCollection<ResponseNotificationTemplateJson>>(okResult.Value);

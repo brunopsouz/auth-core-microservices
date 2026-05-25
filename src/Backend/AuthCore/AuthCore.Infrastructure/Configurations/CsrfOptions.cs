@@ -3,7 +3,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de proteção CSRF.
 /// </summary>
-public sealed class CsrfOptions
+internal sealed class CsrfOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

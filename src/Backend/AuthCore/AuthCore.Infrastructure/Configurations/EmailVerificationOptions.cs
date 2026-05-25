@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações da verificação de e-mail.
 /// </summary>
-public sealed class EmailVerificationOptions
+internal sealed class EmailVerificationOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

@@ -3,7 +3,7 @@ namespace NotificationCore.Infrastructure.Messaging.RabbitMq;
 /// <summary>
 /// Define operação para consumir mensagens de notificação do RabbitMQ.
 /// </summary>
-public interface IRabbitMqNotificationConsumer : IDisposable
+internal interface IRabbitMqNotificationConsumer : IDisposable
 {
     /// <summary>
     /// Operação para iniciar o consumo de mensagens.

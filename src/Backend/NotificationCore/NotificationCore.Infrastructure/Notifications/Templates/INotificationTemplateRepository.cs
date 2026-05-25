@@ -5,7 +5,7 @@ namespace NotificationCore.Infrastructure.Notifications.Templates;
 /// <summary>
 /// Define operação para consultar templates de notificação.
 /// </summary>
-public interface INotificationTemplateRepository
+internal interface INotificationTemplateRepository
 {
     /// <summary>
     /// Operação para listar templates ativos.

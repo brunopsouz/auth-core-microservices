@@ -5,7 +5,7 @@ namespace AuthCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de sessão autenticada.
 /// </summary>
-public sealed class SessionOptions
+internal sealed class SessionOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

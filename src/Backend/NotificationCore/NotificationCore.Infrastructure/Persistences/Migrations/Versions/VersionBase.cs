@@ -6,7 +6,7 @@ namespace NotificationCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a base para migrações versionadas do banco.
 /// </summary>
-public abstract class VersionBase : ForwardOnlyMigration
+internal abstract class VersionBase : ForwardOnlyMigration
 {
     /// <summary>
     /// Operação para criar uma tabela com identificador padrão.

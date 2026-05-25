@@ -5,7 +5,7 @@ namespace NotificationCore.Infrastructure.Configurations;
 /// <summary>
 /// Representa as configurações de migração do banco de dados.
 /// </summary>
-public sealed class DatabaseMigrationOptions
+internal sealed class DatabaseMigrationOptions
 {
     /// <summary>
     /// Nome da seção de configuração.

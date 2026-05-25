@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migração de criação da tabela de usuários.
 /// </summary>
-public sealed class Version0000001 : VersionBase
+internal sealed class Version0000001 : VersionBase
 {
     /// <summary>
     /// Operação para aplicar a migração da versão atual.

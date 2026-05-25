@@ -3,7 +3,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Define as versões ordenadas das migrações do banco.
 /// </summary>
-public static class DatabaseVersions
+internal static class DatabaseVersions
 {
     /// <summary>
     /// Versão de criação da tabela de usuários.
