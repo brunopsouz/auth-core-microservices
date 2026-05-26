@@ -12,6 +12,7 @@ src/Backend
 |   |-- AuthCore.Domain
 |   |-- AuthCore.Infrastructure
 |   `-- AuthCore.Service.sln
+|-- Backend.sln
 |-- Gateway
 |   |-- Gateway.Api
 |   `-- Gateway.Service.sln
@@ -25,7 +26,7 @@ src/Backend
 `-- .env.development.example
 ```
 
-Cada microservico possui sua propria solucao (`*.Service.sln`). A solucao da raiz do repositorio funciona apenas como agregadora para tarefas globais.
+Cada microservico possui sua propria solucao (`*.Service.sln`) com projetos de producao. A solucao `Backend.sln` funciona como agregadora de producao do backend. A solucao da raiz do repositorio funciona apenas como agregadora global do monorepo.
 
 ## Microservicos
 
@@ -34,6 +35,16 @@ Cada microservico possui sua propria solucao (`*.Service.sln`). A solucao da rai
 | AuthCore | Autenticacao, sessao, credenciais e emissao de eventos de notificacao. | `src/Backend/AuthCore/AuthCore.Service.sln` |
 | NotificationCore | Consumo de eventos, persistencia e envio de notificacoes. | `src/Backend/NotificationCore/NotificationCore.Service.sln` |
 | Gateway | Borda de entrada HTTP para roteamento das APIs. | `src/Backend/Gateway/Gateway.Service.sln` |
+
+## Solucoes
+
+| Solucao | Uso recomendado |
+| --- | --- |
+| `src/Backend/AuthCore/AuthCore.Service.sln` | Desenvolvimento, build e pipeline de producao do AuthCore. |
+| `src/Backend/NotificationCore/NotificationCore.Service.sln` | Desenvolvimento, build e pipeline de producao do NotificationCore. |
+| `src/Backend/Gateway/Gateway.Service.sln` | Desenvolvimento, build e pipeline de producao do Gateway. |
+| `src/Backend/Backend.sln` | Visao agregada dos projetos de producao do backend para abrir todos os servicos ou validar mudancas transversais. |
+| `AuthCore.sln` | Visao global do repositorio quando for necessario validar o monorepo inteiro. |
 
 ## Pre-requisitos
 
@@ -117,6 +128,13 @@ Build por microservico:
 ./run.sh build-gateway
 ```
 
+Tambem e possivel entrar na pasta do microservico e executar `dotnet build`, porque a `*.Service.sln` local contem apenas os projetos de producao:
+
+```bash
+cd src/Backend/AuthCore
+dotnet build
+```
+
 Comandos equivalentes sem Bash:
 
 ```bash
@@ -131,7 +149,19 @@ Para validar a solucao agregadora da raiz:
 ./run.sh build-all
 ```
 
-Use `build-all` como diagnostico global. Para microservicos, prefira os builds por servico.
+Para validar a solucao agregadora de producao do backend:
+
+```bash
+./run.sh build-backend
+```
+
+Comando equivalente sem Bash:
+
+```bash
+dotnet build src/Backend/Backend.sln -c Release
+```
+
+Use `build-backend` como diagnostico dos projetos de producao do backend e `build-all` como diagnostico global do monorepo. Para microservicos, prefira os builds por servico.
 
 ## Testes
 
@@ -141,7 +171,7 @@ Executar apenas a suite atualmente estavel:
 ./run.sh test
 ```
 
-Executar testes por microservico:
+Executar testes por microservico. Estes comandos executam os projetos de teste diretamente, nao as `*.Service.sln`:
 
 ```bash
 ./run.sh test-authcore
@@ -149,7 +179,7 @@ Executar testes por microservico:
 ./run.sh test-gateway
 ```
 
-Executar a validacao completa por solucoes de microservico:
+Executar a validacao completa por projetos de teste dos microservicos:
 
 ```bash
 ./run.sh test-all
@@ -164,9 +194,10 @@ Ao adicionar um novo microservico:
 1. Crie uma pasta em `src/Backend/<NomeDoServico>`.
 2. Mantenha projetos separados por camada quando o servico tiver dominio proprio: `Api`, `Application`, `Domain` e `Infrastructure`.
 3. Crie uma solucao local `NomeDoServico.Service.sln`.
-4. Adicione a solucao local apenas os projetos do servico e dependencias compartilhadas necessarias.
+4. Adicione a solucao local apenas os projetos de producao do servico e dependencias compartilhadas necessarias.
 5. Adicione comandos proprios no `run.sh` para build e teste do novo servico.
-6. So inclua o servico na solucao agregadora da raiz quando fizer sentido validar o repositorio inteiro.
+6. Inclua o servico em `src/Backend/Backend.sln` para manter a visao agregada do backend.
+7. So inclua o servico na solucao agregadora da raiz quando fizer sentido validar o repositorio inteiro.
 
 ## Direcao arquitetural
 

@@ -1,5 +1,5 @@
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Common.DomainEvents;
-using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
@@ -15,13 +15,37 @@ namespace AuthCore.Application.Users.UseCases.RegisterUser;
 /// </summary>
 internal sealed class RegisterUserUseCase : IRegisterUserUseCase
 {
+    /// <summary>
+    /// Campo que armazena email verification repository.
+    /// </summary>
     private readonly IEmailVerificationRepository _emailVerificationRepository;
+    /// <summary>
+    /// Campo que armazena email verification requested publisher.
+    /// </summary>
     private readonly IEmailVerificationRequestedPublisher _emailVerificationRequestedPublisher;
+    /// <summary>
+    /// Campo que armazena email verification service.
+    /// </summary>
     private readonly IEmailVerificationService _emailVerificationService;
+    /// <summary>
+    /// Campo que armazena password encripter.
+    /// </summary>
     private readonly IPasswordEncripter _passwordEncripter;
+    /// <summary>
+    /// Campo que armazena password repository.
+    /// </summary>
     private readonly IPasswordRepository _passwordRepository;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
+    /// <summary>
+    /// Campo que armazena user repository.
+    /// </summary>
     private readonly IUserRepository _userRepository;
 
     /// <summary>

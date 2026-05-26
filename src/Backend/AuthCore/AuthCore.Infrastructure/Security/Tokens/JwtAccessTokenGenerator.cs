@@ -16,10 +16,15 @@ namespace AuthCore.Infrastructure.Security.Tokens;
 /// </summary>
 internal sealed class JwtAccessTokenGenerator : IAccessTokenGenerator
 {
+    /// <summary>
+    /// Campo que armazena jwt options.
+    /// </summary>
     private readonly JwtOptions _jwtOptions;
+    /// <summary>
+    /// Campo que armazena signing credentials.
+    /// </summary>
     private readonly SigningCredentials _signingCredentials;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -35,7 +40,6 @@ internal sealed class JwtAccessTokenGenerator : IAccessTokenGenerator
             SecurityAlgorithms.HmacSha256);
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para gerar um access token para o usuário.
@@ -71,7 +75,6 @@ internal sealed class JwtAccessTokenGenerator : IAccessTokenGenerator
         };
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar as claims do access token.
@@ -95,5 +98,4 @@ internal sealed class JwtAccessTokenGenerator : IAccessTokenGenerator
         ];
     }
 
-    #endregion
 }

@@ -24,11 +24,29 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     private const string EXPIRES_IN_MINUTES_VARIABLE = "expiresInMinutes";
     private const string LEGACY_IDEMPOTENCY_KEY_PREFIX = "auth-email-confirmation-legacy";
 
+    /// <summary>
+    /// Campo que armazena outbox repository.
+    /// </summary>
     private readonly IOutboxMessageRepository _outboxRepository;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena notification request publisher.
+    /// </summary>
     private readonly INotificationRequestPublisher _notificationRequestPublisher;
+    /// <summary>
+    /// Campo que armazena outbox options.
+    /// </summary>
     private readonly OutboxOptions _outboxOptions;
+    /// <summary>
+    /// Campo que armazena outbox metrics.
+    /// </summary>
     private readonly OutboxMetrics _outboxMetrics;
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<OutboxProcessor> _logger;
 
     /// <summary>

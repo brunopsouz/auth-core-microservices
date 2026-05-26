@@ -12,10 +12,25 @@ namespace AuthCore.Application.Authentication.UseCases.ResendVerification;
 /// </summary>
 internal sealed class ResendVerificationUseCase : IResendVerificationUseCase
 {
+    /// <summary>
+    /// Campo que armazena email verification repository.
+    /// </summary>
     private readonly IEmailVerificationRepository _emailVerificationRepository;
+    /// <summary>
+    /// Campo que armazena email verification requested publisher.
+    /// </summary>
     private readonly IEmailVerificationRequestedPublisher _emailVerificationRequestedPublisher;
+    /// <summary>
+    /// Campo que armazena email verification service.
+    /// </summary>
     private readonly IEmailVerificationService _emailVerificationService;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
     /// <summary>

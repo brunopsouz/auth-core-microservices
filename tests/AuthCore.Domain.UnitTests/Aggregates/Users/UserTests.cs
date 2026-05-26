@@ -1,4 +1,4 @@
-using AuthCore.Domain.Common.Exceptions;
+﻿using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Users.Aggregates;
 using AuthCore.Domain.Users.Enums;
 

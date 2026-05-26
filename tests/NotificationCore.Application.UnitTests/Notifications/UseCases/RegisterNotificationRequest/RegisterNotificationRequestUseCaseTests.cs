@@ -260,6 +260,9 @@ public sealed class RegisterNotificationRequestUseCaseTests
 
     private sealed class FakeNotificationRepository : INotificationRepository
     {
+        /// <summary>
+        /// Campo que armazena notifications by idempotency key.
+        /// </summary>
         private readonly Dictionary<string, Notification> _notificationsByIdempotencyKey = [];
 
         public bool ThrowOnAdd { get; init; }

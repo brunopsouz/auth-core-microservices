@@ -9,10 +9,15 @@ namespace AuthCore.Api.Security;
 /// </summary>
 internal sealed class CookieCsrfRequestValidator : ICsrfRequestValidator
 {
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<CookieCsrfRequestValidator> _logger;
+    /// <summary>
+    /// Campo que armazena csrf options.
+    /// </summary>
     private readonly CsrfOptions _csrfOptions;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -30,7 +35,6 @@ internal sealed class CookieCsrfRequestValidator : ICsrfRequestValidator
         _csrfOptions = csrfOptions.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para validar a origem da requisição HTTP atual.
@@ -56,7 +60,6 @@ internal sealed class CookieCsrfRequestValidator : ICsrfRequestValidator
         throw new ForbiddenException("A origem da requisição não é permitida.");
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para indicar se a origem da requisição está permitida.
@@ -132,5 +135,4 @@ internal sealed class CookieCsrfRequestValidator : ICsrfRequestValidator
         return !string.IsNullOrWhiteSpace(normalizedOrigin);
     }
 
-    #endregion
 }

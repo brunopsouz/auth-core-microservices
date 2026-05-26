@@ -60,7 +60,6 @@ public static class ApiDependencyInjection
         return services;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para adicionar a autenticação da API.
@@ -269,5 +268,4 @@ public static class ApiDependencyInjection
         return new Microsoft.AspNetCore.HttpOverrides.IPNetwork(prefix, prefixLength);
     }
 
-    #endregion
 }

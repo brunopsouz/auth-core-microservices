@@ -37,7 +37,6 @@ public static class ApiDependencyInjection
         return services;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para adicionar a configuração do Swagger.
@@ -54,5 +53,4 @@ public static class ApiDependencyInjection
         });
     }
 
-    #endregion
 }

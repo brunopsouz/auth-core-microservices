@@ -192,6 +192,9 @@ public sealed class OutboxProcessorTests
 
     private sealed class FakeOutboxRepository : IOutboxRepository
     {
+        /// <summary>
+        /// Campo que armazena messages.
+        /// </summary>
         private readonly List<OutboxMessage> _messages;
 
         public FakeOutboxRepository(params OutboxMessage[] messages)

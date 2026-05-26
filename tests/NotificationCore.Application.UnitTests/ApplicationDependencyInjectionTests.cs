@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using NotificationCore.Application.Notifications.UseCases.DispatchPendingNotification;
 using NotificationCore.Application.Notifications.UseCases.GetNotification;
 using NotificationCore.Application.Notifications.UseCases.RegisterNotificationRequest;

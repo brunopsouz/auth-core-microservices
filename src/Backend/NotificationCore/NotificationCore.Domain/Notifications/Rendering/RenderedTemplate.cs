@@ -1,4 +1,4 @@
-namespace NotificationCore.Domain.Notifications.Rendering;
+﻿namespace NotificationCore.Domain.Notifications.Rendering;
 
 /// <summary>
 /// Representa template renderizado para envio.

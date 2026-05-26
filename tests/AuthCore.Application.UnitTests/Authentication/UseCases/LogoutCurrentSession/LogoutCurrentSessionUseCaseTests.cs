@@ -1,4 +1,4 @@
-using global::AuthCore.Application.UnitTests.Authentication.Support;
+﻿using global::AuthCore.Application.UnitTests.Authentication.Support;
 using AuthCore.Application.Authentication.UseCases.LogoutCurrentSession;
 
 namespace AuthCore.Application.UnitTests.Authentication.UseCases.LogoutCurrentSession;

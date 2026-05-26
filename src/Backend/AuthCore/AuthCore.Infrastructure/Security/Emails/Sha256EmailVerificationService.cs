@@ -12,9 +12,11 @@ namespace AuthCore.Infrastructure.Security.Emails;
 /// </summary>
 internal sealed class Sha256EmailVerificationService : IEmailVerificationService
 {
+    /// <summary>
+    /// Campo que armazena email verification options.
+    /// </summary>
     private readonly EmailVerificationOptions _emailVerificationOptions;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -27,7 +29,6 @@ internal sealed class Sha256EmailVerificationService : IEmailVerificationService
         _emailVerificationOptions = emailVerificationOptions.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para gerar um código OTP com o respectivo hash.

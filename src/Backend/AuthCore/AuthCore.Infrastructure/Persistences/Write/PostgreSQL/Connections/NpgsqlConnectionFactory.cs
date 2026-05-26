@@ -11,9 +11,11 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Connections;
 /// </summary>
 internal sealed class NpgsqlConnectionFactory : IDbConnectionFactory
 {
+    /// <summary>
+    /// Campo que armazena connection string.
+    /// </summary>
     private readonly string _connectionString;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -31,7 +33,6 @@ internal sealed class NpgsqlConnectionFactory : IDbConnectionFactory
         }
     }
 
-    #endregion
 
     /// <summary>
     /// Define operação para criar uma conexão aberta com o banco de dados.

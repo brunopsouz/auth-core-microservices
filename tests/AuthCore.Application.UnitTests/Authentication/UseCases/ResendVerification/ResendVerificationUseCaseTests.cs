@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using global::AuthCore.Application.UnitTests.Authentication.Support;
 using AuthCore.Application.Authentication.UseCases.ResendVerification;
 using BuildingBlocks.Messaging.Contracts.Notifications;

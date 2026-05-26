@@ -1,4 +1,4 @@
-namespace NotificationCore.Infrastructure.Notifications.Providers;
+﻿namespace NotificationCore.Infrastructure.Notifications.Providers;
 
 internal interface ISmtpClientFactory
 {

@@ -11,9 +11,11 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// </summary>
 internal sealed class PasswordRepository : IPasswordRepository
 {
+    /// <summary>
+    /// Campo que armazena database session.
+    /// </summary>
     private readonly IDatabaseSession _databaseSession;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -24,7 +26,6 @@ internal sealed class PasswordRepository : IPasswordRepository
         _databaseSession = databaseSession;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para adicionar uma senha.
@@ -145,7 +146,6 @@ internal sealed class PasswordRepository : IPasswordRepository
         await command.ExecuteNonQueryAsync();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar comando SQL respeitando a transação atual.
@@ -158,5 +158,4 @@ internal sealed class PasswordRepository : IPasswordRepository
         return new NpgsqlCommand(sql, connection, _databaseSession.CurrentTransaction);
     }
 
-    #endregion
 }

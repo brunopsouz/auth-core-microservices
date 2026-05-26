@@ -1,4 +1,4 @@
-using AuthCore.Domain.Common.Exceptions;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Users.Repositories;
 
 namespace AuthCore.Application.Users.UseCases.GetUserProfile;
@@ -8,9 +8,11 @@ namespace AuthCore.Application.Users.UseCases.GetUserProfile;
 /// </summary>
 internal sealed class GetUserProfileUseCase : IGetUserProfileUseCase
 {
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -21,7 +23,6 @@ internal sealed class GetUserProfileUseCase : IGetUserProfileUseCase
         _userReadRepository = userReadRepository;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para obter o perfil do usuário autenticado.

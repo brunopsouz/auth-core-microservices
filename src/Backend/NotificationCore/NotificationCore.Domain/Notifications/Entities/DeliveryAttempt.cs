@@ -54,7 +54,6 @@ public sealed class DeliveryAttempt : EntityBase
     /// </summary>
     public string ProviderMessageId { get; private set; } = null!;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -138,9 +137,7 @@ public sealed class DeliveryAttempt : EntityBase
         Validate();
     }
 
-    #endregion
 
-    #region Factory
 
     /// <summary>
     /// Operação para registrar tentativa bem-sucedida.
@@ -243,9 +240,7 @@ public sealed class DeliveryAttempt : EntityBase
             providerMessageId);
     }
 
-    #endregion
 
-    #region Helpers
 
     /// <summary>
     /// Operação para validar os dados da tentativa.
@@ -284,5 +279,4 @@ public sealed class DeliveryAttempt : EntityBase
         DomainException.When(value == default || value.Kind != DateTimeKind.Utc, message);
     }
 
-    #endregion
 }

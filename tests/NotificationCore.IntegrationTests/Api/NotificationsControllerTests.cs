@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using NotificationCore.Api.Contracts.Requests;
 using NotificationCore.Api.Contracts.Responses;
 using NotificationCore.Api.Controllers;

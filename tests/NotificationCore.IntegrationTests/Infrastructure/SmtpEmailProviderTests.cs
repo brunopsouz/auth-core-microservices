@@ -129,6 +129,9 @@ public sealed class SmtpEmailProviderTests
 
     private sealed class FakeSmtpClientFactory : ISmtpClientFactory
     {
+        /// <summary>
+        /// Campo que armazena smtp client.
+        /// </summary>
         private readonly ISmtpClientAdapter _smtpClient;
 
         public FakeSmtpClientFactory(ISmtpClientAdapter smtpClient)

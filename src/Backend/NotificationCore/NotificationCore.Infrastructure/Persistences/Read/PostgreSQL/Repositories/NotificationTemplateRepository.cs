@@ -10,9 +10,11 @@ namespace NotificationCore.Infrastructure.Persistences.Read.PostgreSQL.Repositor
 /// </summary>
 internal sealed class NotificationTemplateRepository : INotificationTemplateRepository
 {
+    /// <summary>
+    /// Campo que armazena database session.
+    /// </summary>
     private readonly IDatabaseSession _databaseSession;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -23,7 +25,6 @@ internal sealed class NotificationTemplateRepository : INotificationTemplateRepo
         _databaseSession = databaseSession;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para listar templates ativos.
@@ -87,7 +88,6 @@ internal sealed class NotificationTemplateRepository : INotificationTemplateRepo
         return await ReadTemplateAsync(command);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar comando SQL respeitando a transação atual.
@@ -132,5 +132,4 @@ internal sealed class NotificationTemplateRepository : INotificationTemplateRepo
         };
     }
 
-    #endregion
 }

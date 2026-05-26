@@ -9,11 +9,19 @@ namespace AuthCore.Api.Workers;
 /// </summary>
 internal sealed class OutboxHostedService : BackgroundService
 {
+    /// <summary>
+    /// Campo que armazena service scope factory.
+    /// </summary>
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    /// <summary>
+    /// Campo que armazena outbox options.
+    /// </summary>
     private readonly OutboxOptions _outboxOptions;
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<OutboxHostedService> _logger;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -31,7 +39,6 @@ internal sealed class OutboxHostedService : BackgroundService
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para executar o worker da outbox.
@@ -71,7 +78,6 @@ internal sealed class OutboxHostedService : BackgroundService
         _logger.LogInformation("Worker da outbox encerrado.");
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para aguardar o próximo ciclo de processamento.
@@ -84,5 +90,4 @@ internal sealed class OutboxHostedService : BackgroundService
         return Task.Delay(delay, stoppingToken);
     }
 
-    #endregion
 }

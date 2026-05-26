@@ -20,11 +20,19 @@ namespace AuthCore.Api.Controllers;
 [Route("api/auth/session")]
 public sealed class SessionAuthController : AuthControllerBase
 {
+    /// <summary>
+    /// Campo que armazena csrf request validator.
+    /// </summary>
     private readonly ICsrfRequestValidator _csrfRequestValidator;
+    /// <summary>
+    /// Campo que armazena login rate limiter.
+    /// </summary>
     private readonly ILoginRateLimiter _loginRateLimiter;
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<SessionAuthController> _logger;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -47,7 +55,6 @@ public sealed class SessionAuthController : AuthControllerBase
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para autenticar um usuário por sessão.

@@ -28,13 +28,27 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
     private const string EMAIL_PROVIDER_TEMPORARY_FAILURE_MESSAGE = "Falha temporária no provedor de e-mail.";
     private const string EMAIL_PROVIDER_PERMANENT_FAILURE_MESSAGE = "Falha permanente no provedor de e-mail.";
 
+    /// <summary>
+    /// Campo que armazena email provider.
+    /// </summary>
     private readonly IEmailProvider _emailProvider;
+    /// <summary>
+    /// Campo que armazena inbox repository.
+    /// </summary>
     private readonly IInboxRepository _inboxRepository;
+    /// <summary>
+    /// Campo que armazena notification repository.
+    /// </summary>
     private readonly INotificationRepository _notificationRepository;
+    /// <summary>
+    /// Campo que armazena template renderer.
+    /// </summary>
     private readonly ITemplateRenderer _templateRenderer;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -58,7 +72,6 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
         _unitOfWork = unitOfWork;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para despachar notificações pendentes.
@@ -101,7 +114,6 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
         }
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para despachar uma notificação.
@@ -520,5 +532,4 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
         }
     }
 
-    #endregion
 }

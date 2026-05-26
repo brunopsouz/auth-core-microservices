@@ -12,11 +12,19 @@ namespace AuthCore.Infrastructure.Services.Caching;
 /// </summary>
 internal sealed class RedisSessionStore : ISessionStore
 {
+    /// <summary>
+    /// Campo que armazena database.
+    /// </summary>
     private readonly IDatabase _database;
+    /// <summary>
+    /// Campo que armazena redis options.
+    /// </summary>
     private readonly RedisOptions _redisOptions;
+    /// <summary>
+    /// Campo que armazena serializer options.
+    /// </summary>
     private readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -34,7 +42,6 @@ internal sealed class RedisSessionStore : ISessionStore
         _redisOptions = redisOptions.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para persistir uma sessão autenticada.
@@ -154,7 +161,6 @@ internal sealed class RedisSessionStore : ISessionStore
         await _database.KeyDeleteAsync(userSessionsKey);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para obter a chave Redis da sessão.
@@ -198,5 +204,4 @@ internal sealed class RedisSessionStore : ISessionStore
         public DateTime? RevokedAtUtc { get; set; }
     }
 
-    #endregion
 }

@@ -9,9 +9,11 @@ namespace NotificationCore.Api.HealthChecks;
 /// </summary>
 internal sealed class NotificationDispatcherHealthCheck : IHealthCheck
 {
+    /// <summary>
+    /// Campo que armazena options.
+    /// </summary>
     private readonly NotificationDispatcherOptions _options;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -24,7 +26,6 @@ internal sealed class NotificationDispatcherHealthCheck : IHealthCheck
         _options = options.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para verificar a saúde do despachante de notificações.

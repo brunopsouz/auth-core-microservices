@@ -1,4 +1,4 @@
-using AuthCore.Api;
+﻿using AuthCore.Api;
 using AuthCore.Application;
 using AuthCore.Infrastructure;
 using AuthCore.Infrastructure.Persistences.Migrations;

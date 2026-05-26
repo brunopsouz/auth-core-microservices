@@ -1,4 +1,4 @@
-using AuthCore.Api;
+﻿using AuthCore.Api;
 using AuthCore.Api.Controllers;
 using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Application;

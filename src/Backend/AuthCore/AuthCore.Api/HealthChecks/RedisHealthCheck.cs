@@ -8,9 +8,11 @@ namespace AuthCore.Api.HealthChecks;
 /// </summary>
 internal sealed class RedisHealthCheck : IHealthCheck
 {
+    /// <summary>
+    /// Campo que armazena connection multiplexer.
+    /// </summary>
     private readonly IConnectionMultiplexer _connectionMultiplexer;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -21,7 +23,6 @@ internal sealed class RedisHealthCheck : IHealthCheck
         _connectionMultiplexer = connectionMultiplexer;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para verificar a saúde da conectividade com o Redis.

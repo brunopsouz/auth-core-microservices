@@ -8,12 +8,23 @@ namespace AuthCore.Api.Security;
 /// </summary>
 internal sealed class InMemoryLoginRateLimiter : ILoginRateLimiter
 {
+    /// <summary>
+    /// Campo que armazena entries.
+    /// </summary>
     private readonly Dictionary<string, RateLimitEntry> _entries = [];
+    /// <summary>
+    /// Campo que armazena sync.
+    /// </summary>
     private readonly object _sync = new();
+    /// <summary>
+    /// Campo que armazena time provider.
+    /// </summary>
     private readonly TimeProvider _timeProvider;
+    /// <summary>
+    /// Campo que armazena login rate limit options.
+    /// </summary>
     private readonly LoginRateLimitOptions _loginRateLimitOptions;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -31,7 +42,6 @@ internal sealed class InMemoryLoginRateLimiter : ILoginRateLimiter
         _loginRateLimitOptions = loginRateLimitOptions.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para registrar uma tentativa de login.
@@ -69,7 +79,6 @@ internal sealed class InMemoryLoginRateLimiter : ILoginRateLimiter
         }
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para obter ou reiniciar a entrada da janela corrente.
@@ -169,5 +178,4 @@ internal sealed class InMemoryLoginRateLimiter : ILoginRateLimiter
         }
     }
 
-    #endregion
 }

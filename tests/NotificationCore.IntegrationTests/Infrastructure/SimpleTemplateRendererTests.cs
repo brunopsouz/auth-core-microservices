@@ -107,6 +107,9 @@ public sealed class SimpleTemplateRendererTests
 
     private sealed class FakeNotificationTemplateRepository : INotificationTemplateRepository
     {
+        /// <summary>
+        /// Campo que armazena templates.
+        /// </summary>
         private readonly List<NotificationTemplate> _templates = [];
 
         public Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync()

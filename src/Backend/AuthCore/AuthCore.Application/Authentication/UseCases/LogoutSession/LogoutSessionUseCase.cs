@@ -10,10 +10,15 @@ internal sealed class LogoutSessionUseCase : ILogoutSessionUseCase
 {
     private const string LOGOUT_REASON = "logout";
 
+    /// <summary>
+    /// Campo que armazena refresh token repository.
+    /// </summary>
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    /// <summary>
+    /// Campo que armazena refresh token service.
+    /// </summary>
     private readonly IRefreshTokenService _refreshTokenService;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -28,7 +33,6 @@ internal sealed class LogoutSessionUseCase : ILogoutSessionUseCase
         _refreshTokenService = refreshTokenService;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para encerrar uma autenticação do modo token.
@@ -59,7 +63,6 @@ internal sealed class LogoutSessionUseCase : ILogoutSessionUseCase
         await _refreshTokenRepository.UpdateAsync(revokedRefreshToken);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para revogar a família da autenticação encerrada.
@@ -71,5 +74,4 @@ internal sealed class LogoutSessionUseCase : ILogoutSessionUseCase
         await _refreshTokenRepository.RevokeFamilyAsync(familyId, revokedAtUtc, LOGOUT_REASON);
     }
 
-    #endregion
 }

@@ -10,9 +10,11 @@ namespace AuthCore.Api.Security;
 /// </summary>
 internal sealed class AuthenticatedUserAccessValidator : IAuthenticatedUserAccessValidator
 {
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -25,7 +27,6 @@ internal sealed class AuthenticatedUserAccessValidator : IAuthenticatedUserAcces
         _userReadRepository = userReadRepository;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para validar o acesso do usuário autenticado e retornar seu identificador público atual.
@@ -54,7 +55,6 @@ internal sealed class AuthenticatedUserAccessValidator : IAuthenticatedUserAcces
         return authenticatedUser.UserIdentifier;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para obter o identificador público do usuário autenticado.
@@ -80,5 +80,4 @@ internal sealed class AuthenticatedUserAccessValidator : IAuthenticatedUserAcces
         throw new UnauthorizedAccessException("O identificador do usuário autenticado não foi encontrado.");
     }
 
-    #endregion
 }

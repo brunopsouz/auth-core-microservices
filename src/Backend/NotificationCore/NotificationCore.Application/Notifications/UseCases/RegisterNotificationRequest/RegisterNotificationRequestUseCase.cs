@@ -14,11 +14,19 @@ namespace NotificationCore.Application.Notifications.UseCases.RegisterNotificati
 /// </summary>
 internal sealed class RegisterNotificationRequestUseCase : IRegisterNotificationRequestUseCase
 {
+    /// <summary>
+    /// Campo que armazena inbox repository.
+    /// </summary>
     private readonly IInboxRepository _inboxRepository;
+    /// <summary>
+    /// Campo que armazena notification repository.
+    /// </summary>
     private readonly INotificationRepository _notificationRepository;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -36,7 +44,6 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
         _unitOfWork = unitOfWork;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para registrar solicitação de notificação.
@@ -106,7 +113,6 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
         }
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar mensagem de inbox.
@@ -155,5 +161,4 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
         };
     }
 
-    #endregion
 }

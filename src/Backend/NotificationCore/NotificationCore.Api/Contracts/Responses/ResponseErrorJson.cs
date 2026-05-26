@@ -1,4 +1,4 @@
-namespace NotificationCore.Api.Contracts.Responses;
+﻿namespace NotificationCore.Api.Contracts.Responses;
 
 /// <summary>
 /// Representa resposta JSON para erros da API.

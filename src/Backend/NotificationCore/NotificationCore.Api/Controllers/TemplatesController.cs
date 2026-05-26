@@ -29,7 +29,6 @@ public sealed class TemplatesController : ControllerBase
             .ToList());
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para mapear template para resposta HTTP.
@@ -48,5 +47,4 @@ public sealed class TemplatesController : ControllerBase
         };
     }
 
-    #endregion
 }

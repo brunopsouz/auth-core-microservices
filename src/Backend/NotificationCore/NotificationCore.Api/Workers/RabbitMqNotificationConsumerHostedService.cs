@@ -20,12 +20,23 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>
+    /// Campo que armazena consumer.
+    /// </summary>
     private readonly IRabbitMqNotificationConsumer _consumer;
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<RabbitMqNotificationConsumerHostedService> _logger;
+    /// <summary>
+    /// Campo que armazena rabbit mq options.
+    /// </summary>
     private readonly RabbitMqOptions _rabbitMqOptions;
+    /// <summary>
+    /// Campo que armazena service scope factory.
+    /// </summary>
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -51,7 +62,6 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para executar o worker de consumo RabbitMQ.
@@ -70,7 +80,6 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
         return _consumer.StartAsync(ProcessMessageAsync, stoppingToken);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para processar mensagem consumida.
@@ -193,5 +202,4 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
         return JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(json, _jsonSerializerOptions);
     }
 
-    #endregion
 }

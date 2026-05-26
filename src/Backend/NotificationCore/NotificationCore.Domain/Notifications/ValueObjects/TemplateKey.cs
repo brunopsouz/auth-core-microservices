@@ -14,7 +14,6 @@ public sealed class TemplateKey : ValueObject
     /// </summary>
     public string Value { get; } = null!;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -32,7 +31,6 @@ public sealed class TemplateKey : ValueObject
     {
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para criar chave de template.
@@ -78,7 +76,6 @@ public sealed class TemplateKey : ValueObject
         return Value;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para obter os componentes usados na igualdade.
@@ -89,5 +86,4 @@ public sealed class TemplateKey : ValueObject
         yield return Value;
     }
 
-    #endregion
 }

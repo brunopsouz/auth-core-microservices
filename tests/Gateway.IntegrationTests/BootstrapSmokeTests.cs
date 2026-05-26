@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Gateway.Api;
 using Gateway.Api.Options;
 using Microsoft.AspNetCore.Authentication;

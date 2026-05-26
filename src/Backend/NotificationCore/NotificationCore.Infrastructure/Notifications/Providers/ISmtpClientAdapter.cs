@@ -1,4 +1,4 @@
-using MailKit.Security;
+﻿using MailKit.Security;
 using MimeKit;
 
 namespace NotificationCore.Infrastructure.Notifications.Providers;

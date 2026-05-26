@@ -1,9 +1,12 @@
-using Npgsql;
+﻿using Npgsql;
 
 namespace NotificationCore.IntegrationTests.Infrastructure;
 
 public sealed class NotificationSchemaMigrationTests : IClassFixture<PostgreSqlIntegrationFixture>
 {
+    /// <summary>
+    /// Campo que armazena fixture.
+    /// </summary>
     private readonly PostgreSqlIntegrationFixture _fixture;
 
     public NotificationSchemaMigrationTests(PostgreSqlIntegrationFixture fixture)

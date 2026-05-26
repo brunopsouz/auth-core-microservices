@@ -14,7 +14,6 @@ public sealed class RecipientEmail : ValueObject
     /// </summary>
     public string Value { get; } = null!;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -32,7 +31,6 @@ public sealed class RecipientEmail : ValueObject
     {
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para criar e-mail de destinatário.
@@ -77,7 +75,6 @@ public sealed class RecipientEmail : ValueObject
         return Value;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para obter os componentes usados na igualdade.
@@ -88,5 +85,4 @@ public sealed class RecipientEmail : ValueObject
         yield return Value;
     }
 
-    #endregion
 }

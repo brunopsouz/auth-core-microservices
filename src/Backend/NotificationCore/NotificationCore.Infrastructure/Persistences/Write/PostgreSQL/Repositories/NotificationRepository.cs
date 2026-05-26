@@ -13,9 +13,11 @@ namespace NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.Reposito
 /// </summary>
 internal sealed class NotificationRepository : INotificationRepository
 {
+    /// <summary>
+    /// Campo que armazena database session.
+    /// </summary>
     private readonly IDatabaseSession _databaseSession;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -26,7 +28,6 @@ internal sealed class NotificationRepository : INotificationRepository
         _databaseSession = databaseSession;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para adicionar uma notificação.
@@ -385,7 +386,6 @@ internal sealed class NotificationRepository : INotificationRepository
         return wasUpdated;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para inserir uma notificação.
@@ -774,5 +774,4 @@ internal sealed class NotificationRepository : INotificationRepository
             lastError: notification.LastError);
     }
 
-    #endregion
 }

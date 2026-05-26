@@ -18,7 +18,6 @@ public sealed class IdempotencyKey : ValueObject
     /// </summary>
     public string Value { get; } = null!;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -36,7 +35,6 @@ public sealed class IdempotencyKey : ValueObject
     {
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para criar chave de idempotência.
@@ -78,7 +76,6 @@ public sealed class IdempotencyKey : ValueObject
         return Value;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para obter os componentes usados na igualdade.
@@ -89,5 +86,4 @@ public sealed class IdempotencyKey : ValueObject
         yield return Value;
     }
 
-    #endregion
 }

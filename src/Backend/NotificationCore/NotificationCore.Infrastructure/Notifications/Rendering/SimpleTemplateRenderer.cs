@@ -15,9 +15,11 @@ internal sealed class SimpleTemplateRenderer : ITemplateRenderer
     private const string INVALID_VARIABLE_MESSAGE = "Template possui variável inválida.";
     private const string MISSING_VARIABLE_MESSAGE = "Template possui variável obrigatória ausente.";
 
+    /// <summary>
+    /// Campo que armazena template repository.
+    /// </summary>
     private readonly INotificationTemplateRepository _templateRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -30,7 +32,6 @@ internal sealed class SimpleTemplateRenderer : ITemplateRenderer
         _templateRepository = templateRepository;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para renderizar template de notificação.
@@ -58,7 +59,6 @@ internal sealed class SimpleTemplateRenderer : ITemplateRenderer
         };
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para renderizar conteúdo textual com variáveis.
@@ -102,5 +102,4 @@ internal sealed class SimpleTemplateRenderer : ITemplateRenderer
         return rendered.ToString();
     }
 
-    #endregion
 }

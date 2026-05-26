@@ -1,4 +1,4 @@
-namespace AuthCore.Api.Contracts.Responses;
+﻿namespace AuthCore.Api.Contracts.Responses;
 
 /// <summary>
 /// Representa resposta de erro da aplicacao.

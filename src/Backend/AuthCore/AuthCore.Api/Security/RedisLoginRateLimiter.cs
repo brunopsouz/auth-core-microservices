@@ -11,11 +11,19 @@ namespace AuthCore.Api.Security;
 /// </summary>
 internal sealed class RedisLoginRateLimiter : ILoginRateLimiter
 {
+    /// <summary>
+    /// Campo que armazena database.
+    /// </summary>
     private readonly IDatabase _database;
+    /// <summary>
+    /// Campo que armazena redis options.
+    /// </summary>
     private readonly RedisOptions _redisOptions;
+    /// <summary>
+    /// Campo que armazena login rate limit options.
+    /// </summary>
     private readonly LoginRateLimitOptions _loginRateLimitOptions;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -37,7 +45,6 @@ internal sealed class RedisLoginRateLimiter : ILoginRateLimiter
         _loginRateLimitOptions = loginRateLimitOptions.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para registrar uma tentativa de login.
@@ -71,7 +78,6 @@ internal sealed class RedisLoginRateLimiter : ILoginRateLimiter
         return LoginRateLimitResult.Block(ipRetryAfter > emailRetryAfter ? ipRetryAfter : emailRetryAfter);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para incrementar uma chave garantindo expiração da janela.
@@ -153,5 +159,4 @@ internal sealed class RedisLoginRateLimiter : ILoginRateLimiter
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    #endregion
 }

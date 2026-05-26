@@ -1,4 +1,4 @@
-using MailKit.Net.Smtp;
+﻿using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
 
@@ -13,6 +13,9 @@ internal sealed class MailKitSmtpClientFactory : ISmtpClientFactory
 
     private sealed class MailKitSmtpClientAdapter : ISmtpClientAdapter
     {
+        /// <summary>
+        /// Campo que armazena client.
+        /// </summary>
         private readonly SmtpClient _client;
 
         public int Timeout

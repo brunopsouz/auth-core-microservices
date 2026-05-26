@@ -10,9 +10,11 @@ namespace NotificationCore.Api.HealthChecks;
 /// </summary>
 internal sealed class RabbitMqHealthCheck : IHealthCheck
 {
+    /// <summary>
+    /// Campo que armazena options.
+    /// </summary>
     private readonly RabbitMqOptions _options;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -25,7 +27,6 @@ internal sealed class RabbitMqHealthCheck : IHealthCheck
         _options = options.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para verificar a saúde da conectividade com o RabbitMQ.

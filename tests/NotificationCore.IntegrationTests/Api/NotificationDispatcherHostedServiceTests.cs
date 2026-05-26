@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NotificationCore.Api.Workers;
@@ -95,6 +95,9 @@ public sealed class NotificationDispatcherHostedServiceTests
 
     private sealed class SpyDispatchPendingNotificationUseCase : IDispatchPendingNotificationUseCase
     {
+        /// <summary>
+        /// Campo que armazena command received.
+        /// </summary>
         private readonly TaskCompletionSource<DispatchPendingNotificationCommand> _commandReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public int ExecutionCount { get; private set; }

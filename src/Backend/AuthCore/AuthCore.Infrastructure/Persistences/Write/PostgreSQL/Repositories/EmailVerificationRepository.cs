@@ -10,9 +10,11 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// </summary>
 internal sealed class EmailVerificationRepository : IEmailVerificationRepository
 {
+    /// <summary>
+    /// Campo que armazena database session.
+    /// </summary>
     private readonly IDatabaseSession _databaseSession;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -23,7 +25,6 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
         _databaseSession = databaseSession;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para adicionar uma verificação de e-mail.
@@ -231,7 +232,6 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
         return await ReadAsync(reader);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para adicionar os parâmetros da verificação ao comando SQL.
@@ -313,5 +313,4 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
                 : reader.GetDateTime(reader.GetOrdinal("RevokedAtUtc")));
     }
 
-    #endregion
 }

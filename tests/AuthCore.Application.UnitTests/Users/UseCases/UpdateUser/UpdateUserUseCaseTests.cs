@@ -1,4 +1,4 @@
-using global::AuthCore.Application.UnitTests.Authentication.Support;
+﻿using global::AuthCore.Application.UnitTests.Authentication.Support;
 using AuthCore.Application.Users.UseCases.UpdateUser;
 
 namespace AuthCore.Application.UnitTests.Users.UseCases.UpdateUser;

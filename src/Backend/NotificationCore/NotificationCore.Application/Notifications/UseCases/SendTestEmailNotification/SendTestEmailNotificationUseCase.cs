@@ -13,9 +13,11 @@ internal sealed class SendTestEmailNotificationUseCase : ISendTestEmailNotificat
     private const string TEST_TEXT_BODY = "Mensagem de teste do NotificationCore.";
     private const string TEST_HTML_BODY = "<p>Mensagem de teste do NotificationCore.</p>";
 
+    /// <summary>
+    /// Campo que armazena email provider.
+    /// </summary>
     private readonly IEmailProvider _emailProvider;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -28,7 +30,6 @@ internal sealed class SendTestEmailNotificationUseCase : ISendTestEmailNotificat
         _emailProvider = emailProvider;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para enviar e-mail de teste.
@@ -66,7 +67,6 @@ internal sealed class SendTestEmailNotificationUseCase : ISendTestEmailNotificat
         };
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar identificador de correlação.
@@ -93,5 +93,4 @@ internal sealed class SendTestEmailNotificationUseCase : ISendTestEmailNotificat
             : provider.Trim();
     }
 
-    #endregion
 }

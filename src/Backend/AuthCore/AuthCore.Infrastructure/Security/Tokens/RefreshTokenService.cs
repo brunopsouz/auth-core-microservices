@@ -14,9 +14,11 @@ internal sealed class RefreshTokenService : IRefreshTokenService
 {
     private const int TOKEN_SIZE_IN_BYTES = 32;
 
+    /// <summary>
+    /// Campo que armazena jwt options.
+    /// </summary>
     private readonly JwtOptions _jwtOptions;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -29,7 +31,6 @@ internal sealed class RefreshTokenService : IRefreshTokenService
         _jwtOptions = jwtOptions.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para criar um refresh token.

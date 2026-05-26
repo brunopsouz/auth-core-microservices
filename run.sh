@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOLUTION_FILE="$ROOT_DIR/AuthCore.sln"
 BACKEND_DIR="$ROOT_DIR/src/Backend"
+BACKEND_SOLUTION="$BACKEND_DIR/Backend.sln"
 COMPOSE_FILE="$BACKEND_DIR/docker-compose.yml"
 ENV_FILE="$BACKEND_DIR/.env.development"
 AUTHCORE_API_PROJECT="$BACKEND_DIR/AuthCore/AuthCore.Api/AuthCore.Api.csproj"
@@ -12,6 +13,13 @@ GATEWAY_API_PROJECT="$BACKEND_DIR/Gateway/Gateway.Api/Gateway.Api.csproj"
 AUTHCORE_SERVICE_SOLUTION="$BACKEND_DIR/AuthCore/AuthCore.Service.sln"
 NOTIFICATIONCORE_SERVICE_SOLUTION="$BACKEND_DIR/NotificationCore/NotificationCore.Service.sln"
 GATEWAY_SERVICE_SOLUTION="$BACKEND_DIR/Gateway/Gateway.Service.sln"
+AUTHCORE_DOMAIN_TESTS_PROJECT="$ROOT_DIR/tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj"
+AUTHCORE_APPLICATION_TESTS_PROJECT="$ROOT_DIR/tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.csproj"
+AUTHCORE_INTEGRATION_TESTS_PROJECT="$ROOT_DIR/tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj"
+NOTIFICATIONCORE_DOMAIN_TESTS_PROJECT="$ROOT_DIR/tests/NotificationCore.Domain.UnitTests/NotificationCore.Domain.UnitTests.csproj"
+NOTIFICATIONCORE_APPLICATION_TESTS_PROJECT="$ROOT_DIR/tests/NotificationCore.Application.UnitTests/NotificationCore.Application.UnitTests.csproj"
+NOTIFICATIONCORE_INTEGRATION_TESTS_PROJECT="$ROOT_DIR/tests/NotificationCore.IntegrationTests/NotificationCore.IntegrationTests.csproj"
+GATEWAY_INTEGRATION_TESTS_PROJECT="$ROOT_DIR/tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj"
 DEFAULT_COMMAND="${1:-dev}"
 
 GREEN='\033[1;32m'
@@ -193,9 +201,10 @@ Comandos:
   infra     Sobe apenas a infraestrutura em background.
   docker    Sobe toda a aplicacao com Docker Compose.
   build     Compila os projetos de producao dos microservicos, sem testes.
+  build-backend Compila a solucao agregadora do backend.
   build-all Compila a solucao raiz agregadora.
   test      Executa apenas os testes atualmente estaveis.
-  test-all  Executa os testes por solucao de microservico.
+  test-all  Executa todos os projetos de teste dos microservicos.
   build-authcore Compila a API de producao do AuthCore.
   build-notificationcore Compila a API de producao do NotificationCore.
   build-gateway Compila a API de producao do Gateway.
@@ -285,6 +294,14 @@ build_all() {
     dotnet build "$SOLUTION_FILE"
 }
 
+build_backend() {
+    ensure_command dotnet
+    ensure_file "$BACKEND_SOLUTION"
+
+    echo -e "${YELLOW}Compilando solucao agregadora do backend...${NC}"
+    dotnet build "$BACKEND_SOLUTION" -c Release
+}
+
 test_solution() {
     ensure_command dotnet
 
@@ -327,26 +344,34 @@ build_gateway() {
 
 test_authcore() {
     ensure_command dotnet
-    ensure_file "$AUTHCORE_SERVICE_SOLUTION"
+    ensure_file "$AUTHCORE_DOMAIN_TESTS_PROJECT"
+    ensure_file "$AUTHCORE_APPLICATION_TESTS_PROJECT"
+    ensure_file "$AUTHCORE_INTEGRATION_TESTS_PROJECT"
 
     echo -e "${YELLOW}Executando testes do AuthCore...${NC}"
-    dotnet test "$AUTHCORE_SERVICE_SOLUTION" -c Release
+    dotnet test "$AUTHCORE_DOMAIN_TESTS_PROJECT" -c Release
+    dotnet test "$AUTHCORE_APPLICATION_TESTS_PROJECT" -c Release
+    dotnet test "$AUTHCORE_INTEGRATION_TESTS_PROJECT" -c Release
 }
 
 test_notificationcore() {
     ensure_command dotnet
-    ensure_file "$NOTIFICATIONCORE_SERVICE_SOLUTION"
+    ensure_file "$NOTIFICATIONCORE_DOMAIN_TESTS_PROJECT"
+    ensure_file "$NOTIFICATIONCORE_APPLICATION_TESTS_PROJECT"
+    ensure_file "$NOTIFICATIONCORE_INTEGRATION_TESTS_PROJECT"
 
     echo -e "${YELLOW}Executando testes do NotificationCore...${NC}"
-    dotnet test "$NOTIFICATIONCORE_SERVICE_SOLUTION" -c Release
+    dotnet test "$NOTIFICATIONCORE_DOMAIN_TESTS_PROJECT" -c Release
+    dotnet test "$NOTIFICATIONCORE_APPLICATION_TESTS_PROJECT" -c Release
+    dotnet test "$NOTIFICATIONCORE_INTEGRATION_TESTS_PROJECT" -c Release
 }
 
 test_gateway() {
     ensure_command dotnet
-    ensure_file "$GATEWAY_SERVICE_SOLUTION"
+    ensure_file "$GATEWAY_INTEGRATION_TESTS_PROJECT"
 
     echo -e "${YELLOW}Executando testes do Gateway...${NC}"
-    dotnet test "$GATEWAY_SERVICE_SOLUTION" -c Release
+    dotnet test "$GATEWAY_INTEGRATION_TESTS_PROJECT" -c Release
 }
 
 stop_containers() {
@@ -380,6 +405,9 @@ case "$DEFAULT_COMMAND" in
         ;;
     build)
         build_solution
+        ;;
+    build-backend)
+        build_backend
         ;;
     build-all)
         build_all

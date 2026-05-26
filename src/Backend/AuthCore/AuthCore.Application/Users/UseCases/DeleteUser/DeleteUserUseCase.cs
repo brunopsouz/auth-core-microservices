@@ -1,4 +1,4 @@
-using AuthCore.Domain.Common.Exceptions;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Users.Repositories;
@@ -12,13 +12,27 @@ internal sealed class DeleteUserUseCase : IDeleteUserUseCase
 {
     private const string USER_DEACTIVATED_REASON = "user-deactivated";
 
+    /// <summary>
+    /// Campo que armazena password repository.
+    /// </summary>
     private readonly IPasswordRepository _passwordRepository;
+    /// <summary>
+    /// Campo que armazena refresh token repository.
+    /// </summary>
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
+    /// <summary>
+    /// Campo que armazena user repository.
+    /// </summary>
     private readonly IUserRepository _userRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -42,7 +56,6 @@ internal sealed class DeleteUserUseCase : IDeleteUserUseCase
         _unitOfWork = unitOfWork;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para excluir o usuário autenticado.

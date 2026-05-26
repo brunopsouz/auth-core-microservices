@@ -11,6 +11,9 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// </summary>
 internal sealed class EmailVerificationRequestedPublisher : IEmailVerificationRequestedPublisher
 {
+    /// <summary>
+    /// Campo que armazena outbox message repository.
+    /// </summary>
     private readonly IOutboxMessageRepository _outboxMessageRepository;
 
     /// <summary>

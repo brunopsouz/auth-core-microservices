@@ -8,9 +8,11 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// </summary>
 internal sealed class LoggingEmailSender : IEmailSender
 {
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<LoggingEmailSender> _logger;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -21,7 +23,6 @@ internal sealed class LoggingEmailSender : IEmailSender
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para enviar o código de verificação de e-mail.

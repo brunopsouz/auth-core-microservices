@@ -51,7 +51,6 @@ public static class InfrastructureDependencyInjection
         return services;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para adicionar as opções de configuração da infraestrutura.
@@ -230,5 +229,4 @@ public static class InfrastructureDependencyInjection
             ?? string.Empty;
     }
 
-    #endregion
 }

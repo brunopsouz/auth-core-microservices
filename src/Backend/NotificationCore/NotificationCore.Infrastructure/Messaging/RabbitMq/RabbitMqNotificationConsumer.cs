@@ -11,14 +11,19 @@ namespace NotificationCore.Infrastructure.Messaging.RabbitMq;
 /// </summary>
 internal sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsumer
 {
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<RabbitMqNotificationConsumer> _logger;
+    /// <summary>
+    /// Campo que armazena options.
+    /// </summary>
     private readonly RabbitMqOptions _options;
 
     private IConnection? _connection;
     private IModel? _channel;
     private string? _consumerTag;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -36,7 +41,6 @@ internal sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsum
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para iniciar o consumo de mensagens.
@@ -92,7 +96,6 @@ internal sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsum
         _connection?.Dispose();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para processar mensagem recebida.
@@ -259,5 +262,4 @@ internal sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsum
         _consumerTag = null;
     }
 
-    #endregion
 }

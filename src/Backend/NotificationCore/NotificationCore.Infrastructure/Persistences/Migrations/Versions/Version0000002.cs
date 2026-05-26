@@ -26,7 +26,6 @@ internal sealed class Version0000002 : VersionBase
         SeedAuthEmailConfirmationTemplate();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar índice idempotente de templates por chave, canal e versão.
@@ -81,5 +80,4 @@ internal sealed class Version0000002 : VersionBase
             """);
     }
 
-    #endregion
 }

@@ -4,7 +4,6 @@ using AuthCore.Api.Security;
 using AuthCore.Application.Authentication.UseCases.Login;
 using AuthCore.Application.Authentication.UseCases.LogoutSession;
 using AuthCore.Application.Authentication.UseCases.RefreshSession;
-using AuthCore.Api.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthCore.Api.Controllers;
@@ -16,10 +15,15 @@ namespace AuthCore.Api.Controllers;
 [Route("api/auth/token")]
 public sealed class TokenAuthController : AuthControllerBase
 {
+    /// <summary>
+    /// Campo que armazena login rate limiter.
+    /// </summary>
     private readonly ILoginRateLimiter _loginRateLimiter;
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<TokenAuthController> _logger;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -38,7 +42,6 @@ public sealed class TokenAuthController : AuthControllerBase
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para autenticar um usuário no modo token.

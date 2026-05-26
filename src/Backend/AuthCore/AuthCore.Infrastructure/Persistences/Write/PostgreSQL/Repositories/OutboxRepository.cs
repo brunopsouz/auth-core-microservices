@@ -9,6 +9,9 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// </summary>
 internal sealed class OutboxRepository : IOutboxMessageRepository
 {
+    /// <summary>
+    /// Campo que armazena database session.
+    /// </summary>
     private readonly IDatabaseSession _databaseSession;
 
     /// <summary>

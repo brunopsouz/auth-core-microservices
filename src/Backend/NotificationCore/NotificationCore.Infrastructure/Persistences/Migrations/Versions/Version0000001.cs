@@ -20,7 +20,6 @@ internal sealed class Version0000001 : VersionBase
         CreateIndexes();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar a tabela de inbox.
@@ -132,5 +131,4 @@ internal sealed class Version0000001 : VersionBase
             .WithOptions().Unique();
     }
 
-    #endregion
 }

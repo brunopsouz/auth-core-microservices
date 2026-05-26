@@ -11,9 +11,11 @@ namespace NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.Connecti
 /// </summary>
 internal sealed class NpgsqlConnectionFactory : IDbConnectionFactory
 {
+    /// <summary>
+    /// Campo que armazena connection string.
+    /// </summary>
     private readonly string _connectionString;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -29,7 +31,6 @@ internal sealed class NpgsqlConnectionFactory : IDbConnectionFactory
             throw new InvalidOperationException("Database connection string was not configured.");
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para criar uma conexão aberta com o banco de dados.

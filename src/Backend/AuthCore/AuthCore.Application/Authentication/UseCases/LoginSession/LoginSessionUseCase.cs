@@ -16,13 +16,27 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
 {
     private const string INVALID_CREDENTIALS_MESSAGE = "As credenciais informadas são inválidas.";
 
+    /// <summary>
+    /// Campo que armazena password encripter.
+    /// </summary>
     private readonly IPasswordEncripter _passwordEncripter;
+    /// <summary>
+    /// Campo que armazena password repository.
+    /// </summary>
     private readonly IPasswordRepository _passwordRepository;
+    /// <summary>
+    /// Campo que armazena session service.
+    /// </summary>
     private readonly ISessionService _sessionService;
+    /// <summary>
+    /// Campo que armazena session store.
+    /// </summary>
     private readonly ISessionStore _sessionStore;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -46,7 +60,6 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
         _sessionService = sessionService;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para autenticar um usuário por sessão.
@@ -87,7 +100,6 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
         return await AuthenticateAsync(user, password, command);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para concluir a autenticação por sessão.
@@ -203,5 +215,4 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
         };
     }
 
-    #endregion
 }

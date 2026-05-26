@@ -75,7 +75,6 @@ public sealed class JwtAuthenticationIntegrationTests
         Assert.Equal(authenticatedUser.UserIdentifier.ToString(), authenticateResult.Principal!.FindFirstValue(ClaimTypes.NameIdentifier));
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar a aplicação usada nos testes de autenticação.
@@ -157,5 +156,4 @@ public sealed class JwtAuthenticationIntegrationTests
         throw new InvalidOperationException($"Nenhuma claim foi encontrada para os tipos: {string.Join(", ", claimTypes)}.");
     }
 
-    #endregion
 }

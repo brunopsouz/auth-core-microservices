@@ -1,4 +1,4 @@
-using AuthCore.Application.Authentication.UseCases.GetUserSessions;
+﻿using AuthCore.Application.Authentication.UseCases.GetUserSessions;
 using AuthCore.Domain.Passports.Aggregates;
 using AuthCore.Domain.Passports.Repositories;
 
@@ -54,6 +54,9 @@ public sealed class GetUserSessionsUseCaseTests
 
     private sealed class UnorderedSessionStore : ISessionStore
     {
+        /// <summary>
+        /// Campo que armazena sessions.
+        /// </summary>
         private readonly IReadOnlyCollection<Session> _sessions;
 
         public UnorderedSessionStore(IReadOnlyCollection<Session> sessions)

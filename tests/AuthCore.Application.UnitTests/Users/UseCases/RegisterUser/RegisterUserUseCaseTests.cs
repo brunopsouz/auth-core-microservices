@@ -1,7 +1,7 @@
 using System.Text.Json;
 using global::AuthCore.Application.UnitTests.Authentication.Support;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.Users.UseCases.RegisterUser;
-using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Users.Enums;
 using BuildingBlocks.Messaging.Contracts.Notifications;
 

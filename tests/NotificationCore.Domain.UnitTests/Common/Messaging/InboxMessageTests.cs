@@ -1,4 +1,4 @@
-using NotificationCore.Domain.Common.Exceptions;
+﻿using NotificationCore.Domain.Common.Exceptions;
 using NotificationCore.Domain.Common.Messaging;
 
 namespace NotificationCore.Domain.UnitTests.Common.Messaging;

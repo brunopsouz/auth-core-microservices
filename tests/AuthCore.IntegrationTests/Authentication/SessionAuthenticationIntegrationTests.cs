@@ -7,7 +7,6 @@ using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Controllers;
 using AuthCore.Api.Security;
 using AuthCore.Application;
-using AuthCore.Application.Common.Models.Responses;
 using AuthCore.Application.Authentication.UseCases.LoginSession;
 using AuthCore.Application.Authentication.UseCases.LogoutAllSessions;
 using AuthCore.Application.Authentication.UseCases.LogoutCurrentSession;
@@ -379,7 +378,6 @@ public sealed class SessionAuthenticationIntegrationTests
         Assert.Empty(await sessionStore.ListByUserIdAsync(user.Id));
     }
 
-    #region Helpers
 
     private static ServiceProvider BuildServiceProvider(
         InMemoryUserReadRepository userRepository,
@@ -478,8 +476,17 @@ public sealed class SessionAuthenticationIntegrationTests
 
     private sealed class InMemoryUserReadRepository : IUserReadRepository
     {
+        /// <summary>
+        /// Campo que armazena users by id.
+        /// </summary>
         private readonly Dictionary<Guid, User> _usersById = [];
+        /// <summary>
+        /// Campo que armazena users by email.
+        /// </summary>
         private readonly Dictionary<string, User> _usersByEmail = [];
+        /// <summary>
+        /// Campo que armazena users by identifier.
+        /// </summary>
         private readonly Dictionary<Guid, User> _usersByIdentifier = [];
 
         public Task<User?> GetByIdAsync(Guid userId)
@@ -525,6 +532,9 @@ public sealed class SessionAuthenticationIntegrationTests
 
     private sealed class InMemoryPasswordRepository : IPasswordRepository
     {
+        /// <summary>
+        /// Campo que armazena passwords by user id.
+        /// </summary>
         private readonly Dictionary<Guid, Password> _passwordsByUserId = [];
 
         public Task AddAsync(Password password)
@@ -553,6 +563,9 @@ public sealed class SessionAuthenticationIntegrationTests
 
     private sealed class InMemorySessionStore : ISessionStore
     {
+        /// <summary>
+        /// Campo que armazena sessions by id.
+        /// </summary>
         private readonly Dictionary<string, Session> _sessionsById = [];
 
         public List<string> RevokedSessionIds { get; } = [];
@@ -661,5 +674,4 @@ public sealed class SessionAuthenticationIntegrationTests
         }
     }
 
-    #endregion
 }

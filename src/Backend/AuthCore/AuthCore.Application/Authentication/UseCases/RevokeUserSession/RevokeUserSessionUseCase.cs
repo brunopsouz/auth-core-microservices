@@ -1,4 +1,4 @@
-using AuthCore.Domain.Common.Exceptions;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Passports.Repositories;
 
 namespace AuthCore.Application.Authentication.UseCases.RevokeUserSession;
@@ -8,9 +8,11 @@ namespace AuthCore.Application.Authentication.UseCases.RevokeUserSession;
 /// </summary>
 internal sealed class RevokeUserSessionUseCase : IRevokeUserSessionUseCase
 {
+    /// <summary>
+    /// Campo que armazena session store.
+    /// </summary>
     private readonly ISessionStore _sessionStore;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -21,7 +23,6 @@ internal sealed class RevokeUserSessionUseCase : IRevokeUserSessionUseCase
         _sessionStore = sessionStore;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para revogar uma sessão específica do usuário.

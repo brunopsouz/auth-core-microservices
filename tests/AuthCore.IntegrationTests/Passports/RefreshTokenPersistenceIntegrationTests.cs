@@ -16,6 +16,9 @@ namespace AuthCore.IntegrationTests.Passports;
 /// </summary>
 public sealed class RefreshTokenPersistenceIntegrationTests : IClassFixture<PostgreSqlIntegrationFixture>
 {
+    /// <summary>
+    /// Campo que armazena fixture.
+    /// </summary>
     private readonly PostgreSqlIntegrationFixture _fixture;
 
     /// <summary>
@@ -164,7 +167,13 @@ public sealed class RefreshTokenPersistenceIntegrationTests : IClassFixture<Post
 /// </summary>
 public sealed class PostgreSqlIntegrationFixture : IAsyncLifetime
 {
+    /// <summary>
+    /// Campo que armazena database name.
+    /// </summary>
     private readonly string _databaseName = $"auth_core_integration_{Guid.NewGuid():N}";
+    /// <summary>
+    /// Campo que armazena base connection string.
+    /// </summary>
     private readonly string _baseConnectionString;
 
     /// <summary>

@@ -9,9 +9,11 @@ namespace AuthCore.Infrastructure.Services.Caching;
 /// </summary>
 internal sealed class SessionService : ISessionService
 {
+    /// <summary>
+    /// Campo que armazena session options.
+    /// </summary>
     private readonly SessionOptions _sessionOptions;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -24,7 +26,6 @@ internal sealed class SessionService : ISessionService
         _sessionOptions = sessionOptions.Value;
     }
 
-    #endregion
 
     /// <summary>
     /// Indica se a sessão usa expiração deslizante.

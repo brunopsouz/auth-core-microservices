@@ -201,6 +201,9 @@ public sealed class RabbitMqNotificationConsumerHostedServiceTests
 
     private sealed class FakeRabbitMqNotificationConsumer : IRabbitMqNotificationConsumer
     {
+        /// <summary>
+        /// Campo que armazena started.
+        /// </summary>
         private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         private Func<RabbitMqNotificationMessage, CancellationToken, Task<RabbitMqNotificationDisposition>>? _handler;

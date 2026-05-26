@@ -1,4 +1,4 @@
-namespace AuthCore.Domain.Security.Tokens.Models;
+﻿namespace AuthCore.Domain.Security.Tokens.Models;
 
 /// <summary>
 /// Representa o material gerado para um refresh token.

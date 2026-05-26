@@ -9,11 +9,13 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.UnitOfWork;
 /// </summary>
 internal sealed class NpgsqlUnitOfWork : IUnitOfWork, IDatabaseSession, IAsyncDisposable
 {
+    /// <summary>
+    /// Campo que armazena db connection factory.
+    /// </summary>
     private readonly IDbConnectionFactory _dbConnectionFactory;
 
     private NpgsqlConnection? _connection;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -24,7 +26,6 @@ internal sealed class NpgsqlUnitOfWork : IUnitOfWork, IDatabaseSession, IAsyncDi
         _dbConnectionFactory = dbConnectionFactory;
     }
 
-    #endregion
 
     /// <summary>
     /// Transação atual da sessão.

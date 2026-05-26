@@ -1,5 +1,6 @@
 using AuthCore.Api.Exceptions;
-using AuthCore.Application.Common.Models.Responses;
+using AuthCore.Api.Contracts.Responses;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -9,6 +10,9 @@ namespace AuthCore.IntegrationTests.Exceptions;
 
 public sealed class ApiExceptionHandlerTests
 {
+    /// <summary>
+    /// Campo que armazena exception handler.
+    /// </summary>
     private readonly ApiExceptionHandler _exceptionHandler = new(NullLogger<ApiExceptionHandler>.Instance);
 
     [Fact]
@@ -113,7 +117,6 @@ public sealed class ApiExceptionHandlerTests
         Assert.Equal(["Ocorreu um erro interno inesperado."], response.Errors);
     }
 
-    #region Helpers
 
     private static DefaultHttpContext CreateHttpContext()
     {
@@ -136,5 +139,4 @@ public sealed class ApiExceptionHandlerTests
             cancellationToken: CancellationToken.None))!;
     }
 
-    #endregion
 }

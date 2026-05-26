@@ -1,4 +1,4 @@
-namespace AuthCore.Infrastructure.Services.Messaging;
+﻿namespace AuthCore.Infrastructure.Services.Messaging;
 
 /// <summary>
 /// Representa o resultado de um ciclo de processamento da outbox.

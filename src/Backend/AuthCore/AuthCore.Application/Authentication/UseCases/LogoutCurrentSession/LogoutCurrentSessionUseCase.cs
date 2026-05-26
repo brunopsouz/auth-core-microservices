@@ -7,9 +7,11 @@ namespace AuthCore.Application.Authentication.UseCases.LogoutCurrentSession;
 /// </summary>
 internal sealed class LogoutCurrentSessionUseCase : ILogoutCurrentSessionUseCase
 {
+    /// <summary>
+    /// Campo que armazena session store.
+    /// </summary>
     private readonly ISessionStore _sessionStore;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -20,7 +22,6 @@ internal sealed class LogoutCurrentSessionUseCase : ILogoutCurrentSessionUseCase
         _sessionStore = sessionStore;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para encerrar a sessão atual do usuário.

@@ -14,10 +14,15 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
 {
     private static readonly TimeSpan PublishConfirmationTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<RabbitMqNotificationRequestPublisher> _logger;
+    /// <summary>
+    /// Campo que armazena options.
+    /// </summary>
     private readonly RabbitMqOptions _options;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -35,7 +40,6 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
         _logger = logger;
     }
 
-    #endregion
 
     /// <inheritdoc />
     public Task PublishAsync(
@@ -94,7 +98,6 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
         return Task.CompletedTask;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar conexão com RabbitMQ.
@@ -162,5 +165,4 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
         };
     }
 
-    #endregion
 }

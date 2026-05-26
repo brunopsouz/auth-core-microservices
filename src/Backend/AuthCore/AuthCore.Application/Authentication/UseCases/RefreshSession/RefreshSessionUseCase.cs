@@ -16,13 +16,27 @@ internal sealed class RefreshSessionUseCase : IRefreshSessionUseCase
     private const string INVALID_SESSION_MESSAGE = "A sessão informada é inválida ou expirou.";
     private const string REUSE_DETECTED_REASON = "reuse-detected";
 
+    /// <summary>
+    /// Campo que armazena access token generator.
+    /// </summary>
     private readonly IAccessTokenGenerator _accessTokenGenerator;
+    /// <summary>
+    /// Campo que armazena refresh token repository.
+    /// </summary>
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    /// <summary>
+    /// Campo que armazena refresh token service.
+    /// </summary>
     private readonly IRefreshTokenService _refreshTokenService;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -46,7 +60,6 @@ internal sealed class RefreshSessionUseCase : IRefreshSessionUseCase
         _unitOfWork = unitOfWork;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para renovar uma autenticação do modo token.
@@ -85,7 +98,6 @@ internal sealed class RefreshSessionUseCase : IRefreshSessionUseCase
         return await RotateSessionAsync(currentRefreshToken, user, nowUtc);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para rotacionar a autenticação do modo token.
@@ -152,5 +164,4 @@ internal sealed class RefreshSessionUseCase : IRefreshSessionUseCase
         return new UnauthorizedAccessException(INVALID_SESSION_MESSAGE);
     }
 
-    #endregion
 }

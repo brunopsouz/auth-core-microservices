@@ -33,12 +33,23 @@ internal sealed class SmtpEmailProvider : IEmailProvider
     private const string PERMANENT_FAILURE_CODE = "SMTP_PERMANENT_FAILURE";
     private const int MAX_PROVIDER_MESSAGE_ID_LENGTH = 300;
 
+    /// <summary>
+    /// Campo que armazena options.
+    /// </summary>
     private readonly IOptions<SmtpOptions> _options;
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<SmtpEmailProvider> _logger;
+    /// <summary>
+    /// Campo que armazena notification metrics.
+    /// </summary>
     private readonly NotificationMetrics _notificationMetrics;
+    /// <summary>
+    /// Campo que armazena smtp client factory.
+    /// </summary>
     private readonly ISmtpClientFactory _smtpClientFactory;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -77,7 +88,6 @@ internal sealed class SmtpEmailProvider : IEmailProvider
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para enviar mensagem de e-mail.
@@ -181,7 +191,6 @@ internal sealed class SmtpEmailProvider : IEmailProvider
         }
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar a mensagem MIME.
@@ -305,5 +314,4 @@ internal sealed class SmtpEmailProvider : IEmailProvider
             : messageId[..MAX_PROVIDER_MESSAGE_ID_LENGTH];
     }
 
-    #endregion
 }

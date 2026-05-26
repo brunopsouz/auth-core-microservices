@@ -59,8 +59,8 @@ O padrão atual está bem representado em:
 
 Os contratos HTTP ficam organizados em:
 
-- `Contracts/Requests`
-- `Contracts/Responses`
+- `src/Backend/AuthCore/AuthCore.Api/Contracts/Requests`
+- `src/Backend/AuthCore/AuthCore.Api/Contracts/Responses`
 
 O padrão de nomes é obrigatório:
 
@@ -225,9 +225,10 @@ Esse contrato é usado para erros previsíveis da aplicação e do domínio.
 Mapeamento atual do handler global:
 
 - `DomainException` -> `400 Bad Request`
+- `ValidationException` da aplicação -> `400 Bad Request`
 - `UnauthorizedAccessException` -> `401 Unauthorized`
-- `NotFoundException` -> `404 Not Found`
-- `ConflictException` -> `409 Conflict`
+- `NotFoundException` da aplicação -> `404 Not Found`
+- `ConflictException` da aplicação -> `409 Conflict`
 - exceções não tratadas -> `500 Internal Server Error`
 
 Os controllers de autenticação também possuem mapeamento local para exceções conhecidas. Ao criar novos endpoints, preserve consistência com o formato de erro já exposto pela API.

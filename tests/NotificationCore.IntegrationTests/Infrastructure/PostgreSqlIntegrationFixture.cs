@@ -11,7 +11,13 @@ namespace NotificationCore.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class PostgreSqlIntegrationFixture : IAsyncLifetime
 {
+    /// <summary>
+    /// Campo que armazena database name.
+    /// </summary>
     private readonly string _databaseName = $"notification_core_integration_{Guid.NewGuid():N}";
+    /// <summary>
+    /// Campo que armazena base connection string.
+    /// </summary>
     private readonly string _baseConnectionString;
 
     /// <summary>

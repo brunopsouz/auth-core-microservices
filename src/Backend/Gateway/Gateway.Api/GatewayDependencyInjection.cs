@@ -41,7 +41,6 @@ public static class GatewayDependencyInjection
         return services;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para adicionar as opções de JWT.
@@ -173,5 +172,4 @@ public static class GatewayDependencyInjection
         return new NetIPNetwork(prefix, prefixLength);
     }
 
-    #endregion
 }

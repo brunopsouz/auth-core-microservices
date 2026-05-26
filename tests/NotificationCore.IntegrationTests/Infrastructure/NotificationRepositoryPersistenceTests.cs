@@ -13,6 +13,9 @@ namespace NotificationCore.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class NotificationRepositoryPersistenceTests : IClassFixture<PostgreSqlIntegrationFixture>
 {
+    /// <summary>
+    /// Campo que armazena fixture.
+    /// </summary>
     private readonly PostgreSqlIntegrationFixture _fixture;
 
     /// <summary>

@@ -10,9 +10,11 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// </summary>
 internal sealed class RefreshTokenRepository : IRefreshTokenRepository
 {
+    /// <summary>
+    /// Campo que armazena database session.
+    /// </summary>
     private readonly IDatabaseSession _databaseSession;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -23,7 +25,6 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
         _databaseSession = databaseSession;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para adicionar um refresh token.
@@ -224,7 +225,6 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
         await command.ExecuteNonQueryAsync();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar comando SQL respeitando a transação atual.
@@ -307,5 +307,4 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
             throw new ArgumentException("O motivo da revogação do refresh token é obrigatório.", nameof(reason));
     }
 
-    #endregion
 }

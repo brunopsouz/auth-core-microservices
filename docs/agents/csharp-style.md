@@ -64,19 +64,13 @@ A ordem de membros mais recorrente no repositório é:
 
 Esse padrão deve ser tratado como referência para novos arquivos e para trechos refatorados.
 
-O uso de regiões é aceito com moderação quando realmente melhora a leitura. Os nomes mais recorrentes e alinhados ao projeto são:
-
-- `Constructors`
-- `Factory`
-- `Helpers`
-- `Validation`
-- `Constants`
+O uso de `#region` não faz parte do padrão atual do projeto. A organização deve vir da ordem previsível dos membros, da nomenclatura clara e da documentação XML objetiva.
 
 Regras de aplicação:
 
 - métodos auxiliares privados devem permanecer no final da classe
-- classes pequenas não precisam de regiões artificiais
-- regiões devem organizar leitura, não introduzir cerimônia
+- não introduza `#region` ou `#endregion` em código novo
+- ao tocar arquivos antigos, remova regiões existentes no trecho alterado
 - a prioridade é legibilidade e previsibilidade estrutural
 
 ## Documentação XML
@@ -94,6 +88,7 @@ Diretrizes de uso:
 
 - documentar membros públicos de tipos de produção
 - documentar propriedades públicas quando o significado não for trivial
+- documentar campos privados relevantes, especialmente dependências `private readonly`, com `<summary>` curto e objetivo
 - documentar métodos privados quando isso já fizer parte do padrão adotado no arquivo ou no módulo
 - usar `param` com consistência sempre que o parâmetro carregar informação relevante
 - usar `returns` quando isso melhorar a compreensão do contrato
@@ -122,11 +117,12 @@ Evite mover regra de negócio central para serviços utilitários ou para a apli
 Na camada `AuthCore.Application`, o padrão dominante é:
 
 - organização por caso de uso em formato vertical slice
-- interface `I...UseCase`, implementação `...UseCase`, `Command` ou `Query` e `Result` quando necessário
+- dentro de cada use case, interface `I...UseCase`, implementação `...UseCase`, `Command` ou `Query` e `Result` quando necessário
 - dependências recebidas pelo construtor
 - validação de argumentos com `ArgumentNullException.ThrowIfNull(...)` quando aplicável
 - orquestração de repositórios e transação sem reimplementar regra central de negócio
 - retorno de DTOs de resultado somente quando agregam clareza ao fluxo
+- exceções de aplicação em `Common/Exceptions`, com `NotFoundException`, `ValidationException` e `ConflictException` para falhas previsíveis da orquestração
 
 O caso de uso deve ser explícito e legível, com fluxo de execução fácil de seguir.
 
@@ -135,7 +131,7 @@ O caso de uso deve ser explícito e legível, com fluxo de execução fácil de 
 Na camada `AuthCore.Api`, o padrão dominante é:
 
 - controllers finos, focados em adaptação HTTP
-- contratos com sufixo `Request...Json` e `Response...Json`
+- contratos em `Contracts/Requests` e `Contracts/Responses`, com sufixo `Request...Json` e `Response...Json`
 - mapeamento simples de request para command ou query
 - retorno de responses explícitas e previsíveis
 - uso de object initializer quando ajuda a montar commands e responses com clareza
@@ -222,7 +218,7 @@ Os arquivos abaixo representam boas âncoras do estilo dominante do projeto:
 
 Esses exemplos mostram, em conjunto:
 
-- `User.cs`: encapsulamento, factories estáticas, validação interna, XML docs em português e uso equilibrado de regiões
+- `User.cs`: encapsulamento, factories estáticas, validação interna e XML docs em português
 - `LoginUseCase.cs`: orquestração explícita, dependências no construtor, validação defensiva, helpers privados no final e fluxo transacional legível
 - `UserRepository.cs`: classe técnica `sealed`, SQL em raw string, `ArgumentNullException.ThrowIfNull(...)` e helper privado simples para integração com a transação atual
 
@@ -236,7 +232,7 @@ Antes de concluir uma alteração C# neste projeto, revise:
 - a classe, interface ou tipo segue a convenção dominante do módulo
 - tipos de `Infrastructure` permanecem `internal`, exceto a classe pública de registro de DI
 - a ordem de membros está alinhada ao padrão predominante
-- regiões foram usadas apenas quando realmente ajudam
+- o arquivo não introduz `#region` ou `#endregion`
 - a documentação XML está em português e segue o padrão textual do projeto
 - a responsabilidade permaneceu na camada correta
 - o código novo foi alinhado ao padrão dominante atual, e não ao legado residual

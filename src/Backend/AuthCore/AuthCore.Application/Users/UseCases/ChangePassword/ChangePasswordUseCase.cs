@@ -1,3 +1,4 @@
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
@@ -15,13 +16,27 @@ internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
 {
     private const string PASSWORD_CHANGED_REASON = "password-changed";
 
+    /// <summary>
+    /// Campo que armazena password encripter.
+    /// </summary>
     private readonly IPasswordEncripter _passwordEncripter;
+    /// <summary>
+    /// Campo que armazena password repository.
+    /// </summary>
     private readonly IPasswordRepository _passwordRepository;
+    /// <summary>
+    /// Campo que armazena refresh token repository.
+    /// </summary>
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -45,7 +60,6 @@ internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
         _unitOfWork = unitOfWork;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para alterar a senha do usuário autenticado.

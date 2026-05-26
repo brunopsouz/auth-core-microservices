@@ -10,9 +10,11 @@ namespace AuthCore.Infrastructure.Persistences.Read.PostgreSQL.Repositories;
 /// </summary>
 internal sealed class UserReadRepository : IUserReadRepository
 {
+    /// <summary>
+    /// Campo que armazena database session.
+    /// </summary>
     private readonly IDatabaseSession _databaseSession;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -23,7 +25,6 @@ internal sealed class UserReadRepository : IUserReadRepository
         _databaseSession = databaseSession;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para obter um usuário pelo identificador interno.
@@ -133,7 +134,6 @@ internal sealed class UserReadRepository : IUserReadRepository
         return await ReadUserAsync(reader);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar comando SQL respeitando a transação atual.
@@ -174,5 +174,4 @@ internal sealed class UserReadRepository : IUserReadRepository
                 : reader.GetDateTime(reader.GetOrdinal("EmailVerifiedAt")));
     }
 
-    #endregion
 }

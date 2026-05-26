@@ -11,9 +11,11 @@ namespace NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.Reposito
 /// </summary>
 internal sealed class InboxRepository : IInboxRepository
 {
+    /// <summary>
+    /// Campo que armazena database session.
+    /// </summary>
     private readonly IDatabaseSession _databaseSession;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -24,7 +26,6 @@ internal sealed class InboxRepository : IInboxRepository
         _databaseSession = databaseSession;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para adicionar uma mensagem de inbox.
@@ -302,7 +303,6 @@ internal sealed class InboxRepository : IInboxRepository
         await command.ExecuteNonQueryAsync();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para adicionar os parâmetros da inbox ao comando SQL.
@@ -385,5 +385,4 @@ internal sealed class InboxRepository : IInboxRepository
                 : reader.GetString(reader.GetOrdinal("Error")));
     }
 
-    #endregion
 }

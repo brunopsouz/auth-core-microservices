@@ -9,9 +9,11 @@ namespace NotificationCore.Application.Notifications.UseCases.GetNotification;
 /// </summary>
 internal sealed class GetNotificationUseCase : IGetNotificationUseCase
 {
+    /// <summary>
+    /// Campo que armazena notification repository.
+    /// </summary>
     private readonly INotificationRepository _notificationRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -24,7 +26,6 @@ internal sealed class GetNotificationUseCase : IGetNotificationUseCase
         _notificationRepository = notificationRepository;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para consultar notificação por identificador.

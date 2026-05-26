@@ -19,15 +19,35 @@ internal sealed class LoginUseCase : ILoginUseCase
 {
     private const string INVALID_CREDENTIALS_MESSAGE = "As credenciais informadas são inválidas.";
 
+    /// <summary>
+    /// Campo que armazena access token generator.
+    /// </summary>
     private readonly IAccessTokenGenerator _accessTokenGenerator;
+    /// <summary>
+    /// Campo que armazena password encripter.
+    /// </summary>
     private readonly IPasswordEncripter _passwordEncripter;
+    /// <summary>
+    /// Campo que armazena password repository.
+    /// </summary>
     private readonly IPasswordRepository _passwordRepository;
+    /// <summary>
+    /// Campo que armazena refresh token repository.
+    /// </summary>
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    /// <summary>
+    /// Campo que armazena refresh token service.
+    /// </summary>
     private readonly IRefreshTokenService _refreshTokenService;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -57,7 +77,6 @@ internal sealed class LoginUseCase : ILoginUseCase
         _unitOfWork = unitOfWork;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para autenticar um usuário no modo token.
@@ -98,7 +117,6 @@ internal sealed class LoginUseCase : ILoginUseCase
         return await AuthenticateAsync(user, password);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para concluir a autenticação com emissão inicial da sessão.
@@ -239,5 +257,4 @@ internal sealed class LoginUseCase : ILoginUseCase
         };
     }
 
-    #endregion
 }

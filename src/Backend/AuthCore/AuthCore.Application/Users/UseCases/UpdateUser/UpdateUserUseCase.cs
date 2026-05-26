@@ -1,4 +1,4 @@
-using AuthCore.Domain.Common.Exceptions;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Users.Repositories;
 
 namespace AuthCore.Application.Users.UseCases.UpdateUser;
@@ -8,10 +8,15 @@ namespace AuthCore.Application.Users.UseCases.UpdateUser;
 /// </summary>
 internal sealed class UpdateUserUseCase : IUpdateUserUseCase
 {
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
+    /// <summary>
+    /// Campo que armazena user repository.
+    /// </summary>
     private readonly IUserRepository _userRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -26,7 +31,6 @@ internal sealed class UpdateUserUseCase : IUpdateUserUseCase
         _userReadRepository = userReadRepository;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para atualizar o perfil do usuário autenticado.

@@ -1,4 +1,4 @@
-using AuthCore.Domain.Common.Exceptions;
+﻿using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Users.ValueObjects;
 
 namespace AuthCore.Domain.UnitTests.Aggregates.Users;

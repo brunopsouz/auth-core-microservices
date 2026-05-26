@@ -1,6 +1,6 @@
 using global::AuthCore.Application.UnitTests.Authentication.Support;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.Authentication.UseCases.RevokeUserSession;
-using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Passports.Aggregates;
 
 namespace AuthCore.Application.UnitTests.Authentication.UseCases.RevokeUserSession;

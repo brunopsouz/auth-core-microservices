@@ -9,6 +9,9 @@ namespace NotificationCore.IntegrationTests.Exceptions;
 
 public sealed class ApiExceptionHandlerTests
 {
+    /// <summary>
+    /// Campo que armazena exception handler.
+    /// </summary>
     private readonly ApiExceptionHandler _exceptionHandler = new(NullLogger<ApiExceptionHandler>.Instance);
 
     [Fact]
@@ -64,7 +67,6 @@ public sealed class ApiExceptionHandlerTests
         Assert.Contains("confirmationCode=[REDACTED]", error);
     }
 
-    #region Helpers
 
     private static DefaultHttpContext CreateHttpContext()
     {
@@ -87,5 +89,4 @@ public sealed class ApiExceptionHandlerTests
             cancellationToken: CancellationToken.None))!;
     }
 
-    #endregion
 }

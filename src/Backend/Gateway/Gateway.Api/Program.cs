@@ -1,4 +1,4 @@
-using Gateway.Api;
+﻿using Gateway.Api;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Ocelot.Middleware;

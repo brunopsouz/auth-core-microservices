@@ -2,7 +2,7 @@ using AuthCore.Api.Contracts.Requests;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Application.Authentication.UseCases.ResendVerification;
 using AuthCore.Application.Authentication.UseCases.VerifyEmail;
-using AuthCore.Api.Contracts.Responses;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.Users.UseCases.RegisterUser;
 using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +16,6 @@ namespace AuthCore.Api.Controllers;
 [Route("api/auth")]
 public sealed class AuthController : AuthControllerBase
 {
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -27,7 +26,6 @@ public sealed class AuthController : AuthControllerBase
     {
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para registrar um usuário pendente de verificação.

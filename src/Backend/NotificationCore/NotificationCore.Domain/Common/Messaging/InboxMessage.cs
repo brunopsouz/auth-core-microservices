@@ -47,7 +47,6 @@ public sealed class InboxMessage
     /// </summary>
     public string Error { get; private set; } = string.Empty;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -89,9 +88,7 @@ public sealed class InboxMessage
         Validate();
     }
 
-    #endregion
 
-    #region Factory
 
     /// <summary>
     /// Operação para criar mensagem de inbox recebida.
@@ -153,7 +150,6 @@ public sealed class InboxMessage
             error);
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para marcar a mensagem como processada.
@@ -188,7 +184,6 @@ public sealed class InboxMessage
         Validate();
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para validar a consistência da mensagem.
@@ -252,5 +247,4 @@ public sealed class InboxMessage
         ValidateUtc(value.Value, message);
     }
 
-    #endregion
 }

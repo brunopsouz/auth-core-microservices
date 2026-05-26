@@ -110,7 +110,6 @@ public sealed class NotificationsController : ControllerBase
         });
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para mapear notificação para resposta HTTP.
@@ -164,5 +163,4 @@ public sealed class NotificationsController : ControllerBase
         };
     }
 
-    #endregion
 }

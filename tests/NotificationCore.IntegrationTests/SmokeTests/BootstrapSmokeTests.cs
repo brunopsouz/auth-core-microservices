@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using FluentMigrator.Runner;

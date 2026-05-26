@@ -370,6 +370,9 @@ public sealed class DispatchPendingNotificationUseCaseTests
 
     private sealed class FakeNotificationRepository : INotificationRepository
     {
+        /// <summary>
+        /// Campo que armazena notifications.
+        /// </summary>
         private readonly List<Notification> _notifications = [];
 
         public List<Notification> UpdatedNotifications { get; } = [];
@@ -470,6 +473,9 @@ public sealed class DispatchPendingNotificationUseCaseTests
 
     private sealed class FakeInboxRepository : IInboxRepository
     {
+        /// <summary>
+        /// Campo que armazena messages.
+        /// </summary>
         private readonly List<InboxMessage> _messages = [];
 
         public Task AddAsync(InboxMessage message)

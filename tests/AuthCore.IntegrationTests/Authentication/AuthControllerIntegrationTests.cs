@@ -16,7 +16,7 @@ using AuthCore.Application.Authentication.UseCases.RefreshSession;
 using AuthCore.Application.Authentication.UseCases.ResendVerification;
 using AuthCore.Application.Authentication.UseCases.RevokeUserSession;
 using AuthCore.Application.Authentication.UseCases.VerifyEmail;
-using AuthCore.Application.Common.Models.Responses;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.Users.UseCases.RegisterUser;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Infrastructure.Configurations;
@@ -772,7 +772,6 @@ public sealed class AuthControllerIntegrationTests
         Assert.DoesNotContain("api/auth/logout-all", actions);
     }
 
-    #region Helpers
 
     private static AuthController CreateAuthController()
     {
@@ -874,6 +873,9 @@ public sealed class AuthControllerIntegrationTests
 
     private sealed class ThrowingLoginSessionUseCase : ILoginSessionUseCase
     {
+        /// <summary>
+        /// Campo que armazena exception.
+        /// </summary>
         private readonly Exception _exception;
 
         public ThrowingLoginSessionUseCase(Exception exception)
@@ -926,6 +928,9 @@ public sealed class AuthControllerIntegrationTests
 
     private sealed class ThrowingVerifyEmailUseCase : IVerifyEmailUseCase
     {
+        /// <summary>
+        /// Campo que armazena exception.
+        /// </summary>
         private readonly Exception _exception;
 
         public ThrowingVerifyEmailUseCase(Exception exception)
@@ -941,6 +946,9 @@ public sealed class AuthControllerIntegrationTests
 
     private sealed class ThrowingResendVerificationUseCase : IResendVerificationUseCase
     {
+        /// <summary>
+        /// Campo que armazena exception.
+        /// </summary>
         private readonly Exception _exception;
 
         public ThrowingResendVerificationUseCase(Exception exception)
@@ -978,6 +986,9 @@ public sealed class AuthControllerIntegrationTests
 
     private sealed class ThrowingLogoutSessionUseCase : ILogoutSessionUseCase
     {
+        /// <summary>
+        /// Campo que armazena exception.
+        /// </summary>
         private readonly Exception _exception;
 
         public ThrowingLogoutSessionUseCase(Exception exception)
@@ -1030,6 +1041,9 @@ public sealed class AuthControllerIntegrationTests
 
     private sealed class ThrowingRevokeUserSessionUseCase : IRevokeUserSessionUseCase
     {
+        /// <summary>
+        /// Campo que armazena exception.
+        /// </summary>
         private readonly Exception _exception;
 
         public ThrowingRevokeUserSessionUseCase(Exception exception)
@@ -1071,6 +1085,9 @@ public sealed class AuthControllerIntegrationTests
 
     private sealed class FakeTimeProvider : TimeProvider
     {
+        /// <summary>
+        /// Campo que armazena utc now.
+        /// </summary>
         private readonly DateTimeOffset _utcNow;
 
         public FakeTimeProvider(DateTimeOffset utcNow)
@@ -1084,5 +1101,4 @@ public sealed class AuthControllerIntegrationTests
         }
     }
 
-    #endregion
 }

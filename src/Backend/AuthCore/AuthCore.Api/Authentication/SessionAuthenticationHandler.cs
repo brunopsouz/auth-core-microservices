@@ -14,12 +14,23 @@ namespace AuthCore.Api.Authentication;
 /// </summary>
 internal sealed class SessionAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
+    /// <summary>
+    /// Campo que armazena auth cookie options.
+    /// </summary>
     private readonly AuthCookieOptions _authCookieOptions;
+    /// <summary>
+    /// Campo que armazena session service.
+    /// </summary>
     private readonly ISessionService _sessionService;
+    /// <summary>
+    /// Campo que armazena session store.
+    /// </summary>
     private readonly ISessionStore _sessionStore;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -52,7 +63,6 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
         _userReadRepository = userReadRepository;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para autenticar a requisição atual usando o cookie de sessão.
@@ -104,7 +114,6 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
         return AuthenticateResult.Success(ticket);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para renovar o cookie da sessão autenticada.
@@ -118,5 +127,4 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
             SessionCookiePolicy.CreateSessionCookie(_authCookieOptions, session.ExpiresAtUtc));
     }
 
-    #endregion
 }

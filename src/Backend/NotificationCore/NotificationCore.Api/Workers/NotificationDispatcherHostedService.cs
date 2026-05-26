@@ -11,12 +11,23 @@ namespace NotificationCore.Api.Workers;
 /// </summary>
 internal sealed class NotificationDispatcherHostedService : BackgroundService
 {
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<NotificationDispatcherHostedService> _logger;
+    /// <summary>
+    /// Campo que armazena notification metrics.
+    /// </summary>
     private readonly NotificationMetrics _notificationMetrics;
+    /// <summary>
+    /// Campo que armazena notification dispatcher options.
+    /// </summary>
     private readonly NotificationDispatcherOptions _notificationDispatcherOptions;
+    /// <summary>
+    /// Campo que armazena service scope factory.
+    /// </summary>
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -42,7 +53,6 @@ internal sealed class NotificationDispatcherHostedService : BackgroundService
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para executar o worker de despacho de notificações.
@@ -105,7 +115,6 @@ internal sealed class NotificationDispatcherHostedService : BackgroundService
         _logger.LogInformation("Worker de despacho de notificações encerrado.");
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar comando de despacho.
@@ -133,5 +142,4 @@ internal sealed class NotificationDispatcherHostedService : BackgroundService
         return Task.Delay(delay, stoppingToken);
     }
 
-    #endregion
 }

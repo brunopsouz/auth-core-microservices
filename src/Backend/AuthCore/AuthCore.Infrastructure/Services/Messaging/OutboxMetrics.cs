@@ -9,10 +9,19 @@ internal sealed class OutboxMetrics
 {
     private static readonly Meter Meter = new("AuthCore.Outbox", "1.0.0");
 
+    /// <summary>
+    /// Campo que armazena contador de mensagens processadas.
+    /// </summary>
     private readonly Counter<long> _processedMessages = Meter.CreateCounter<long>(
         "authcore.outbox.messages.processed");
+    /// <summary>
+    /// Campo que armazena contador de mensagens com falha.
+    /// </summary>
     private readonly Counter<long> _failedMessages = Meter.CreateCounter<long>(
         "authcore.outbox.messages.failed");
+    /// <summary>
+    /// Campo que armazena histograma de duração do processamento.
+    /// </summary>
     private readonly Histogram<double> _processingDuration = Meter.CreateHistogram<double>(
         "authcore.outbox.processing.duration.ms");
 

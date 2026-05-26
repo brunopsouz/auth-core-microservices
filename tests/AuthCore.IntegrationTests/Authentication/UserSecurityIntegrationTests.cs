@@ -31,6 +31,9 @@ namespace AuthCore.IntegrationTests.Authentication;
 /// </summary>
 public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlIntegrationFixture>
 {
+    /// <summary>
+    /// Campo que armazena fixture.
+    /// </summary>
     private readonly PostgreSqlIntegrationFixture _fixture;
 
     /// <summary>
@@ -308,7 +311,6 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         Assert.False(useCase.WasCalled);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar um provider completo de serviços da API para os testes.
@@ -382,5 +384,4 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         }
     }
 
-    #endregion
 }

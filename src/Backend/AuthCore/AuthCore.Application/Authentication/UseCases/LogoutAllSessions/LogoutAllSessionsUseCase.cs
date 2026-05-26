@@ -7,9 +7,11 @@ namespace AuthCore.Application.Authentication.UseCases.LogoutAllSessions;
 /// </summary>
 internal sealed class LogoutAllSessionsUseCase : ILogoutAllSessionsUseCase
 {
+    /// <summary>
+    /// Campo que armazena session store.
+    /// </summary>
     private readonly ISessionStore _sessionStore;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -20,7 +22,6 @@ internal sealed class LogoutAllSessionsUseCase : ILogoutAllSessionsUseCase
         _sessionStore = sessionStore;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para revogar todas as sessões do usuário.

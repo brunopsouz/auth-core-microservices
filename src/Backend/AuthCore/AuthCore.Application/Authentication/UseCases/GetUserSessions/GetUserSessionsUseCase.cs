@@ -8,9 +8,11 @@ namespace AuthCore.Application.Authentication.UseCases.GetUserSessions;
 /// </summary>
 internal sealed class GetUserSessionsUseCase : IGetUserSessionsUseCase
 {
+    /// <summary>
+    /// Campo que armazena session store.
+    /// </summary>
     private readonly ISessionStore _sessionStore;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -21,7 +23,6 @@ internal sealed class GetUserSessionsUseCase : IGetUserSessionsUseCase
         _sessionStore = sessionStore;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para listar as sessões ativas do usuário.

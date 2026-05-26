@@ -9,9 +9,11 @@ namespace NotificationCore.Api.HealthChecks;
 /// </summary>
 internal sealed class DatabaseHealthCheck : IHealthCheck
 {
+    /// <summary>
+    /// Campo que armazena db connection factory.
+    /// </summary>
     private readonly IDbConnectionFactory _dbConnectionFactory;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -24,7 +26,6 @@ internal sealed class DatabaseHealthCheck : IHealthCheck
         _dbConnectionFactory = dbConnectionFactory;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para verificar a saúde da conectividade com o banco.

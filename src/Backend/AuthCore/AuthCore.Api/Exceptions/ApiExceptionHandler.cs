@@ -1,4 +1,5 @@
 using AuthCore.Api.Contracts.Responses;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using System.Net.Mime;
@@ -12,9 +13,11 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
 {
     private const string UNKNOWN_ERROR_MESSAGE = "Ocorreu um erro interno inesperado.";
 
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger<ApiExceptionHandler> _logger;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -25,7 +28,6 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
         _logger = logger;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para tratar exceções não tratadas da requisição atual.
@@ -57,7 +59,6 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
         return true;
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para mapear a exceção para o status code e mensagens de erro da resposta.
@@ -68,6 +69,7 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
     {
         return exception switch
         {
+            ValidationException validationException => (StatusCodes.Status400BadRequest, validationException.Errors.ToList()),
             ArgumentException argumentException => (StatusCodes.Status400BadRequest, GetErrors(argumentException)),
             UnauthorizedAccessException unauthorizedAccessException => (StatusCodes.Status401Unauthorized, GetErrors(unauthorizedAccessException)),
             ForbiddenException forbiddenException => (StatusCodes.Status403Forbidden, GetErrors(forbiddenException)),
@@ -104,5 +106,4 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
         return [exception.Message];
     }
 
-    #endregion
 }

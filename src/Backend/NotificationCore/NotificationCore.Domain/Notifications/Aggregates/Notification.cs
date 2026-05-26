@@ -16,6 +16,9 @@ public sealed class Notification : AggregateRoot
     /// </summary>
     private const int MAX_DELIVERY_ATTEMPTS = 3;
 
+    /// <summary>
+    /// Campo que armazena delivery attempts.
+    /// </summary>
     private readonly List<DeliveryAttempt> _deliveryAttempts = [];
 
     /// <summary>
@@ -93,7 +96,6 @@ public sealed class Notification : AggregateRoot
     /// </summary>
     public IReadOnlyCollection<DeliveryAttempt> DeliveryAttempts => _deliveryAttempts.AsReadOnly();
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -211,9 +213,7 @@ public sealed class Notification : AggregateRoot
         ValidateDeliveryAttemptsState();
     }
 
-    #endregion
 
-    #region Factory
 
     /// <summary>
     /// Operação para criar notificação pendente.
@@ -311,7 +311,6 @@ public sealed class Notification : AggregateRoot
             lastError);
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para iniciar processamento da notificação.
@@ -489,7 +488,6 @@ public sealed class Notification : AggregateRoot
         LastError = Normalize(lastError);
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para validar os dados da notificação.
@@ -627,5 +625,4 @@ public sealed class Notification : AggregateRoot
         DomainException.When(value.Value == default || value.Value.Kind != DateTimeKind.Utc, message);
     }
 
-    #endregion
 }

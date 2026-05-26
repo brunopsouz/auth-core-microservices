@@ -75,27 +75,32 @@ A solução combina microserviços e organização em camadas dentro de cada ser
 
 ```mermaid
 flowchart TD
-    Client[Cliente HTTP] --> Gateway[Gateway.Api]
-    Gateway --> AuthApi[AuthCore.Api]
-    Gateway --> NotificationApi[NotificationCore.Api]
+    Client[Cliente HTTP] -->|HTTP| Gateway[Gateway.Api]
+    Gateway -->|HTTP/Ocelot| AuthApi[AuthCore.Api]
+    Gateway -->|HTTP/Ocelot| NotificationApi[NotificationCore.Api]
 
     AuthApi --> AuthApplication[AuthCore.Application]
     AuthApi --> AuthInfrastructure[AuthCore.Infrastructure]
     AuthApplication --> AuthDomain[AuthCore.Domain]
     AuthInfrastructure --> AuthDomain
-    AuthInfrastructure --> Contracts[BuildingBlocks.Messaging.Contracts]
 
     NotificationApi --> NotificationApplication[NotificationCore.Application]
     NotificationApi --> NotificationInfrastructure[NotificationCore.Infrastructure]
     NotificationApplication --> NotificationDomain[NotificationCore.Domain]
-    NotificationApplication --> Contracts
     NotificationInfrastructure --> NotificationDomain
-    NotificationInfrastructure --> Contracts
 
-    AuthInfrastructure --> RabbitMQ[(RabbitMQ)]
-    RabbitMQ --> NotificationInfrastructure
+    AuthInfrastructure -. compile-time .-> Contracts[BuildingBlocks.Messaging.Contracts]
+    NotificationApplication -. compile-time .-> Contracts
+    NotificationInfrastructure -. compile-time .-> Contracts
+
+    AuthApi -->|OutboxHostedService| AuthInfrastructure
+    AuthInfrastructure -->|publish| RabbitMQ[(RabbitMQ)]
+    RabbitMQ -->|consume| NotificationApi
+    NotificationApi -->|worker/use case| NotificationApplication
+
     AuthInfrastructure --> AuthPostgres[(AuthCore PostgreSQL)]
     AuthInfrastructure --> Redis[(Redis)]
+
     NotificationInfrastructure --> NotificationPostgres[(NotificationCore PostgreSQL)]
     NotificationInfrastructure --> SMTP[SMTP4Dev/SMTP]
 ```

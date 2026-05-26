@@ -12,9 +12,11 @@ internal sealed class SearchNotificationsUseCase : ISearchNotificationsUseCase
 {
     private const int MAX_TAKE = 100;
 
+    /// <summary>
+    /// Campo que armazena notification repository.
+    /// </summary>
     private readonly INotificationRepository _notificationRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -27,7 +29,6 @@ internal sealed class SearchNotificationsUseCase : ISearchNotificationsUseCase
         _notificationRepository = notificationRepository;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para buscar notificações por filtros administrativos.
@@ -56,7 +57,6 @@ internal sealed class SearchNotificationsUseCase : ISearchNotificationsUseCase
         };
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para validar consulta administrativa.
@@ -90,5 +90,4 @@ internal sealed class SearchNotificationsUseCase : ISearchNotificationsUseCase
                 : throw new DomainException("Status de notificação inválido.");
     }
 
-    #endregion
 }

@@ -13,13 +13,27 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
 {
     private const string INVALID_VERIFICATION_MESSAGE = "Não foi possível validar o código de verificação informado.";
 
+    /// <summary>
+    /// Campo que armazena email verification repository.
+    /// </summary>
     private readonly IEmailVerificationRepository _emailVerificationRepository;
+    /// <summary>
+    /// Campo que armazena email verification service.
+    /// </summary>
     private readonly IEmailVerificationService _emailVerificationService;
+    /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena user read repository.
+    /// </summary>
     private readonly IUserReadRepository _userReadRepository;
+    /// <summary>
+    /// Campo que armazena user repository.
+    /// </summary>
     private readonly IUserRepository _userRepository;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -43,7 +57,6 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
         _unitOfWork = unitOfWork;
     }
 
-    #endregion
 
     /// <summary>
     /// Operação para verificar o e-mail do usuário.
@@ -88,7 +101,6 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
         }
     }
 
-    #region Helpers
 
     /// <summary>
     /// Operação para validar o código OTP e normalizar falhas previsíveis.
@@ -131,5 +143,4 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
             : email.Trim().ToLowerInvariant();
     }
 
-    #endregion
 }

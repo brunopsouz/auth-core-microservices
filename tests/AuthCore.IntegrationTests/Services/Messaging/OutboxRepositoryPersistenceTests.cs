@@ -12,6 +12,9 @@ namespace AuthCore.IntegrationTests.Services.Messaging;
 /// </summary>
 public sealed class OutboxRepositoryPersistenceTests : IClassFixture<PostgreSqlIntegrationFixture>
 {
+    /// <summary>
+    /// Campo que armazena fixture.
+    /// </summary>
     private readonly PostgreSqlIntegrationFixture _fixture;
 
     /// <summary>

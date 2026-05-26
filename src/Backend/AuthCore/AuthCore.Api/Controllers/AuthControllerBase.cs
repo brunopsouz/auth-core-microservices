@@ -4,7 +4,7 @@ using AuthCore.Api.Authentication;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Security;
 using AuthCore.Application.Authentication.Models;
-using AuthCore.Api.Contracts.Responses;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Users;
 using AuthCore.Infrastructure.Configurations;
@@ -19,9 +19,11 @@ public abstract class AuthControllerBase : ControllerBase
 {
     private const string TooManyLoginAttemptsMessage = "Muitas tentativas de login. Aguarde alguns minutos e tente novamente.";
 
+    /// <summary>
+    /// Campo que armazena logger.
+    /// </summary>
     private readonly ILogger _logger;
 
-    #region Constructors
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -34,9 +36,7 @@ public abstract class AuthControllerBase : ControllerBase
         _logger = logger;
     }
 
-    #endregion
 
-    #region Helpers
 
     /// <summary>
     /// Operação para criar a resposta HTTP do usuário autenticado.
@@ -400,5 +400,4 @@ public abstract class AuthControllerBase : ControllerBase
         };
     }
 
-    #endregion
 }

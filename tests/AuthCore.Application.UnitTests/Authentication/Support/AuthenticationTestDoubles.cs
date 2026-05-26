@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.DomainEvents;
@@ -19,8 +19,17 @@ namespace AuthCore.Application.UnitTests.Authentication.Support;
 
 internal sealed class FakeUserReadRepository : IUserReadRepository
 {
+    /// <summary>
+    /// Campo que armazena users by id.
+    /// </summary>
     private readonly Dictionary<Guid, User> _usersById = [];
+    /// <summary>
+    /// Campo que armazena users by email.
+    /// </summary>
     private readonly Dictionary<string, User> _usersByEmail = [];
+    /// <summary>
+    /// Campo que armazena users by identifier.
+    /// </summary>
     private readonly Dictionary<Guid, User> _usersByIdentifier = [];
 
     public Task<User?> GetByIdAsync(Guid userId)
@@ -51,6 +60,9 @@ internal sealed class FakeUserReadRepository : IUserReadRepository
 
 internal sealed class FakePasswordRepository : IPasswordRepository
 {
+    /// <summary>
+    /// Campo que armazena passwords by user id.
+    /// </summary>
     private readonly Dictionary<Guid, Password> _passwordsByUserId = [];
 
     public List<Password> AddedPasswords { get; } = [];
@@ -85,6 +97,9 @@ internal sealed class FakePasswordRepository : IPasswordRepository
 
 internal sealed class FakeUserRepository : IUserRepository
 {
+    /// <summary>
+    /// Campo que armazena users by id.
+    /// </summary>
     private readonly Dictionary<Guid, User> _usersById = [];
 
     public List<User> AddedUsers { get; } = [];
@@ -122,6 +137,9 @@ internal sealed class FakeUserRepository : IUserRepository
 
 internal sealed class FakeEmailVerificationRepository : IEmailVerificationRepository
 {
+    /// <summary>
+    /// Campo que armazena verifications by user id.
+    /// </summary>
     private readonly Dictionary<Guid, EmailVerification> _verificationsByUserId = [];
 
     public List<EmailVerification> AddedVerifications { get; } = [];
@@ -249,6 +267,9 @@ internal sealed class FakeEmailVerificationNotificationOutboxFactory : IEmailVer
 
 internal sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
 {
+    /// <summary>
+    /// Campo que armazena refresh tokens by hash.
+    /// </summary>
     private readonly Dictionary<string, RefreshToken> _refreshTokensByHash = [];
 
     public List<RefreshToken> AddedRefreshTokens { get; } = [];
@@ -398,6 +419,9 @@ internal sealed class FakeEmailVerificationService : IEmailVerificationService
 
 internal sealed class FakeSessionStore : ISessionStore
 {
+    /// <summary>
+    /// Campo que armazena sessions by id.
+    /// </summary>
     private readonly Dictionary<string, Session> _sessionsById = [];
 
     public List<Session> SavedSessions { get; } = [];
