@@ -3,7 +3,7 @@ using System.Text.Json;
 using BuildingBlocks.Messaging.Contracts.Notifications;
 using BuildingBlocks.Messaging.Contracts.Security;
 using Microsoft.Extensions.Options;
-using NotificationCore.Application.Notifications.UseCases.RegisterNotificationRequest;
+using NotificationCore.Application.UseCases.Notifications.RegisterNotificationRequest;
 using NotificationCore.Domain.Common.Exceptions;
 using NotificationCore.Infrastructure.Configurations;
 using NotificationCore.Infrastructure.Messaging.RabbitMq;

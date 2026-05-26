@@ -1,9 +1,9 @@
 using AuthCore.Api.Contracts.Requests;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Security;
-using AuthCore.Application.Authentication.UseCases.Login;
-using AuthCore.Application.Authentication.UseCases.LogoutSession;
-using AuthCore.Application.Authentication.UseCases.RefreshSession;
+using AuthCore.Application.UseCases.Authentication.Login;
+using AuthCore.Application.UseCases.Authentication.LogoutSession;
+using AuthCore.Application.UseCases.Authentication.RefreshSession;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthCore.Api.Controllers;

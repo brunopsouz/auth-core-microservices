@@ -135,11 +135,11 @@ Exceções próprias da aplicação devem ficar em `Common/Exceptions`. O padrã
 
 Exemplos reais:
 
-- `Users/UseCases/RegisterUser`
-- `Users/UseCases/GetUserProfile`
-- `Users/UseCases/ChangePassword`
-- `Authentication/UseCases/Login`
-- `Authentication/UseCases/RefreshSession`
+- `UseCases/Users/RegisterUser`
+- `UseCases/Users/GetUserProfile`
+- `UseCases/Users/ChangePassword`
+- `UseCases/Authentication/Login`
+- `UseCases/Authentication/RefreshSession`
 
 ### AuthCore.Api
 

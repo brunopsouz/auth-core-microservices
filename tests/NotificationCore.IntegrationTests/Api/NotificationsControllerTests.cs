@@ -1,11 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using NotificationCore.Api.Contracts.Requests;
 using NotificationCore.Api.Contracts.Responses;
 using NotificationCore.Api.Controllers;
-using NotificationCore.Application.Notifications.Models;
-using NotificationCore.Application.Notifications.UseCases.GetNotification;
-using NotificationCore.Application.Notifications.UseCases.SearchNotifications;
-using NotificationCore.Application.Notifications.UseCases.SendTestEmailNotification;
+using NotificationCore.Application.UseCases.Notifications.Models;
+using NotificationCore.Application.UseCases.Notifications.GetNotification;
+using NotificationCore.Application.UseCases.Notifications.SearchNotifications;
+using NotificationCore.Application.UseCases.Notifications.SendTestEmailNotification;
 
 namespace NotificationCore.IntegrationTests.Api;
 

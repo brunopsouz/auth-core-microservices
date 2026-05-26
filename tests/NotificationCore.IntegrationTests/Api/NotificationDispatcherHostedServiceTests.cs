@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NotificationCore.Api.Workers;
-using NotificationCore.Application.Notifications.UseCases.DispatchPendingNotification;
+using NotificationCore.Application.UseCases.Notifications.DispatchPendingNotification;
 using NotificationCore.Infrastructure.Configurations;
 using NotificationCore.Infrastructure.Observability;
 

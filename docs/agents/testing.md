@@ -182,8 +182,8 @@ Quando os testes de integração dependerem de PostgreSQL, confirme a disponibil
 Os arquivos abaixo representam boas referências para a estratégia atual de testes:
 
 - `tests/AuthCore.Domain.UnitTests/Aggregates/Users/UserTests.cs`
-- `tests/AuthCore.Application.UnitTests/Users/UseCases/ChangePassword/ChangePasswordUseCaseTests.cs`
-- `tests/AuthCore.Application.UnitTests/Authentication/Support/AuthenticationTestDoubles.cs`
+- `tests/AuthCore.Application.UnitTests/UseCases/Users/ChangePassword/ChangePasswordUseCaseTests.cs`
+- `tests/AuthCore.Application.UnitTests/UseCases/Authentication/Support/AuthenticationTestDoubles.cs`
 - `tests/AuthCore.IntegrationTests/Authentication/AuthControllerIntegrationTests.cs`
 - `tests/AuthCore.IntegrationTests/Exceptions/ApiExceptionHandlerTests.cs`
 - `tests/AuthCore.IntegrationTests/Passports/RefreshTokenPersistenceIntegrationTests.cs`

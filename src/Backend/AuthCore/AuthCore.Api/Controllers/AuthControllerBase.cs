@@ -3,7 +3,7 @@ using System.Security.Claims;
 using AuthCore.Api.Authentication;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Security;
-using AuthCore.Application.Authentication.Models;
+using AuthCore.Application.UseCases.Authentication.Models;
 using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Users;

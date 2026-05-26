@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NotificationCore.Api.Workers;
-using NotificationCore.Application.Notifications.UseCases.RegisterNotificationRequest;
+using NotificationCore.Application.UseCases.Notifications.RegisterNotificationRequest;
 using NotificationCore.Domain.Common.Exceptions;
 using NotificationCore.Infrastructure.Configurations;
 using NotificationCore.Infrastructure.Messaging.RabbitMq;

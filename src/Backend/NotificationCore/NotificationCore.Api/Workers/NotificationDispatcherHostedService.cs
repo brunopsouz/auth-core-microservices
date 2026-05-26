@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
-using NotificationCore.Application.Notifications.UseCases.DispatchPendingNotification;
+using NotificationCore.Application.UseCases.Notifications.DispatchPendingNotification;
 using NotificationCore.Infrastructure.Configurations;
 using NotificationCore.Infrastructure.Observability;
 

@@ -1,4 +1,4 @@
-﻿using AuthCore.Application.Users.UseCases.RegisterUser;
+using AuthCore.Application.UseCases.Users.RegisterUser;
 
 namespace AuthCore.Application.UnitTests.SmokeTests;
 

@@ -213,7 +213,7 @@ Regra de evolução:
 Os arquivos abaixo representam boas âncoras do estilo dominante do projeto:
 
 - `src/Backend/AuthCore/AuthCore.Domain/Users/Aggregates/User.cs`
-- `src/Backend/AuthCore/AuthCore.Application/Authentication/UseCases/Login/LoginUseCase.cs`
+- `src/Backend/AuthCore/AuthCore.Application/UseCases/Authentication/Login/LoginUseCase.cs`
 - `src/Backend/AuthCore/AuthCore.Infrastructure/Persistences/Write/PostgreSQL/Repositories/UserRepository.cs`
 
 Esses exemplos mostram, em conjunto:

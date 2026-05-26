@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using NotificationCore.Application.Notifications.UseCases.DispatchPendingNotification;
-using NotificationCore.Application.Notifications.UseCases.GetNotification;
-using NotificationCore.Application.Notifications.UseCases.RegisterNotificationRequest;
-using NotificationCore.Application.Notifications.UseCases.SearchNotifications;
-using NotificationCore.Application.Notifications.UseCases.SendTestEmailNotification;
+using NotificationCore.Application.UseCases.Notifications.DispatchPendingNotification;
+using NotificationCore.Application.UseCases.Notifications.GetNotification;
+using NotificationCore.Application.UseCases.Notifications.RegisterNotificationRequest;
+using NotificationCore.Application.UseCases.Notifications.SearchNotifications;
+using NotificationCore.Application.UseCases.Notifications.SendTestEmailNotification;
 
 namespace NotificationCore.Application;
 

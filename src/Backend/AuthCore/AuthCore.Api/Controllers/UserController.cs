@@ -2,11 +2,11 @@ using AuthCore.Api.Authentication;
 using AuthCore.Api.Contracts.Requests;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Security;
-using AuthCore.Application.Users.UseCases.ChangePassword;
-using AuthCore.Application.Users.UseCases.DeleteUser;
-using AuthCore.Application.Users.UseCases.GetUserProfile;
-using AuthCore.Application.Users.UseCases.RegisterUser;
-using AuthCore.Application.Users.UseCases.UpdateUser;
+using AuthCore.Application.UseCases.Users.ChangePassword;
+using AuthCore.Application.UseCases.Users.DeleteUser;
+using AuthCore.Application.UseCases.Users.GetUserProfile;
+using AuthCore.Application.UseCases.Users.RegisterUser;
+using AuthCore.Application.UseCases.Users.UpdateUser;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthCore.Api.Controllers;

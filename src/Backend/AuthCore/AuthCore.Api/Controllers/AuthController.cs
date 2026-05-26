@@ -1,9 +1,9 @@
 using AuthCore.Api.Contracts.Requests;
 using AuthCore.Api.Contracts.Responses;
-using AuthCore.Application.Authentication.UseCases.ResendVerification;
-using AuthCore.Application.Authentication.UseCases.VerifyEmail;
+using AuthCore.Application.UseCases.Authentication.ResendVerification;
+using AuthCore.Application.UseCases.Authentication.VerifyEmail;
 using AuthCore.Application.Common.Exceptions;
-using AuthCore.Application.Users.UseCases.RegisterUser;
+using AuthCore.Application.UseCases.Users.RegisterUser;
 using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
