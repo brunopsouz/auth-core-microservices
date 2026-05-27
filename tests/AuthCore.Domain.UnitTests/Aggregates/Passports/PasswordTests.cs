@@ -1,6 +1,6 @@
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.Exceptions;
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 
 namespace AuthCore.Domain.UnitTests.Aggregates.Passports;
 

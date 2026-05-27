@@ -3,15 +3,12 @@ using System.Text.Json;
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
-using AuthCore.Domain.Passports.Aggregates;
-using AuthCore.Domain.Passports.Models;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
-using AuthCore.Domain.Passports.Services;
 using AuthCore.Domain.Security.Cryptography;
 using AuthCore.Domain.Security.Tokens.Models;
 using AuthCore.Domain.Security.Tokens.Services;
-using AuthCore.Domain.Users.Aggregates;
-using AuthCore.Domain.Users.Enums;
+using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 using BuildingBlocks.Messaging.Contracts.Notifications;
 

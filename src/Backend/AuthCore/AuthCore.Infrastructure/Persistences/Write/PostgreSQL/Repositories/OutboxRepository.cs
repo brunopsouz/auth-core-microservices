@@ -1,5 +1,5 @@
+using AuthCore.Domain.Common.Repositories;
 using AuthCore.Infrastructure.Abstractions.Data;
-using AuthCore.Infrastructure.Services.Messaging;
 using Npgsql;
 
 namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
@@ -7,7 +7,7 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 /// <summary>
 /// Representa repositório PostgreSQL da outbox.
 /// </summary>
-internal sealed class OutboxRepository : IOutboxMessageRepository
+internal sealed class OutboxRepository : IOutboxRepository
 {
     /// <summary>
     /// Campo que armazena database session.

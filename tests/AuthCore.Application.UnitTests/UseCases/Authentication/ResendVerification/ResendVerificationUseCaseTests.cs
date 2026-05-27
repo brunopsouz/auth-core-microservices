@@ -24,7 +24,7 @@ public sealed class ResendVerificationUseCaseTests
         var outboxRepository = new FakeOutboxRepository();
         var unitOfWork = new SpyUnitOfWork();
         var user = AuthenticationFixtures.CreateUnverifiedUser();
-        var existingVerification = AuthCore.Domain.Passports.Aggregates.EmailVerification.Issue(
+        var existingVerification = AuthCore.Domain.Passports.EmailVerification.Issue(
             user.Id,
             user.Email.Value,
             "old-hash",
@@ -82,7 +82,7 @@ public sealed class ResendVerificationUseCaseTests
         var outboxRepository = new FakeOutboxRepository();
         var unitOfWork = new SpyUnitOfWork();
         var user = AuthenticationFixtures.CreateUnverifiedUser();
-        var existingVerification = AuthCore.Domain.Passports.Aggregates.EmailVerification.Issue(
+        var existingVerification = AuthCore.Domain.Passports.EmailVerification.Issue(
             user.Id,
             user.Email.Value,
             "old-hash",

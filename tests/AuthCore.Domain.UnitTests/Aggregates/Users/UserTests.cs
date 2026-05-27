@@ -1,6 +1,5 @@
-﻿using AuthCore.Domain.Common.Exceptions;
-using AuthCore.Domain.Users.Aggregates;
-using AuthCore.Domain.Users.Enums;
+using AuthCore.Domain.Common.Exceptions;
+using AuthCore.Domain.Users;
 
 namespace AuthCore.Domain.UnitTests.Aggregates.Users;
 

@@ -15,7 +15,7 @@ public sealed class VerifyEmailUseCaseTests
         var userRepository = new FakeUserRepository();
         var unitOfWork = new SpyUnitOfWork();
         var user = AuthenticationFixtures.CreateUnverifiedUser();
-        var verification = AuthCore.Domain.Passports.Aggregates.EmailVerification.Issue(
+        var verification = AuthCore.Domain.Passports.EmailVerification.Issue(
             user.Id,
             user.Email.Value,
             emailVerificationService.ComputeHash(emailVerificationService.Material.Code),
@@ -45,7 +45,7 @@ public sealed class VerifyEmailUseCaseTests
         Assert.NotNull(updatedVerification.ConsumedAtUtc);
         Assert.Equal(user.Id, updatedVerification.UserId);
         Assert.True(updatedUser.IsEmailVerified);
-        Assert.Equal(AuthCore.Domain.Users.Enums.UserStatus.Active, updatedUser.Status);
+        Assert.Equal(AuthCore.Domain.Users.UserStatus.Active, updatedUser.Status);
         Assert.Equal(1, unitOfWork.BegunTransactions);
         Assert.Equal(1, unitOfWork.CommittedTransactions);
         Assert.Equal(0, unitOfWork.RolledBackTransactions);
@@ -60,7 +60,7 @@ public sealed class VerifyEmailUseCaseTests
         var userRepository = new FakeUserRepository();
         var unitOfWork = new SpyUnitOfWork();
         var user = AuthenticationFixtures.CreateUnverifiedUser();
-        var verification = AuthCore.Domain.Passports.Aggregates.EmailVerification.Issue(
+        var verification = AuthCore.Domain.Passports.EmailVerification.Issue(
             user.Id,
             user.Email.Value,
             "valid-code-hash",

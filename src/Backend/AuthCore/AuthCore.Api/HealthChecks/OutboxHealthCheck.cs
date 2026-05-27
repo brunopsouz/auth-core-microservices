@@ -1,5 +1,5 @@
+using AuthCore.Domain.Common.Repositories;
 using AuthCore.Infrastructure.Configurations;
-using AuthCore.Infrastructure.Services.Messaging;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
@@ -13,7 +13,7 @@ internal sealed class OutboxHealthCheck : IHealthCheck
     /// <summary>
     /// Campo que armazena outbox repository.
     /// </summary>
-    private readonly IOutboxMessageRepository _outboxRepository;
+    private readonly IOutboxRepository _outboxRepository;
     /// <summary>
     /// Campo que armazena outbox options.
     /// </summary>
@@ -25,7 +25,7 @@ internal sealed class OutboxHealthCheck : IHealthCheck
     /// <param name="outboxRepository">Repositório da outbox.</param>
     /// <param name="outboxOptions">Opções de processamento da outbox.</param>
     public OutboxHealthCheck(
-        IOutboxMessageRepository outboxRepository,
+        IOutboxRepository outboxRepository,
         IOptions<OutboxOptions> outboxOptions)
     {
         _outboxRepository = outboxRepository;

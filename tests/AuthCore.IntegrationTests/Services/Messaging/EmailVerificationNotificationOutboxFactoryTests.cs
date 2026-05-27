@@ -1,5 +1,5 @@
-﻿using System.Text.Json;
-using AuthCore.Domain.Passports.Aggregates;
+using System.Text.Json;
+using AuthCore.Domain.Passports;
 using AuthCore.Infrastructure.Services.Messaging;
 using BuildingBlocks.Messaging.Contracts.Notifications;
 

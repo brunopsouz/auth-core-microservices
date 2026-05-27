@@ -1,6 +1,6 @@
 using global::AuthCore.Application.UnitTests.UseCases.Authentication.Support;
 using AuthCore.Application.UseCases.Authentication.LogoutAllSessions;
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 
 namespace AuthCore.Application.UnitTests.UseCases.Authentication.LogoutAllSessions;
 

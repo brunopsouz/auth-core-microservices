@@ -27,7 +27,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     /// <summary>
     /// Campo que armazena outbox repository.
     /// </summary>
-    private readonly IOutboxMessageRepository _outboxRepository;
+    private readonly IOutboxRepository _outboxRepository;
     /// <summary>
     /// Campo que armazena unit of work.
     /// </summary>
@@ -59,7 +59,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     /// <param name="outboxMetrics">Métricas da outbox.</param>
     /// <param name="logger">Serviço de logging.</param>
     public OutboxProcessor(
-        IOutboxMessageRepository outboxRepository,
+        IOutboxRepository outboxRepository,
         IUnitOfWork unitOfWork,
         INotificationRequestPublisher notificationRequestPublisher,
         IOptions<OutboxOptions> outboxOptions,
@@ -82,28 +82,25 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     public async Task<OutboxProcessingResult> ProcessPendingAsync(CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
-
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        var processedCount = 0;
+        var failedCount = 0;
 
         try
         {
-            var messages = await _outboxRepository.GetPendingAsync(
-                _outboxOptions.BatchSize,
-                _outboxOptions.MaxAttempts);
-            var processedCount = 0;
-            var failedCount = 0;
-
-            foreach (var message in messages)
+            for (var index = 0; index < _outboxOptions.BatchSize; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (await TryProcessMessageAsync(message, cancellationToken))
+                var processed = await ProcessNextPendingMessageAsync(cancellationToken);
+
+                if (processed is null)
+                    break;
+
+                if (processed.Value)
                     processedCount++;
                 else
                     failedCount++;
             }
-
-            await _unitOfWork.CommitAsync(cancellationToken);
 
             var result = new OutboxProcessingResult
             {
@@ -119,15 +116,46 @@ internal sealed class OutboxProcessor : IOutboxProcessor
 
             return result;
         }
-        catch
-        {
-            await _unitOfWork.RollbackAsync();
-            throw;
-        }
         finally
         {
             stopwatch.Stop();
             _outboxMetrics.RecordDuration(stopwatch.Elapsed);
+        }
+
+    }
+
+    /// <summary>
+    /// Operação para processar a próxima mensagem pendente da outbox.
+    /// </summary>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>Indicador de sucesso no processamento, ou nulo quando não houver mensagem pendente.</returns>
+    private async Task<bool?> ProcessNextPendingMessageAsync(CancellationToken cancellationToken)
+    {
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var messages = await _outboxRepository.GetPendingAsync(
+                take: 1,
+                maxAttempts: _outboxOptions.MaxAttempts);
+            var message = messages.FirstOrDefault();
+
+            if (message is null)
+            {
+                await _unitOfWork.CommitAsync(cancellationToken);
+                return null;
+            }
+
+            var processed = await TryProcessMessageAsync(message, cancellationToken);
+
+            await _unitOfWork.CommitAsync(cancellationToken);
+
+            return processed;
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync();
+            throw;
         }
     }
 

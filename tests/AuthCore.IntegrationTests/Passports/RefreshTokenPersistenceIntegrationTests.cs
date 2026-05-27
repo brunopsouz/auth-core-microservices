@@ -1,7 +1,6 @@
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
-using AuthCore.Domain.Users.Aggregates;
-using AuthCore.Domain.Users.Enums;
+using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 using AuthCore.Infrastructure;
 using AuthCore.Infrastructure.Persistences.Migrations;

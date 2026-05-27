@@ -1,4 +1,3 @@
-using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
@@ -17,13 +16,17 @@ internal sealed class ResendVerificationUseCase : IResendVerificationUseCase
     /// </summary>
     private readonly IEmailVerificationRepository _emailVerificationRepository;
     /// <summary>
-    /// Campo que armazena email verification requested publisher.
+    /// Campo que armazena email verification notification outbox factory.
     /// </summary>
-    private readonly IEmailVerificationRequestedPublisher _emailVerificationRequestedPublisher;
+    private readonly IEmailVerificationNotificationOutboxFactory _emailVerificationNotificationOutboxFactory;
     /// <summary>
     /// Campo que armazena email verification service.
     /// </summary>
     private readonly IEmailVerificationService _emailVerificationService;
+    /// <summary>
+    /// Campo que armazena outbox repository.
+    /// </summary>
+    private readonly IOutboxRepository _outboxRepository;
     /// <summary>
     /// Campo que armazena unit of work.
     /// </summary>
@@ -39,19 +42,22 @@ internal sealed class ResendVerificationUseCase : IResendVerificationUseCase
     /// <param name="userReadRepository">Repositório de leitura de usuário.</param>
     /// <param name="emailVerificationRepository">Repositório de verificação de e-mail.</param>
     /// <param name="emailVerificationService">Serviço de verificação de e-mail.</param>
-    /// <param name="emailVerificationRequestedPublisher">Publisher do evento de verificação de e-mail.</param>
+    /// <param name="emailVerificationNotificationOutboxFactory">Factory de mensagem de outbox de verificação de e-mail.</param>
+    /// <param name="outboxRepository">Repositório da outbox.</param>
     /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
     public ResendVerificationUseCase(
         IUserReadRepository userReadRepository,
         IEmailVerificationRepository emailVerificationRepository,
         IEmailVerificationService emailVerificationService,
-        IEmailVerificationRequestedPublisher emailVerificationRequestedPublisher,
+        IEmailVerificationNotificationOutboxFactory emailVerificationNotificationOutboxFactory,
+        IOutboxRepository outboxRepository,
         IUnitOfWork unitOfWork)
     {
         _userReadRepository = userReadRepository;
         _emailVerificationRepository = emailVerificationRepository;
         _emailVerificationService = emailVerificationService;
-        _emailVerificationRequestedPublisher = emailVerificationRequestedPublisher;
+        _emailVerificationNotificationOutboxFactory = emailVerificationNotificationOutboxFactory;
+        _outboxRepository = outboxRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -100,21 +106,17 @@ internal sealed class ResendVerificationUseCase : IResendVerificationUseCase
                     _emailVerificationService.GetMaxAttempts(),
                     _emailVerificationService.GetCooldownUntilUtc(),
                     nowUtc);
-            var emailVerificationRequested = new EmailVerificationRequested
-            {
-                UserId = user.Id,
-                Email = user.Email.Value,
-                Code = material.Code,
-                RequestedAtUtc = nowUtc
-            };
-            emailVerificationRequested.Validate();
+            var outboxMessage = _emailVerificationNotificationOutboxFactory.Create(
+                verification,
+                material.Code,
+                nowUtc);
 
             if (existingVerification is null)
                 await _emailVerificationRepository.AddAsync(verification);
             else
                 await _emailVerificationRepository.UpdateAsync(verification);
 
-            await _emailVerificationRequestedPublisher.PublishAsync(emailVerificationRequested);
+            await _outboxRepository.AddAsync(outboxMessage);
             await _unitOfWork.CommitAsync();
         }
         catch

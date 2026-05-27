@@ -1,9 +1,9 @@
-namespace AuthCore.Infrastructure.Services.Messaging;
+namespace AuthCore.Domain.Common.Repositories;
 
 /// <summary>
 /// Representa uma mensagem persistida na outbox.
 /// </summary>
-internal sealed class OutboxMessage
+public sealed class OutboxMessage
 {
     /// <summary>
     /// Identificador da mensagem.

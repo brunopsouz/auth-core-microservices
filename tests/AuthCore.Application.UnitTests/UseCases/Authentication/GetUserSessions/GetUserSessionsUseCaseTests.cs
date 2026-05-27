@@ -1,5 +1,5 @@
 using AuthCore.Application.UseCases.Authentication.GetUserSessions;
-using AuthCore.Domain.Passports.Aggregates;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 
 namespace AuthCore.Application.UnitTests.UseCases.Authentication.GetUserSessions;

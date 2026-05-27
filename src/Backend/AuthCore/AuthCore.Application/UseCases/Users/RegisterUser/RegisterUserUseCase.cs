@@ -1,5 +1,4 @@
 using AuthCore.Application.Common.Exceptions;
-using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
@@ -20,13 +19,17 @@ internal sealed class RegisterUserUseCase : IRegisterUserUseCase
     /// </summary>
     private readonly IEmailVerificationRepository _emailVerificationRepository;
     /// <summary>
-    /// Campo que armazena email verification requested publisher.
+    /// Campo que armazena email verification notification outbox factory.
     /// </summary>
-    private readonly IEmailVerificationRequestedPublisher _emailVerificationRequestedPublisher;
+    private readonly IEmailVerificationNotificationOutboxFactory _emailVerificationNotificationOutboxFactory;
     /// <summary>
     /// Campo que armazena email verification service.
     /// </summary>
     private readonly IEmailVerificationService _emailVerificationService;
+    /// <summary>
+    /// Campo que armazena outbox repository.
+    /// </summary>
+    private readonly IOutboxRepository _outboxRepository;
     /// <summary>
     /// Campo que armazena password encripter.
     /// </summary>
@@ -56,7 +59,8 @@ internal sealed class RegisterUserUseCase : IRegisterUserUseCase
     /// <param name="passwordRepository">Repositório de senha.</param>
     /// <param name="emailVerificationRepository">Repositório de verificação de e-mail.</param>
     /// <param name="emailVerificationService">Serviço de verificação de e-mail.</param>
-    /// <param name="emailVerificationRequestedPublisher">Publisher do evento de verificação de e-mail.</param>
+    /// <param name="emailVerificationNotificationOutboxFactory">Factory de mensagem de outbox de verificação de e-mail.</param>
+    /// <param name="outboxRepository">Repositório da outbox.</param>
     /// <param name="passwordEncripter">Serviço de criptografia de senha.</param>
     /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
     public RegisterUserUseCase(
@@ -65,7 +69,8 @@ internal sealed class RegisterUserUseCase : IRegisterUserUseCase
         IPasswordRepository passwordRepository,
         IEmailVerificationRepository emailVerificationRepository,
         IEmailVerificationService emailVerificationService,
-        IEmailVerificationRequestedPublisher emailVerificationRequestedPublisher,
+        IEmailVerificationNotificationOutboxFactory emailVerificationNotificationOutboxFactory,
+        IOutboxRepository outboxRepository,
         IPasswordEncripter passwordEncripter,
         IUnitOfWork unitOfWork)
     {
@@ -74,7 +79,8 @@ internal sealed class RegisterUserUseCase : IRegisterUserUseCase
         _passwordRepository = passwordRepository;
         _emailVerificationRepository = emailVerificationRepository;
         _emailVerificationService = emailVerificationService;
-        _emailVerificationRequestedPublisher = emailVerificationRequestedPublisher;
+        _emailVerificationNotificationOutboxFactory = emailVerificationNotificationOutboxFactory;
+        _outboxRepository = outboxRepository;
         _passwordEncripter = passwordEncripter;
         _unitOfWork = unitOfWork;
     }
@@ -113,14 +119,10 @@ internal sealed class RegisterUserUseCase : IRegisterUserUseCase
             _emailVerificationService.GetMaxAttempts(),
             _emailVerificationService.GetCooldownUntilUtc(),
             nowUtc);
-        var emailVerificationRequested = new EmailVerificationRequested
-        {
-            UserId = user.Id,
-            Email = user.Email.Value,
-            Code = emailVerificationMaterial.Code,
-            RequestedAtUtc = nowUtc
-        };
-        emailVerificationRequested.Validate();
+        var outboxMessage = _emailVerificationNotificationOutboxFactory.Create(
+            emailVerification,
+            emailVerificationMaterial.Code,
+            nowUtc);
 
         await _unitOfWork.BeginTransactionAsync();
 
@@ -129,7 +131,7 @@ internal sealed class RegisterUserUseCase : IRegisterUserUseCase
             await _userRepository.AddAsync(user);
             await _passwordRepository.AddAsync(password);
             await _emailVerificationRepository.AddAsync(emailVerification);
-            await _emailVerificationRequestedPublisher.PublishAsync(emailVerificationRequested);
+            await _outboxRepository.AddAsync(outboxMessage);
             await _unitOfWork.CommitAsync();
         }
         catch
