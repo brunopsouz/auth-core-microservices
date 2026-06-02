@@ -22,6 +22,7 @@ public class UserTests
         Assert.Equal("+55 11 99999-9999", user.Contact);
         Assert.Equal(Role.User, user.Role);
         Assert.NotEqual(Guid.Empty, user.UserIdentifier);
+        Assert.False(string.IsNullOrWhiteSpace(user.SecurityStamp.Value));
         Assert.False(user.IsEmailVerified);
         Assert.Null(user.EmailVerifiedAt);
         Assert.False(user.CanSignIn);
@@ -123,5 +124,22 @@ public class UserTests
         Assert.False(user.IsEmailVerified);
         Assert.Null(user.EmailVerifiedAt);
         Assert.False(user.CanSignIn);
+    }
+
+    [Fact]
+    public void RotateSecurityStamp_WhenCalled_ShouldChangeSecurityStamp()
+    {
+        var user = User.Register(
+            "Bruno",
+            "Silva",
+            "bruno@example.com",
+            "+55 11 99999-9999",
+            Role.User);
+        var previousStamp = user.SecurityStamp;
+
+        user.RotateSecurityStamp();
+
+        Assert.NotEqual(previousStamp, user.SecurityStamp);
+        Assert.False(string.IsNullOrWhiteSpace(user.SecurityStamp.Value));
     }
 }

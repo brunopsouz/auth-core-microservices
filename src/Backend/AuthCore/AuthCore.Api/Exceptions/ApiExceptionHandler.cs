@@ -69,6 +69,7 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
     {
         return exception switch
         {
+            InvalidEmailVerificationException invalidEmailVerificationException => (StatusCodes.Status400BadRequest, GetErrors(invalidEmailVerificationException)),
             ValidationException validationException => (StatusCodes.Status400BadRequest, validationException.Errors.ToList()),
             ArgumentException argumentException => (StatusCodes.Status400BadRequest, GetErrors(argumentException)),
             UnauthorizedAccessException unauthorizedAccessException => (StatusCodes.Status401Unauthorized, GetErrors(unauthorizedAccessException)),

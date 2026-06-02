@@ -90,27 +90,24 @@ public sealed class AuthControllerIntegrationTests
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenUseCaseThrowsNotFoundException_ShouldReturnBadRequestWithGenericResponse()
+    public async Task VerifyEmail_WhenUseCaseThrowsInvalidEmailVerificationException_ShouldPropagateException()
     {
-        var useCase = new ThrowingVerifyEmailUseCase(new NotFoundException("Nenhuma verificação pendente foi encontrada para o e-mail informado."));
+        var useCase = new ThrowingVerifyEmailUseCase(new InvalidEmailVerificationException());
         var controller = CreateAuthController();
 
-        var result = await controller.VerifyEmail(useCase, new RequestVerifyEmailJson
+        var exception = await Assert.ThrowsAsync<InvalidEmailVerificationException>(() => controller.VerifyEmail(useCase, new RequestVerifyEmailJson
         {
             Email = "missing@authcore.dev",
             Code = "123456"
-        });
+        }));
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        var response = Assert.IsType<ResponseErrorJson>(badRequestResult.Value);
-
-        Assert.Equal(["Não foi possível validar o código de verificação informado."], response.Errors);
+        Assert.Equal(InvalidEmailVerificationException.InvalidVerificationMessage, exception.Message);
     }
 
     [Fact]
-    public async Task ResendVerification_WhenUseCaseThrowsForbiddenException_ShouldReturnNoContent()
+    public async Task ResendVerification_WhenUseCaseCompletes_ShouldReturnNoContentAndForwardCommand()
     {
-        var useCase = new ThrowingResendVerificationUseCase(new ForbiddenException("O reenvio da verificação ainda está em cooldown."));
+        var useCase = new SpyResendVerificationUseCase();
         var controller = CreateAuthController();
 
         var result = await controller.ResendVerification(useCase, new RequestResendVerificationJson
@@ -119,6 +116,7 @@ public sealed class AuthControllerIntegrationTests
         });
 
         Assert.IsType<NoContentResult>(result);
+        Assert.Equal("pending@authcore.dev", useCase.LastCommand!.Email);
     }
 
     [Fact]
@@ -944,21 +942,14 @@ public sealed class AuthControllerIntegrationTests
         }
     }
 
-    private sealed class ThrowingResendVerificationUseCase : IResendVerificationUseCase
+    private sealed class SpyResendVerificationUseCase : IResendVerificationUseCase
     {
-        /// <summary>
-        /// Campo que armazena exception.
-        /// </summary>
-        private readonly Exception _exception;
-
-        public ThrowingResendVerificationUseCase(Exception exception)
-        {
-            _exception = exception;
-        }
+        public ResendVerificationCommand? LastCommand { get; private set; }
 
         public Task Execute(ResendVerificationCommand command)
         {
-            return Task.FromException(_exception);
+            LastCommand = command;
+            return Task.CompletedTask;
         }
     }
 

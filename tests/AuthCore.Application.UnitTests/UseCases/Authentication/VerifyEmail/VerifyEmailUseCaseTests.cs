@@ -1,6 +1,6 @@
 using global::AuthCore.Application.UnitTests.UseCases.Authentication.Support;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.UseCases.Authentication.VerifyEmail;
-using AuthCore.Domain.Common.Exceptions;
 
 namespace AuthCore.Application.UnitTests.UseCases.Authentication.VerifyEmail;
 
@@ -52,7 +52,7 @@ public sealed class VerifyEmailUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenCodeIsInvalid_ShouldPersistAttemptAndThrowDomainException()
+    public async Task Execute_WhenCodeIsInvalid_ShouldPersistAttemptAndThrowInvalidEmailVerificationException()
     {
         var emailVerificationRepository = new FakeEmailVerificationRepository();
         var emailVerificationService = new FakeEmailVerificationService();
@@ -78,7 +78,7 @@ public sealed class VerifyEmailUseCaseTests
         userReadRepository.Store(user);
         emailVerificationRepository.Store(verification);
 
-        var exception = await Assert.ThrowsAsync<DomainException>(() => useCase.Execute(new VerifyEmailCommand
+        var exception = await Assert.ThrowsAsync<InvalidEmailVerificationException>(() => useCase.Execute(new VerifyEmailCommand
         {
             Email = user.Email.Value,
             Code = "000000"
@@ -86,7 +86,7 @@ public sealed class VerifyEmailUseCaseTests
 
         var updatedVerification = Assert.Single(emailVerificationRepository.UpdatedVerifications);
 
-        Assert.Equal("Não foi possível validar o código de verificação informado.", exception.Message);
+        Assert.Equal(InvalidEmailVerificationException.InvalidVerificationMessage, exception.Message);
         Assert.Equal(1, updatedVerification.AttemptCount);
         Assert.Null(updatedVerification.ConsumedAtUtc);
         Assert.Empty(userRepository.UpdatedUsers);

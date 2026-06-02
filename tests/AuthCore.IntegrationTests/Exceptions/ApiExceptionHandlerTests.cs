@@ -33,6 +33,23 @@ public sealed class ApiExceptionHandlerTests
     }
 
     [Fact]
+    public async Task TryHandleAsync_WhenExceptionIsInvalidEmailVerificationException_ShouldReturnBadRequestWithGenericMessage()
+    {
+        var httpContext = CreateHttpContext();
+
+        var wasHandled = await _exceptionHandler.TryHandleAsync(
+            httpContext,
+            new InvalidEmailVerificationException(),
+            CancellationToken.None);
+
+        var response = await ReadResponseAsync(httpContext);
+
+        Assert.True(wasHandled);
+        Assert.Equal(StatusCodes.Status400BadRequest, httpContext.Response.StatusCode);
+        Assert.Equal([InvalidEmailVerificationException.InvalidVerificationMessage], response.Errors);
+    }
+
+    [Fact]
     public async Task TryHandleAsync_WhenExceptionIsUnauthorizedAccessException_ShouldReturnUnauthorized()
     {
         var httpContext = CreateHttpContext();

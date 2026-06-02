@@ -5,7 +5,6 @@ using AuthCore.Api.Security;
 using AuthCore.Application.UseCases.Users.ChangePassword;
 using AuthCore.Application.UseCases.Users.DeleteUser;
 using AuthCore.Application.UseCases.Users.GetUserProfile;
-using AuthCore.Application.UseCases.Users.RegisterUser;
 using AuthCore.Application.UseCases.Users.UpdateUser;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,40 +17,6 @@ namespace AuthCore.Api.Controllers;
 [Route("api/users")]
 public sealed class UserController : ControllerBase
 {
-    /// <summary>
-    /// Operação para registrar um usuário.
-    /// </summary>
-    /// <param name="useCase">Caso de uso responsável pelo registro do usuário.</param>
-    /// <param name="request">Dados da requisição de registro.</param>
-    /// <returns>Resposta com os dados do usuário registrado.</returns>
-    [HttpPost]
-    [ProducesResponseType(typeof(ResponseRegisteredUserJson), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ResponseErrorJson), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ResponseRegisteredUserJson>> Register(
-        [FromServices] IRegisterUserUseCase useCase,
-        [FromBody] RequestRegisterUserJson request)
-    {
-        var command = new RegisterUserCommand
-        {
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            Email = request.Email,
-            Contact = request.Contact,
-            Password = request.Password,
-            ConfirmPassword = request.ConfirmPassword
-        };
-
-        var result = await useCase.Execute(command);
-        var response = new ResponseRegisteredUserJson
-        {
-            UserIdentifier = result.UserIdentifier,
-            FullName = result.FullName,
-            Email = result.Email
-        };
-
-        return Created(string.Empty, response);
-    }
-
     /// <summary>
     /// Operação para obter o perfil do usuário autenticado.
     /// </summary>

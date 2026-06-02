@@ -183,7 +183,7 @@ public sealed class OutboxProcessorTests
             publisher,
             Options.Create(new OutboxOptions
             {
-                BatchSize = 20,
+                BatchSize = 1,
                 MaxAttempts = 5
             }),
             new OutboxMetrics(),
@@ -222,6 +222,11 @@ public sealed class OutboxProcessorTests
 
         public Task UpdateAsync(OutboxMessage message)
         {
+            var index = _messages.FindIndex(current => current.Id == message.Id);
+
+            if (index >= 0)
+                _messages[index] = message;
+
             UpdatedMessages.Add(message);
             return Task.CompletedTask;
         }

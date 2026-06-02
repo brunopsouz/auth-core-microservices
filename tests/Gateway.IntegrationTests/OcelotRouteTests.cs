@@ -72,46 +72,41 @@ public sealed class OcelotRouteTests
         var globalRateLimitOptions = document.RootElement
             .GetProperty("GlobalConfiguration")
             .GetProperty("RateLimitOptions");
-        var routeKeys = globalRateLimitOptions
-            .GetProperty("RouteKeys")
-            .EnumerateArray()
-            .Select(value => value.GetString())
-            .ToHashSet(StringComparer.Ordinal);
 
         Assert.Equal("X-Client-Id", globalRateLimitOptions.GetProperty("ClientIdHeader").GetString());
         Assert.True(globalRateLimitOptions.GetProperty("EnableRateLimiting").GetBoolean());
-        Assert.True(globalRateLimitOptions.GetProperty("EnableHeaders").GetBoolean());
         Assert.Equal(120, globalRateLimitOptions.GetProperty("Limit").GetInt32());
         Assert.Equal("1m", globalRateLimitOptions.GetProperty("Period").GetString());
-        Assert.Equal("1m", globalRateLimitOptions.GetProperty("Wait").GetString());
-        Assert.Equal(429, globalRateLimitOptions.GetProperty("StatusCode").GetInt32());
+        Assert.Equal(60, globalRateLimitOptions.GetProperty("PeriodTimespan").GetInt32());
+        Assert.Equal(429, globalRateLimitOptions.GetProperty("HttpStatusCode").GetInt32());
+        Assert.Equal("Limite de requisicoes excedido. Tente novamente apos o periodo informado em Retry-After.", globalRateLimitOptions.GetProperty("QuotaExceededMessage").GetString());
         Assert.False(globalRateLimitOptions.TryGetProperty("ClientWhitelist", out _));
 
-        AssertRouteKey(routes, routeKeys, "/api/auth/register", "auth-register");
-        AssertRouteKey(routes, routeKeys, "/api/auth/verify-email", "auth-verify-email");
-        AssertRouteKey(routes, routeKeys, "/api/auth/resend-verification", "auth-resend-verification");
-        AssertRouteKey(routes, routeKeys, "/api/auth/token/login", "auth-token-login");
-        AssertRouteKey(routes, routeKeys, "/api/auth/session/login", "auth-session-login");
-        AssertRouteKey(routes, routeKeys, "/api/auth/{everything}", "authcore-auth");
-        AssertRouteKey(routes, routeKeys, "/api/users/{everything}", "authcore-users");
-        AssertRouteKey(routes, routeKeys, "/api/users/change-password", "users-change-password");
-        AssertRouteKey(routes, routeKeys, "/api/users", "users-delete");
-        AssertRouteKey(routes, routeKeys, "/api/notifications/test-email", "notifications-test-email");
-        AssertRouteKey(routes, routeKeys, "/api/notifications/{everything}", "notificationcore-notifications");
-        AssertRouteKey(routes, routeKeys, "/api/templates/{everything}", "notificationcore-templates");
+        AssertRouteKey(routes, "/api/auth/register", "auth-register");
+        AssertRouteKey(routes, "/api/auth/verify-email", "auth-verify-email");
+        AssertRouteKey(routes, "/api/auth/resend-verification", "auth-resend-verification");
+        AssertRouteKey(routes, "/api/auth/token/login", "auth-token-login");
+        AssertRouteKey(routes, "/api/auth/session/login", "auth-session-login");
+        AssertRouteKey(routes, "/api/auth/{everything}", "authcore-auth");
+        AssertRouteKey(routes, "/api/users/{everything}", "authcore-users");
+        AssertRouteKey(routes, "/api/users/change-password", "users-change-password");
+        AssertRouteKey(routes, "/api/users", "users-delete");
+        AssertRouteKey(routes, "/api/notifications/test-email", "notifications-test-email");
+        AssertRouteKey(routes, "/api/notifications/{everything}", "notificationcore-notifications");
+        AssertRouteKey(routes, "/api/templates/{everything}", "notificationcore-templates");
 
-        AssertRouteRateLimit(routes, "/api/auth/register", 10, "1m", "1m");
-        AssertRouteRateLimit(routes, "/api/auth/verify-email", 20, "1m", "1m");
-        AssertRouteRateLimit(routes, "/api/auth/resend-verification", 5, "1m", "1m");
-        AssertRouteRateLimit(routes, "/api/auth/token/login", 10, "1m", "1m");
-        AssertRouteRateLimit(routes, "/api/auth/session/login", 10, "1m", "1m");
-        AssertRouteRateLimit(routes, "/api/auth/{everything}", 120, "1m", "1m");
-        AssertRouteRateLimit(routes, "/api/users/change-password", 20, "1m", "1m");
-        AssertRouteRateLimit(routes, "/api/users", 10, "1m", "1m");
-        AssertRouteRateLimit(routes, "/api/notifications/test-email", 5, "1m", "1m");
+        AssertRouteRateLimit(routes, "/api/auth/register", 10, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/auth/verify-email", 20, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/auth/resend-verification", 5, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/auth/token/login", 10, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/auth/session/login", 10, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/auth/{everything}", 120, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/users/change-password", 20, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/users", 10, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/notifications/test-email", 5, "1m", 60);
 
-        AssertHealthRouteIsNotRateLimited(routes, routeKeys, "/authcore/health");
-        AssertHealthRouteIsNotRateLimited(routes, routeKeys, "/notificationcore/health");
+        AssertHealthRouteIsNotRateLimited(routes, "/authcore/health");
+        AssertHealthRouteIsNotRateLimited(routes, "/notificationcore/health");
     }
 
     [Fact]
@@ -247,12 +242,19 @@ public sealed class OcelotRouteTests
         Assert.Equal(1, downstreamCallCount);
     }
 
-    [Fact]
-    public async Task PublicAuthRoute_WhenRequestHasNoJwt_ShouldForwardToAuthCore()
+    [Theory]
+    [InlineData("/api/auth/register")]
+    [InlineData("/api/auth/verify-email")]
+    [InlineData("/api/auth/resend-verification")]
+    [InlineData("/api/auth/session/login")]
+    [InlineData("/api/auth/token/login")]
+    [InlineData("/api/auth/token/refresh")]
+    [InlineData("/api/auth/token/logout")]
+    public async Task PublicAuthRoute_WhenRequestHasNoJwt_ShouldForwardToAuthCore(string path)
     {
         await using var authCore = await StartDownstreamAsync(app =>
         {
-            app.MapPost("/api/auth/register", () => Results.Text("auth-public"));
+            app.MapPost("/api/auth/{**everything}", (HttpContext context) => Results.Text(context.Request.Path.Value));
         });
 
         await using var gateway = await StartGatewayAsync(CreateConfiguration([
@@ -260,14 +262,74 @@ public sealed class OcelotRouteTests
                 "/api/auth/register",
                 "/api/auth/register",
                 "POST",
+                authCore),
+            CreateRoute(
+                "/api/auth/verify-email",
+                "/api/auth/verify-email",
+                "POST",
+                authCore),
+            CreateRoute(
+                "/api/auth/resend-verification",
+                "/api/auth/resend-verification",
+                "POST",
+                authCore),
+            CreateRoute(
+                "/api/auth/token/login",
+                "/api/auth/token/login",
+                "POST",
+                authCore),
+            CreateRoute(
+                "/api/auth/session/login",
+                "/api/auth/session/login",
+                "POST",
+                authCore),
+            CreateRoute(
+                "/api/auth/{everything}",
+                "/api/auth/{everything}",
+                "POST",
                 authCore)
         ]));
 
         using var httpClient = new HttpClient();
-        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}/api/auth/register", content: null);
+        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}{path}", content: null);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("auth-public", await response.Content.ReadAsStringAsync());
+        Assert.Equal(path, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task PublicUserRegistrationRoute_WhenRequestHasNoJwt_ShouldNotForwardToAuthCore()
+    {
+        var authCoreWasCalled = false;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapPost("/api/auth/register", () =>
+            {
+                authCoreWasCalled = true;
+                return Results.Text("auth-public");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/auth/register",
+                "/api/auth/register",
+                "POST",
+                authCore),
+            CreateRoute(
+                "/api/users/{everything}",
+                "/api/users/{everything}",
+                "POST",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        using var httpClient = new HttpClient();
+        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}/api/users", content: null);
+
+        Assert.NotEqual(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(authCoreWasCalled);
     }
 
     [Fact]
@@ -294,6 +356,43 @@ public sealed class OcelotRouteTests
 
         using var httpClient = new HttpClient();
         using var response = await httpClient.GetAsync($"{GetAddress(gateway)}/api/users/profile");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.False(downstreamWasCalled);
+    }
+
+    [Theory]
+    [InlineData("/api/notifications/messages")]
+    [InlineData("/api/templates/welcome")]
+    public async Task ProtectedNotificationCoreRoute_WhenRequestHasNoJwt_ShouldReturnUnauthorized(string path)
+    {
+        var downstreamWasCalled = false;
+        await using var notificationCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/{**everything}", () =>
+            {
+                downstreamWasCalled = true;
+                return Results.Text("protected");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/notifications/{everything}",
+                "/api/notifications/{everything}",
+                "GET",
+                notificationCore,
+                requiresAuthentication: true),
+            CreateRoute(
+                "/api/templates/{everything}",
+                "/api/templates/{everything}",
+                "GET",
+                notificationCore,
+                requiresAuthentication: true)
+        ]));
+
+        using var httpClient = new HttpClient();
+        using var response = await httpClient.GetAsync($"{GetAddress(gateway)}{path}");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.False(downstreamWasCalled);
@@ -545,14 +644,12 @@ public sealed class OcelotRouteTests
 
     private static void AssertRouteKey(
         IReadOnlyCollection<JsonElement> routes,
-        HashSet<string?> routeKeys,
         string upstreamPathTemplate,
         string expectedKey)
     {
         var route = GetRoute(routes, upstreamPathTemplate);
 
         Assert.Equal(expectedKey, route.GetProperty("Key").GetString());
-        Assert.Contains(expectedKey, routeKeys);
     }
 
     private static void AssertRouteRateLimit(
@@ -560,24 +657,22 @@ public sealed class OcelotRouteTests
         string upstreamPathTemplate,
         int expectedLimit,
         string expectedPeriod,
-        string expectedWait)
+        int expectedPeriodTimespan)
     {
         var route = GetRoute(routes, upstreamPathTemplate);
         var rateLimitOptions = route.GetProperty("RateLimitOptions");
 
         Assert.Equal(expectedLimit, rateLimitOptions.GetProperty("Limit").GetInt32());
         Assert.Equal(expectedPeriod, rateLimitOptions.GetProperty("Period").GetString());
-        Assert.Equal(expectedWait, rateLimitOptions.GetProperty("Wait").GetString());
+        Assert.Equal(expectedPeriodTimespan, rateLimitOptions.GetProperty("PeriodTimespan").GetInt32());
     }
 
     private static void AssertHealthRouteIsNotRateLimited(
         IReadOnlyCollection<JsonElement> routes,
-        HashSet<string?> routeKeys,
         string upstreamPathTemplate)
     {
         var route = GetRoute(routes, upstreamPathTemplate);
 
-        Assert.False(route.TryGetProperty("Key", out var key) && routeKeys.Contains(key.GetString()));
         Assert.False(route.TryGetProperty("RateLimitOptions", out _));
     }
 

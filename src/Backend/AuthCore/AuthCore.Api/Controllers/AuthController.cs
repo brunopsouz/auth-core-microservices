@@ -2,9 +2,7 @@ using AuthCore.Api.Contracts.Requests;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Application.UseCases.Authentication.ResendVerification;
 using AuthCore.Application.UseCases.Authentication.VerifyEmail;
-using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.UseCases.Users.RegisterUser;
-using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthCore.Api.Controllers;
@@ -41,29 +39,22 @@ public sealed class AuthController : AuthControllerBase
         [FromServices] IRegisterUserUseCase useCase,
         [FromBody] RequestRegisterUserJson request)
     {
-        try
+        var result = await useCase.Execute(new RegisterUserCommand
         {
-            var result = await useCase.Execute(new RegisterUserCommand
-            {
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                Email = request.Email,
-                Contact = request.Contact,
-                Password = request.Password,
-                ConfirmPassword = request.ConfirmPassword
-            });
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            Email = request.Email,
+            Contact = request.Contact,
+            Password = request.Password,
+            ConfirmPassword = request.ConfirmPassword
+        });
 
-            return Created(string.Empty, new ResponseRegisteredUserJson
-            {
-                UserIdentifier = result.UserIdentifier,
-                FullName = result.FullName,
-                Email = result.Email
-            });
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
+        return Created(string.Empty, new ResponseRegisteredUserJson
         {
-            return actionResult;
-        }
+            UserIdentifier = result.UserIdentifier,
+            FullName = result.FullName,
+            Email = result.Email
+        });
     }
 
     /// <summary>
@@ -79,24 +70,13 @@ public sealed class AuthController : AuthControllerBase
         [FromServices] IVerifyEmailUseCase useCase,
         [FromBody] RequestVerifyEmailJson request)
     {
-        try
+        await useCase.Execute(new VerifyEmailCommand
         {
-            await useCase.Execute(new VerifyEmailCommand
-            {
-                Email = request.Email,
-                Code = request.Code
-            });
+            Email = request.Email,
+            Code = request.Code
+        });
 
-            return NoContent();
-        }
-        catch (Exception exception) when (exception is DomainException or NotFoundException)
-        {
-            return BadRequest(CreateErrorResponse("Não foi possível validar o código de verificação informado."));
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            return actionResult;
-        }
+        return NoContent();
     }
 
     /// <summary>
@@ -111,22 +91,11 @@ public sealed class AuthController : AuthControllerBase
         [FromServices] IResendVerificationUseCase useCase,
         [FromBody] RequestResendVerificationJson request)
     {
-        try
+        await useCase.Execute(new ResendVerificationCommand
         {
-            await useCase.Execute(new ResendVerificationCommand
-            {
-                Email = request.Email
-            });
+            Email = request.Email
+        });
 
-            return NoContent();
-        }
-        catch (Exception exception) when (exception is NotFoundException or ForbiddenException)
-        {
-            return NoContent();
-        }
-        catch (Exception exception) when (TryMapKnownException(exception, out var actionResult))
-        {
-            return actionResult;
-        }
+        return NoContent();
     }
 }

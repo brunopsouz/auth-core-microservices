@@ -55,6 +55,15 @@ O padrão atual está bem representado em:
 - `Controllers/SessionAuthController.cs`
 - `Controllers/TokenAuthController.cs`
 
+Responsabilidade canônica dos controllers de autenticação e usuário:
+
+- `AuthController`: `POST /api/auth/register`, `POST /api/auth/verify-email` e `POST /api/auth/resend-verification`
+- `SessionAuthController`: rotas `api/auth/session/...` para login, usuário da sessão, logout e revogação de sessões por cookie
+- `TokenAuthController`: rotas `api/auth/token/...` para login JWT, refresh token e logout token-based
+- `UserController`: `GET /api/users/profile`, `PUT /api/users/profile`, `PUT /api/users/change-password` e `DELETE /api/users`
+
+`RegisterUserUseCase` é o caso de uso de autocadastro público usado por `POST /api/auth/register`. Ele não deve ser exposto por `UserController` e não representa convite ou criação administrativa multitenant. Esses fluxos estão fora do escopo atual e devem ser especificados futuramente com contratos e casos de uso próprios.
+
 ## Estrutura de contratos
 
 Os contratos HTTP ficam organizados em:
@@ -133,7 +142,7 @@ Padrão observado:
 
 Exemplos concretos:
 
-- `RequestRegisterUserJson` -> `RegisterUserCommand` -> `ResponseRegisteredUserJson`
+- `RequestRegisterUserJson` -> `RegisterUserCommand` -> `ResponseRegisteredUserJson`, via `AuthController.Register`
 - `RequestLoginJson` -> `LoginCommand` -> `ResponseAuthenticatedSessionJson`
 - ausência de body de saída em operações de alteração -> `NoContent()`
 
@@ -150,14 +159,22 @@ Hoje a API usa rotas iniciadas por `api/...` e não há versionamento explícito
 Padrões observados:
 
 - `api/auth/register`
+- `api/auth/verify-email`
+- `api/auth/resend-verification`
 - `api/auth/session/login`
+- `api/auth/session/me`
 - `api/auth/session/logout`
+- `api/auth/session/sessions`
+- `api/auth/session/sessions/{sid}`
+- `api/auth/session/logout-all`
 - `api/auth/token/login`
 - `api/auth/token/refresh`
 - `api/auth/token/logout`
-- `api/users`
 - `api/users/profile`
 - `api/users/change-password`
+- `api/users`
+
+No conjunto acima, `api/users` é a rota base de `DELETE /api/users` para exclusão autenticada do usuário atual. `POST /api/users` não é contrato de autocadastro público.
 
 Diretrizes para evolução:
 
@@ -170,19 +187,28 @@ Se algum versionamento explícito for introduzido no futuro, ele deve ser aplica
 
 ## Autenticação e endpoints protegidos
 
-O projeto usa JWT Bearer e marca endpoints protegidos com `[AuthenticatedUser]`.
+O projeto possui dois modos de autenticação para contratos protegidos:
 
-Padrões atuais:
+- Bearer/JWT, usado em `UserController` e marcado com `[AuthenticatedUser]`
+- sessão por cookie, usada em `SessionAuthController` e marcada com `[AuthenticatedSession]`
+
+Padrões atuais para Bearer/JWT:
 
 - o atributo `AuthenticatedUserAttribute` herda de `AuthorizeAttribute` e fica em `AuthCore.Api.Authentication`
 - a autenticação é registrada em `ApiDependencyInjection`
 - o controller extrai o identificador do usuário autenticado pelas claims
 
-Ao criar endpoint autenticado:
+Ao criar endpoint autenticado por Bearer:
 
 - aplique `[AuthenticatedUser]`
 - não aceite no body dados que podem ser obtidos do token
 - extraia claims no controller e repasse para o use case no `Command` ou `Query`
+
+Padrões atuais para sessão por cookie:
+
+- `SessionAuthController` usa `[AuthenticatedSession]` nas rotas protegidas de sessão
+- mutações autenticadas por cookie validam CSRF com `ICsrfRequestValidator`
+- o Gateway mantém `/api/auth/{everything}` sem exigência de Bearer para permitir que o AuthCore valide a sessão por cookie
 
 No estado atual, o `UserController` procura `UserIdentifier` em aliases conhecidos de claim:
 
@@ -256,8 +282,8 @@ Antes de concluir uma mudança em contrato HTTP, confirme:
 2. o controller apenas adapta HTTP para `Command` ou `Query`
 3. o endpoint usa o status code correto
 4. erros previsíveis estão documentados com `ProducesResponseType`
-5. endpoints autenticados usam `[AuthenticatedUser]`
-6. dados obtidos do token não foram duplicados no body
+5. endpoints autenticados usam o atributo correto: `[AuthenticatedUser]` para Bearer ou `[AuthenticatedSession]` para sessão por cookie
+6. dados obtidos do token ou da sessão não foram duplicados no body
 7. nomes de rota, action e DTO estão consistentes com o caso de uso
 8. a mudança preserva compatibilidade com contratos já expostos ou trata claramente a evolução
 9. nenhum tipo concreto de `Infrastructure` foi exposto na assinatura pública do endpoint ou no contrato JSON

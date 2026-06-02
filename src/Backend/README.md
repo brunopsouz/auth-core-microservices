@@ -36,6 +36,19 @@ Cada microservico possui sua propria solucao (`*.Service.sln`) com projetos de p
 | NotificationCore | Consumo de eventos, persistencia e envio de notificacoes. | `src/Backend/NotificationCore/NotificationCore.Service.sln` |
 | Gateway | Borda de entrada HTTP para roteamento das APIs. | `src/Backend/Gateway/Gateway.Service.sln` |
 
+## Rotas canonicas do AuthCore
+
+Quando a aplicacao completa roda via Docker Compose, o Gateway em `http://localhost:8080` e a borda publica recomendada.
+
+Responsabilidades atuais:
+
+- `AuthController`: registro publico em `POST /api/auth/register`, verificacao em `POST /api/auth/verify-email` e reenvio em `POST /api/auth/resend-verification`.
+- `SessionAuthController`: autenticacao e gerenciamento de sessao por cookie em `api/auth/session/...`.
+- `TokenAuthController`: login JWT, refresh token e logout token-based em `api/auth/token/...`.
+- `UserController`: operacoes autenticadas de perfil, senha e exclusao em `GET /api/users/profile`, `PUT /api/users/profile`, `PUT /api/users/change-password` e `DELETE /api/users`.
+
+`RegisterUserUseCase` representa o autocadastro publico usado por `POST /api/auth/register`. `POST /api/users` nao e contrato de registro publico. Convite de usuario e criacao administrativa multitenant estao fora do escopo atual e devem ser especificados futuramente em fluxos proprios.
+
 ## Solucoes
 
 | Solucao | Uso recomendado |

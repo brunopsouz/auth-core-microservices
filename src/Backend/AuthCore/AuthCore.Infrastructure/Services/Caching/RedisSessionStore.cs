@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
+using AuthCore.Domain.Users;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -56,13 +57,17 @@ internal sealed class RedisSessionStore : ISessionStore
         var payload = JsonSerializer.Serialize(new SessionCacheModel
         {
             SessionId = session.SessionId,
+            PublicSessionId = session.PublicSessionId,
             UserId = session.UserId,
+            Status = session.Status,
+            SecurityStamp = session.SecurityStamp.Value,
             CreatedAtUtc = session.CreatedAtUtc,
             ExpiresAtUtc = session.ExpiresAtUtc,
             LastSeenAtUtc = session.LastSeenAtUtc,
             IpAddress = session.IpAddress,
             UserAgent = session.UserAgent,
-            RevokedAtUtc = session.RevokedAtUtc
+            RevokedAtUtc = session.RevokedAtUtc,
+            RevocationReason = session.RevocationReason
         }, _serializerOptions);
         var ttl = session.ExpiresAtUtc - DateTime.UtcNow;
 
@@ -92,13 +97,23 @@ internal sealed class RedisSessionStore : ISessionStore
 
         return Session.Restore(
             sessionModel.SessionId,
+            string.IsNullOrWhiteSpace(sessionModel.PublicSessionId)
+                ? sessionModel.SessionId
+                : sessionModel.PublicSessionId,
             sessionModel.UserId,
+            sessionModel.Status == default
+                ? SessionStatus.Active
+                : sessionModel.Status,
+            string.IsNullOrWhiteSpace(sessionModel.SecurityStamp)
+                ? SecurityStamp.Create().Value
+                : sessionModel.SecurityStamp,
             sessionModel.CreatedAtUtc,
             sessionModel.ExpiresAtUtc,
             sessionModel.LastSeenAtUtc,
             sessionModel.IpAddress,
             sessionModel.UserAgent,
-            sessionModel.RevokedAtUtc);
+            sessionModel.RevokedAtUtc,
+            sessionModel.RevocationReason);
     }
 
     /// <summary>
@@ -189,7 +204,13 @@ internal sealed class RedisSessionStore : ISessionStore
     {
         public string SessionId { get; set; } = string.Empty;
 
+        public string PublicSessionId { get; set; } = string.Empty;
+
         public Guid UserId { get; set; }
+
+        public SessionStatus Status { get; set; }
+
+        public string SecurityStamp { get; set; } = string.Empty;
 
         public DateTime CreatedAtUtc { get; set; }
 
@@ -202,6 +223,8 @@ internal sealed class RedisSessionStore : ISessionStore
         public string? UserAgent { get; set; }
 
         public DateTime? RevokedAtUtc { get; set; }
+
+        public SessionRevocationReason? RevocationReason { get; set; }
     }
 
 }

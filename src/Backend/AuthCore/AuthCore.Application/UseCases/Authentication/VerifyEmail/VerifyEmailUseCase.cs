@@ -1,3 +1,4 @@
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
@@ -11,8 +12,6 @@ namespace AuthCore.Application.UseCases.Authentication.VerifyEmail;
 /// </summary>
 internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
 {
-    private const string INVALID_VERIFICATION_MESSAGE = "Não foi possível validar o código de verificação informado.";
-
     /// <summary>
     /// Campo que armazena email verification repository.
     /// </summary>
@@ -125,10 +124,10 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
     /// <summary>
     /// Operação para criar a falha genérica de validação do código.
     /// </summary>
-    /// <returns>Exceção de domínio padronizada.</returns>
-    private static DomainException CreateInvalidVerificationException()
+    /// <returns>Exceção de aplicação padronizada.</returns>
+    private static InvalidEmailVerificationException CreateInvalidVerificationException()
     {
-        return new DomainException(INVALID_VERIFICATION_MESSAGE);
+        return new InvalidEmailVerificationException();
     }
 
     /// <summary>

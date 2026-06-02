@@ -49,6 +49,11 @@ public sealed class User : AggregateRoot
     public UserStatus Status { get; private set; }
 
     /// <summary>
+    /// Carimbo de seguranca usado para invalidar sessoes duraveis.
+    /// </summary>
+    public SecurityStamp SecurityStamp { get; private set; } = null!;
+
+    /// <summary>
     /// Data da verificação do e-mail.
     /// </summary>
     public DateTime? EmailVerifiedAt { get; private set; }
@@ -91,7 +96,8 @@ public sealed class User : AggregateRoot
         Role role,
         UserStatus status,
         Guid userIdentifier,
-        DateTime? emailVerifiedAt)
+        DateTime? emailVerifiedAt,
+        SecurityStamp? securityStamp = null)
     {
         FirstName = firstName.Trim();
         LastName = lastName.Trim();
@@ -102,6 +108,7 @@ public sealed class User : AggregateRoot
         Status = status;
         UserIdentifier = userIdentifier;
         EmailVerifiedAt = emailVerifiedAt;
+        SecurityStamp = securityStamp ?? SecurityStamp.Create();
 
         Validate();
     }
@@ -134,7 +141,8 @@ public sealed class User : AggregateRoot
         Role role,
         UserStatus status,
         Guid userIdentifier,
-        DateTime? emailVerifiedAt)
+        DateTime? emailVerifiedAt,
+        SecurityStamp? securityStamp = null)
         : base(id, createdAt, updateAt, isActive)
     {
         FirstName = firstName.Trim();
@@ -146,6 +154,7 @@ public sealed class User : AggregateRoot
         Status = status;
         UserIdentifier = userIdentifier;
         EmailVerifiedAt = emailVerifiedAt;
+        SecurityStamp = securityStamp ?? SecurityStamp.Create();
 
         Validate();
     }
@@ -233,7 +242,8 @@ public sealed class User : AggregateRoot
         string contact,
         Role role,
         Guid? userIdentifier = null,
-        DateTime? emailVerifiedAt = null)
+        DateTime? emailVerifiedAt = null,
+        string? securityStamp = null)
     {
         return new User(
             firstName,
@@ -244,7 +254,8 @@ public sealed class User : AggregateRoot
             role,
             emailVerifiedAt.HasValue ? UserStatus.Active : UserStatus.PendingEmailVerification,
             userIdentifier ?? Guid.NewGuid(),
-            emailVerifiedAt);
+            emailVerifiedAt,
+            RestoreSecurityStamp(securityStamp));
     }
 
     /// <summary>
@@ -276,7 +287,8 @@ public sealed class User : AggregateRoot
         Role role,
         UserStatus status,
         Guid userIdentifier,
-        DateTime? emailVerifiedAt)
+        DateTime? emailVerifiedAt,
+        string? securityStamp = null)
     {
         return new User(
             id,
@@ -291,7 +303,8 @@ public sealed class User : AggregateRoot
             role,
             status,
             userIdentifier,
-            emailVerifiedAt);
+            emailVerifiedAt,
+            RestoreSecurityStamp(securityStamp));
     }
 
 
@@ -363,6 +376,15 @@ public sealed class User : AggregateRoot
         SetUpdateData();
     }
 
+    /// <summary>
+    /// Operacao para rotacionar o carimbo de seguranca do usuario.
+    /// </summary>
+    public void RotateSecurityStamp()
+    {
+        SecurityStamp = SecurityStamp.Create();
+        SetUpdateData();
+    }
+
 
     /// <summary>
     /// Operação para montar o nome completo do usuário.
@@ -386,9 +408,22 @@ public sealed class User : AggregateRoot
         DomainException.When(Email is null, "O e-mail é obrigatório.");
         DomainException.When(string.IsNullOrWhiteSpace(Contact), "O contato é obrigatório.");
         DomainException.When(UserIdentifier == Guid.Empty, "O identificador do usuário é obrigatório.");
+        DomainException.When(SecurityStamp is null, "O carimbo de seguranca do usuario e obrigatorio.");
         DomainException.When(!Enum.IsDefined(typeof(Role), Role), "Perfil de usuário inválido.");
         DomainException.When(!Enum.IsDefined(typeof(UserStatus), Status), "Status do usuário inválido.");
         DomainException.When(Status == UserStatus.Active && !IsEmailVerified, "O usuário ativo deve possuir e-mail verificado.");
+    }
+
+    /// <summary>
+    /// Operacao para restaurar ou gerar carimbo de seguranca.
+    /// </summary>
+    /// <param name="securityStamp">Carimbo de seguranca persistido.</param>
+    /// <returns>Carimbo de seguranca restaurado ou criado.</returns>
+    private static SecurityStamp RestoreSecurityStamp(string? securityStamp)
+    {
+        return string.IsNullOrWhiteSpace(securityStamp)
+            ? SecurityStamp.Create()
+            : SecurityStamp.Restore(securityStamp);
     }
 
 }

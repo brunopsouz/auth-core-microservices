@@ -118,6 +118,7 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
             : null;
         var session = Session.Issue(
             user.Id,
+            user.SecurityStamp,
             _sessionService.GetExpiresAtUtc(),
             command.IpAddress,
             command.UserAgent);

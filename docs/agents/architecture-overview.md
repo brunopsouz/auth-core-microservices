@@ -4,7 +4,7 @@
 
 Este documento oficializa a visão arquitetural do projeto `auth_core` com base no estado real do repositório. O objetivo é registrar a organização da solução, o papel de cada camada, os padrões dominantes de implementação e as diretrizes que devem orientar a evolução do código.
 
-O projeto implementa um núcleo de autenticação em `.NET 8`, organizado em camadas, com forte influência de Clean Architecture e DDD tático. A principal fonte de verdade para linguagem, modelagem e estilo é a camada `AuthCore.Domain`.
+O backend roda em `.NET 10` e está organizado como um conjunto de serviços. Este documento cobre principalmente o recorte interno do `AuthCore`, que é o núcleo de autenticação modelado em camadas, com forte influência de Clean Architecture e DDD tático. A principal fonte de verdade para linguagem, modelagem e estilo desse recorte é a camada `AuthCore.Domain`.
 
 Este documento adota o recorte **atual + preparado**:
 
@@ -13,12 +13,15 @@ Este documento adota o recorte **atual + preparado**:
 
 ## Visão Geral da Solução
 
-A solução está organizada em duas áreas principais:
+A solução backend está organizada em serviços e projetos compartilhados:
 
-- `src/Backend/AuthCore`: projetos de aplicação
-- `tests`: projetos de validação automatizada
+- `src/Backend/AuthCore`: serviço de autenticação e usuários
+- `src/Backend/NotificationCore`: serviço de notificações transacionais
+- `src/Backend/Gateway`: borda HTTP com Ocelot
+- `src/BuildingBlocks`: contratos e blocos compartilhados
+- `tests`: projetos de validação automatizada por serviço
 
-Os projetos atualmente presentes na solução são:
+No recorte do `AuthCore`, os projetos principais são:
 
 - `AuthCore.Api`
 - `AuthCore.Application`
@@ -156,10 +159,14 @@ As responsabilidades observadas hoje incluem:
 
 Os controllers atuais seguem o papel correto de borda:
 
-- `AuthController` atende registro e verificação pública de autenticação
+- `AuthController` atende autocadastro público e verificação pública de autenticação
 - `SessionAuthController` atende autenticação e gerenciamento de sessão por cookie
-- `TokenAuthController` atende autenticação e renovação por access token e refresh token
-- `UserController` atende registro, perfil, atualização, troca de senha e exclusão
+- `TokenAuthController` atende autenticação, renovação e logout por access token e refresh token
+- `UserController` atende apenas operações autenticadas de perfil, atualização, troca de senha e exclusão
+
+O endpoint canônico de autocadastro público é `POST /api/auth/register`. Ele invoca `RegisterUserUseCase`, que representa o fluxo público de registro de usuário pendente de verificação. `POST /api/users` não é endpoint de registro público; a rota base `DELETE /api/users` pertence à exclusão autenticada do usuário atual.
+
+Convite de usuário e criação administrativa multitenant estão fora do escopo atual. Esses fluxos devem ser especificados futuramente como casos de uso próprios, sem reaproveitar `RegisterUserUseCase` como fluxo administrativo.
 
 ### AuthCore.Infrastructure
 
@@ -311,7 +318,7 @@ As migrações são controladas com `FluentMigrator`, usando classes versionadas
 - Redis
 - RabbitMQ
 
-Redis e RabbitMQ já aparecem como capacidades estruturadas na configuração da solução, mas ainda não sustentam, no estado atual, serviços de negócio relevantes equivalentes ao nível de materialização já visto em persistência PostgreSQL, tokens e criptografia.
+Redis e RabbitMQ já sustentam fluxos relevantes no backend. No recorte do `AuthCore`, Redis apoia recursos técnicos como sessão/cache, enquanto RabbitMQ participa da publicação assíncrona de notificações por Outbox. No recorte do `NotificationCore`, RabbitMQ é consumido pela infraestrutura para processamento de mensagens e integração com o fluxo de notificações transacionais.
 
 ## Estratégia de Testes
 

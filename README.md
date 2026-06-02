@@ -1,13 +1,13 @@
 # AuthCore
 
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![ASP.NET Core](https://img.shields.io/badge/ASP.NET%20Core-Web%20API-512BD4)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3-FF6600?logo=rabbitmq&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-AuthCore é uma solução backend em .NET 8 para autenticação, gestão de usuários e notificações transacionais. O projeto evoluiu para uma arquitetura com microserviços, API Gateway, mensageria assíncrona e serviços organizados por camadas com influência de Clean Architecture e DDD tático.
+AuthCore é uma solução backend em .NET 10 para autenticação, gestão de usuários e notificações transacionais. O projeto evoluiu para uma arquitetura com microserviços, API Gateway, mensageria assíncrona e serviços organizados por camadas com influência de Clean Architecture e DDD tático.
 
 O objetivo é oferecer um núcleo de autenticação robusto para aplicações backend, mantendo regras de negócio no domínio, casos de uso na aplicação, detalhes técnicos na infraestrutura e comunicação entre serviços por contratos explícitos.
 
@@ -54,7 +54,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 
 ## Tecnologias
 
-- .NET 8
+- .NET 10
 - ASP.NET Core Web API
 - Ocelot
 - PostgreSQL 17
@@ -123,7 +123,7 @@ Responsabilidades principais:
 
 Para executar localmente:
 
-- [.NET SDK 8](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET SDK 10](https://dotnet.microsoft.com/download/dotnet/10.0)
 - Docker
 - Docker Compose ou plugin `docker compose`
 - Bash, para usar o script `run.sh`
@@ -271,6 +271,10 @@ Quando a aplicação completa está em Docker, prefira acessar as rotas publicad
 | `PUT` | `/api/users/change-password` | Altera senha |
 | `DELETE` | `/api/users` | Exclui usuário autenticado |
 
+`POST /api/auth/register` é a única entrada pública de autocadastro. Esse endpoint pertence ao `AuthController` e usa `RegisterUserUseCase` para criar usuário pendente de verificação, senha, verificação de e-mail e mensagem de Outbox na mesma transação.
+
+`UserController` fica restrito às operações autenticadas de perfil, senha e exclusão. `POST /api/users` não é endpoint de registro público. Convite de usuário e criação administrativa multitenant estão fora do escopo atual e devem ser especificados futuramente como fluxos próprios.
+
 ### NotificationCore
 
 | Método | Rota | Descrição |
@@ -278,7 +282,7 @@ Quando a aplicação completa está em Docker, prefira acessar as rotas publicad
 | `GET` | `/api/notifications/{id}` | Consulta uma notificação pelo identificador |
 | `POST` | `/api/notifications/test-email` | Envia uma notificação de teste |
 
-As rotas administrativas `GET /api/notifications` e `GET /api/templates` existem no `NotificationCore.Api`, mas não possuem rota base publicada no Gateway atual. Para usá-las via Gateway, adicione rotas explícitas no `ocelot.json` ou exponha o serviço de notificação diretamente em um ambiente controlado.
+As rotas de `NotificationCore` publicadas pelo Gateway exigem Bearer token.
 
 ### Health checks
 
