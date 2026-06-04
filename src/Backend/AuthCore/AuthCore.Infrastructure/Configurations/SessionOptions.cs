@@ -22,4 +22,10 @@ internal sealed class SessionOptions
     /// Indica se a sessão usa expiração deslizante.
     /// </summary>
     public bool SlidingTtl { get; init; } = true;
+
+    /// <summary>
+    /// Intervalo minimo entre atualizacoes de ultimo uso da sessao em segundos.
+    /// </summary>
+    [Range(1, 86400)]
+    public int LastSeenUpdateIntervalSeconds { get; init; } = 60;
 }

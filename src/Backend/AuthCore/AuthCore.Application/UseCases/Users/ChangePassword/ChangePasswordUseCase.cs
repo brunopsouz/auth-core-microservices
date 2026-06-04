@@ -15,7 +15,12 @@ namespace AuthCore.Application.UseCases.Users.ChangePassword;
 internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
 {
     private const string PASSWORD_CHANGED_REASON = "password-changed";
+    private const string PARTIAL_CACHE_INVALIDATION_MESSAGE = "A senha foi alterada e as sessoes persistidas foram revogadas, mas a invalidacao do cache de sessao falhou.";
 
+    /// <summary>
+    /// Campo que armazena durable session repository.
+    /// </summary>
+    private readonly IDurableSessionRepository _durableSessionRepository;
     /// <summary>
     /// Campo que armazena password encripter.
     /// </summary>
@@ -29,9 +34,17 @@ internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
     /// </summary>
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     /// <summary>
+    /// Campo que armazena session store.
+    /// </summary>
+    private readonly ISessionStore _sessionStore;
+    /// <summary>
     /// Campo que armazena unit of work.
     /// </summary>
     private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
+    /// Campo que armazena user repository.
+    /// </summary>
+    private readonly IUserRepository _userRepository;
     /// <summary>
     /// Campo que armazena user read repository.
     /// </summary>
@@ -41,20 +54,38 @@ internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
     /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
+    /// <param name="userRepository">Repositório de escrita de usuário.</param>
     /// <param name="userReadRepository">Repositório de leitura de usuário.</param>
     /// <param name="passwordRepository">Repositório de senha.</param>
+    /// <param name="durableSessionRepository">Repositório durável de sessão.</param>
+    /// <param name="sessionStore">Store de sessão autenticada.</param>
     /// <param name="refreshTokenRepository">Repositório de refresh token.</param>
     /// <param name="passwordEncripter">Serviço de criptografia de senha.</param>
     /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
     public ChangePasswordUseCase(
+        IUserRepository userRepository,
         IUserReadRepository userReadRepository,
         IPasswordRepository passwordRepository,
+        IDurableSessionRepository durableSessionRepository,
+        ISessionStore sessionStore,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordEncripter passwordEncripter,
         IUnitOfWork unitOfWork)
     {
+        ArgumentNullException.ThrowIfNull(userRepository);
+        ArgumentNullException.ThrowIfNull(userReadRepository);
+        ArgumentNullException.ThrowIfNull(passwordRepository);
+        ArgumentNullException.ThrowIfNull(durableSessionRepository);
+        ArgumentNullException.ThrowIfNull(sessionStore);
+        ArgumentNullException.ThrowIfNull(refreshTokenRepository);
+        ArgumentNullException.ThrowIfNull(passwordEncripter);
+        ArgumentNullException.ThrowIfNull(unitOfWork);
+
+        _userRepository = userRepository;
         _userReadRepository = userReadRepository;
         _passwordRepository = passwordRepository;
+        _durableSessionRepository = durableSessionRepository;
+        _sessionStore = sessionStore;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordEncripter = passwordEncripter;
         _unitOfWork = unitOfWork;
@@ -84,21 +115,37 @@ internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
 
         Password.ValidateWithConfirmation(command.NewPassword, command.ConfirmNewPassword);
 
+        var changedAtUtc = DateTime.UtcNow;
         var newPasswordHash = _passwordEncripter.Encrypt(command.NewPassword);
         var updatedPassword = password.Change(newPasswordHash, PasswordStatus.Active);
+        user.RotateSecurityStamp();
 
         await _unitOfWork.BeginTransactionAsync();
 
         try
         {
             await _passwordRepository.UpdateAsync(updatedPassword);
-            await _refreshTokenRepository.RevokeActiveByUserIdAsync(user.Id, DateTime.UtcNow, PASSWORD_CHANGED_REASON);
+            await _userRepository.UpdateAsync(user);
+            await _durableSessionRepository.RevokeActiveByUserIdAsync(
+                user.Id,
+                SessionRevocationReason.PasswordChanged,
+                changedAtUtc);
+            await _refreshTokenRepository.RevokeActiveByUserIdAsync(user.Id, changedAtUtc, PASSWORD_CHANGED_REASON);
             await _unitOfWork.CommitAsync();
         }
         catch
         {
             await _unitOfWork.RollbackAsync();
             throw;
+        }
+
+        try
+        {
+            await _sessionStore.RevokeAllAsync(user.Id);
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(PARTIAL_CACHE_INVALIDATION_MESSAGE, exception);
         }
     }
 }

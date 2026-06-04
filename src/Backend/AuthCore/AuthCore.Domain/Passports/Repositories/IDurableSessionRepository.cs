@@ -23,8 +23,11 @@ public interface IDurableSessionRepository
     /// Operacao para obter sessao pelo hash do identificador opaco.
     /// </summary>
     /// <param name="sessionIdentifierHash">Hash do identificador opaco.</param>
+    /// <param name="identifier">Identificador opaco original da sessao.</param>
     /// <returns>Sessao encontrada ou nula.</returns>
-    Task<Session?> GetByIdentifierHashAsync(string sessionIdentifierHash);
+    Task<Session?> GetByIdentifierHashAsync(
+        string sessionIdentifierHash,
+        SessionIdentifier identifier);
 
     /// <summary>
     /// Operacao para obter sessao pelo identificador publico.

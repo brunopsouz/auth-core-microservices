@@ -95,6 +95,7 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IPasswordEncripter, BCryptNet>();
         services.AddScoped<IAccessTokenGenerator, JwtAccessTokenGenerator>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+        services.AddScoped<ISessionIdentifierHasher, Sha256SessionIdentifierHasher>();
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<IEmailVerificationService, Sha256EmailVerificationService>();
         services.AddScoped<IEmailVerificationNotificationOutboxFactory, EmailVerificationNotificationOutboxFactory>();
@@ -115,6 +116,7 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IUserReadRepository>(serviceProvider => serviceProvider.GetRequiredService<UserReadRepository>());
         services.AddScoped<IPasswordRepository, PasswordRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IDurableSessionRepository, DurableSessionRepository>();
         services.AddScoped<IEmailVerificationRepository, EmailVerificationRepository>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddScoped<ISessionStore, RedisSessionStore>();

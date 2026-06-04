@@ -47,7 +47,8 @@ internal sealed class UserReadRepository : IUserReadRepository
                 "UserIdentifier",
                 "Role",
                 "Status",
-                "EmailVerifiedAt"
+                "EmailVerifiedAt",
+                "SecurityStamp"
             FROM "Users"
             WHERE "Id" = @UserId
             LIMIT 1;
@@ -83,7 +84,8 @@ internal sealed class UserReadRepository : IUserReadRepository
                 "UserIdentifier",
                 "Role",
                 "Status",
-                "EmailVerifiedAt"
+                "EmailVerifiedAt",
+                "SecurityStamp"
             FROM "Users"
             WHERE "UserIdentifier" = @UserIdentifier
             LIMIT 1;
@@ -119,7 +121,8 @@ internal sealed class UserReadRepository : IUserReadRepository
                 "UserIdentifier",
                 "Role",
                 "Status",
-                "EmailVerifiedAt"
+                "EmailVerifiedAt",
+                "SecurityStamp"
             FROM "Users"
             WHERE "Email" = @Email
             LIMIT 1;
@@ -171,7 +174,8 @@ internal sealed class UserReadRepository : IUserReadRepository
             userIdentifier: reader.GetGuid(reader.GetOrdinal("UserIdentifier")),
             emailVerifiedAt: reader.IsDBNull(reader.GetOrdinal("EmailVerifiedAt"))
                 ? null
-                : reader.GetDateTime(reader.GetOrdinal("EmailVerifiedAt")));
+                : reader.GetDateTime(reader.GetOrdinal("EmailVerifiedAt")),
+            securityStamp: reader.GetString(reader.GetOrdinal("SecurityStamp")));
     }
 
 }

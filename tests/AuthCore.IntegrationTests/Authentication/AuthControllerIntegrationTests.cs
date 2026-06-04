@@ -12,6 +12,7 @@ using AuthCore.Application.UseCases.Authentication.LoginSession;
 using AuthCore.Application.UseCases.Authentication.LogoutAllSessions;
 using AuthCore.Application.UseCases.Authentication.LogoutCurrentSession;
 using AuthCore.Application.UseCases.Authentication.LogoutSession;
+using AuthCore.Application.UseCases.Authentication.RefreshBrowserSession;
 using AuthCore.Application.UseCases.Authentication.RefreshSession;
 using AuthCore.Application.UseCases.Authentication.ResendVerification;
 using AuthCore.Application.UseCases.Authentication.RevokeUserSession;
@@ -20,8 +21,10 @@ using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.UseCases.Users.RegisterUser;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Infrastructure.Configurations;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -128,6 +131,8 @@ public sealed class AuthControllerIntegrationTests
             Result = new AuthenticatedUserSessionResult
             {
                 SessionId = "session-123",
+                AccessToken = "access-token-123",
+                AccessTokenExpiresAtUtc = new DateTime(2026, 4, 20, 14, 5, 0, DateTimeKind.Utc),
                 UserIdentifier = userId,
                 Email = "bruno@authcore.dev",
                 ExpiresAtUtc = new DateTime(2026, 4, 20, 15, 0, 0, DateTimeKind.Utc)
@@ -136,11 +141,15 @@ public sealed class AuthControllerIntegrationTests
         var authCookieOptions = Options.Create(new AuthCookieOptions
         {
             SessionCookieName = "sid",
+            AccessTokenCookieName = "at",
+            HttpOnly = true,
+            Path = "/",
+            SameSite = "Strict",
             Secure = false
         });
         var controller = CreateSessionController();
 
-        var result = await controller.Login(useCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
+        var result = await controller.Login(useCase, authCookieOptions, new RequestSessionLoginJson
         {
             Email = "bruno@authcore.dev",
             Password = "ValidPassword#2026"
@@ -155,28 +164,61 @@ public sealed class AuthControllerIntegrationTests
         Assert.Equal(userId, response.UserId);
         Assert.Equal(useCase.Result.Email, response.Email);
         Assert.Contains("sid=session-123", setCookieHeader, StringComparison.Ordinal);
+        Assert.Contains("at=access-token-123", setCookieHeader, StringComparison.Ordinal);
+        Assert.Contains("XSRF-TOKEN=csrf-token", setCookieHeader, StringComparison.Ordinal);
         Assert.Contains("httponly", setCookieHeader, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("samesite=lax", setCookieHeader, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=strict", setCookieHeader, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("path=/", setCookieHeader, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("domain=", setCookieHeader, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task Login_WhenUseCaseThrowsForbiddenException_ShouldReturnForbiddenResponseErrorJson()
+    public async Task Login_WhenUseCaseThrowsForbiddenException_ShouldPropagateException()
     {
         var useCase = new ThrowingLoginSessionUseCase(new ForbiddenException("O usuário precisa verificar o e-mail antes de autenticar."));
         var controller = CreateSessionController();
 
-        var result = await controller.Login(useCase, CreateServiceProvider(Options.Create(new AuthCookieOptions())), new RequestSessionLoginJson
+        var exception = await Assert.ThrowsAsync<ForbiddenException>(() => controller.Login(useCase, Options.Create(new AuthCookieOptions()), new RequestSessionLoginJson
         {
             Email = "pending@authcore.dev",
             Password = "ValidPassword#2026"
+        }));
+
+        Assert.Equal("O usuário precisa verificar o e-mail antes de autenticar.", exception.Message);
+    }
+
+    [Fact]
+    public async Task Login_WhenUsingHostCookies_ShouldEmitSecureCookiesWithoutDomain()
+    {
+        var userId = Guid.NewGuid();
+        var useCase = new SpyLoginSessionUseCase
+        {
+            Result = new AuthenticatedUserSessionResult
+            {
+                SessionId = "session-123",
+                UserIdentifier = userId,
+                Email = "bruno@authcore.dev",
+                AccessToken = "access-token-123",
+                AccessTokenExpiresAtUtc = new DateTime(2026, 4, 20, 14, 0, 0, DateTimeKind.Utc),
+                ExpiresAtUtc = new DateTime(2026, 4, 20, 15, 0, 0, DateTimeKind.Utc)
+            }
+        };
+        var controller = CreateSessionController();
+
+        var result = await controller.Login(useCase, Options.Create(new AuthCookieOptions()), new RequestSessionLoginJson
+        {
+            Email = "bruno@authcore.dev",
+            Password = "ValidPassword#2026"
         });
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        _ = Assert.IsType<ResponseAuthenticatedUserJson>(okResult.Value);
+        var setCookieHeader = controller.Response.Headers.SetCookie.ToString();
 
-        var forbiddenResult = Assert.IsType<ObjectResult>(result.Result);
-        var response = Assert.IsType<ResponseErrorJson>(forbiddenResult.Value);
-
-        Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
-        Assert.Equal(["O usuário precisa verificar o e-mail antes de autenticar."], response.Errors);
+        Assert.Contains("__Host-auth.sid=session-123", setCookieHeader, StringComparison.Ordinal);
+        Assert.Contains("__Host-auth.at=access-token-123", setCookieHeader, StringComparison.Ordinal);
+        Assert.Contains("secure", setCookieHeader, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("path=/", setCookieHeader, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("domain=", setCookieHeader, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -253,20 +295,17 @@ public sealed class AuthControllerIntegrationTests
     }
 
     [Fact]
-    public async Task TokenLogout_WhenUseCaseThrowsUnauthorizedAccessException_ShouldReturnUnauthorizedResponseErrorJson()
+    public async Task TokenLogout_WhenUseCaseThrowsUnauthorizedAccessException_ShouldPropagateException()
     {
         var useCase = new ThrowingLogoutSessionUseCase(new UnauthorizedAccessException("A sessão informada é inválida ou expirou."));
         var controller = CreateTokenController();
 
-        var result = await controller.Logout(useCase, new RequestTokenLogoutJson
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => controller.Logout(useCase, new RequestTokenLogoutJson
         {
             RefreshToken = "invalid-refresh-token"
-        });
+        }));
 
-        var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
-        var response = Assert.IsType<ResponseErrorJson>(unauthorizedResult.Value);
-
-        Assert.Equal(["A sessão informada é inválida ou expirou."], response.Errors);
+        Assert.Equal("A sessão informada é inválida ou expirou.", exception.Message);
     }
 
     [Fact]
@@ -287,6 +326,95 @@ public sealed class AuthControllerIntegrationTests
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("refresh-token", useCase.LastCommand!.RefreshToken);
+    }
+
+    [Fact]
+    public async Task Refresh_WhenUseCaseSucceeds_ShouldReturnNoContentAndWriteAccessTokenCookie()
+    {
+        var useCase = new SpyRefreshBrowserSessionUseCase
+        {
+            Result = new RefreshedSessionAccessResult
+            {
+                AccessToken = "next-access-token",
+                AccessTokenExpiresAtUtc = new DateTime(2026, 4, 20, 14, 10, 0, DateTimeKind.Utc),
+                SessionExpiresAtUtc = new DateTime(2026, 4, 20, 15, 0, 0, DateTimeKind.Utc)
+            }
+        };
+        var authCookieOptions = Options.Create(new AuthCookieOptions
+        {
+            SessionCookieName = "sid",
+            AccessTokenCookieName = "at",
+            Secure = false
+        });
+        var controller = CreateSessionController();
+        SetRequestCookies(controller.HttpContext, ("sid", "session-123"), ("XSRF-TOKEN", "csrf-token"));
+
+        var result = await controller.Refresh(useCase, authCookieOptions);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal("session-123", useCase.LastCommand!.SessionId);
+        Assert.Contains("at=next-access-token", controller.Response.Headers.SetCookie.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Refresh_WhenCsrfHeaderIsMissing_ShouldThrowForbiddenExceptionWithoutCallingUseCase()
+    {
+        var authCookieOptions = Options.Create(new AuthCookieOptions
+        {
+            SessionCookieName = "sid",
+            AccessTokenCookieName = "at",
+            Secure = false
+        });
+        var csrfOptions = Options.Create(new CsrfOptions
+        {
+            AllowedOrigins = ["https://app.authcore.dev"],
+            CookieName = "XSRF-TOKEN",
+            HeaderName = "X-CSRF-TOKEN",
+            SigningKey = "tests-csrf-signing-key-2026"
+        });
+        var csrfTokenService = new CookieCsrfTokenService(csrfOptions);
+        var csrfToken = csrfTokenService.Generate("session-123");
+        var controller = CreateSessionController(
+            csrfRequestValidator: new CookieCsrfRequestValidator(
+                NullLogger<CookieCsrfRequestValidator>.Instance,
+                csrfOptions,
+                authCookieOptions,
+                csrfTokenService));
+        var useCase = new SpyRefreshBrowserSessionUseCase();
+
+        controller.Request.Headers.Origin = "https://app.authcore.dev";
+        SetRequestCookies(controller.HttpContext, ("sid", "session-123"), ("XSRF-TOKEN", csrfToken));
+
+        var exception = await Assert.ThrowsAsync<ForbiddenException>(() => controller.Refresh(useCase, authCookieOptions));
+
+        Assert.Equal("O token CSRF informado e invalido.", exception.Message);
+        Assert.Null(useCase.LastCommand);
+    }
+
+    [Fact]
+    public async Task Logout_WhenCsrfHeaderIsMissing_ShouldThrowForbiddenExceptionWithoutCallingUseCase()
+    {
+        var authCookieOptions = Options.Create(new AuthCookieOptions
+        {
+            SessionCookieName = "sid",
+            Secure = false
+        });
+        var controller = CreateSessionController(
+            [
+                new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123"),
+                new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, Guid.NewGuid().ToString())
+            ],
+            csrfRequestValidator: CreateSignedCsrfRequestValidator(authCookieOptions));
+        var useCase = new SpyLogoutCurrentSessionUseCase();
+        var csrfToken = CreateCsrfToken("session-123");
+
+        controller.Request.Headers.Origin = "https://app.authcore.dev";
+        SetRequestCookies(controller.HttpContext, ("sid", "session-123"), ("XSRF-TOKEN", csrfToken));
+
+        var exception = await Assert.ThrowsAsync<ForbiddenException>(() => controller.Logout(useCase, authCookieOptions));
+
+        Assert.Equal("O token CSRF informado e invalido.", exception.Message);
+        Assert.Null(useCase.LastCommand);
     }
 
     [Fact]
@@ -312,24 +440,14 @@ public sealed class AuthControllerIntegrationTests
     }
 
     [Fact]
-    public void Me_WhenSessionUserIsPending_ShouldReturnForbiddenResponseErrorJson()
+    public void Me_WhenEndpointIsDeclared_ShouldRequireActiveSessionPolicy()
     {
-        var controller = CreateSessionController(new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new Claim(ClaimTypes.Email, "pending@authcore.dev"),
-            new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123"),
-            new Claim(SessionAuthenticationDefaults.UserStatusClaimType, "PendingEmailVerification"),
-            new Claim(SessionAuthenticationDefaults.UserIsActiveClaimType, bool.TrueString)
-        });
+        var method = typeof(SessionAuthController).GetMethod(nameof(SessionAuthController.Me))!;
+        var authorizeAttributes = method
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)
+            .Cast<AuthorizeAttribute>();
 
-        var result = controller.Me();
-
-        var forbiddenResult = Assert.IsType<ObjectResult>(result.Result);
-        var response = Assert.IsType<ResponseErrorJson>(forbiddenResult.Value);
-
-        Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
-        Assert.Equal(["O usuário precisa verificar o e-mail antes de autenticar."], response.Errors);
+        Assert.Contains(authorizeAttributes, attribute => attribute.Policy == "ActiveSession");
     }
 
     [Fact]
@@ -346,7 +464,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
 
-        var result = await controller.Logout(useCase, CreateServiceProvider(authCookieOptions));
+        var result = await controller.Logout(useCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("session-123", useCase.LastCommand!.SessionId);
@@ -354,7 +472,7 @@ public sealed class AuthControllerIntegrationTests
     }
 
     [Fact]
-    public async Task Logout_WhenOriginIsNotAllowed_ShouldReturnForbiddenResponseErrorJson()
+    public async Task Logout_WhenOriginIsNotAllowed_ShouldPropagateForbiddenException()
     {
         var useCase = new SpyLogoutCurrentSessionUseCase();
         var authCookieOptions = Options.Create(new AuthCookieOptions
@@ -371,13 +489,10 @@ public sealed class AuthControllerIntegrationTests
 
         controller.Request.Headers.Origin = "https://evil.authcore.dev";
 
-        var result = await controller.Logout(useCase, CreateServiceProvider(authCookieOptions));
+        var exception = await Assert.ThrowsAsync<ForbiddenException>(() =>
+            controller.Logout(useCase, authCookieOptions));
 
-        var forbiddenResult = Assert.IsType<ObjectResult>(result);
-        var response = Assert.IsType<ResponseErrorJson>(forbiddenResult.Value);
-
-        Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
-        Assert.Equal(["A origem da requisição não é permitida."], response.Errors);
+        Assert.Equal("A origem da requisição não é permitida.", exception.Message);
         Assert.Null(useCase.LastCommand);
     }
 
@@ -439,7 +554,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
 
-        var result = await controller.RevokeSession("session-123", useCase, CreateServiceProvider(authCookieOptions));
+        var result = await controller.RevokeSession("session-123", useCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal(userId, useCase.LastCommand!.UserId);
@@ -463,7 +578,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
 
-        var result = await controller.RevokeSession("  session-123  ", useCase, CreateServiceProvider(authCookieOptions));
+        var result = await controller.RevokeSession("  session-123  ", useCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("session-123", useCase.LastCommand!.SessionId);
@@ -489,11 +604,39 @@ public sealed class AuthControllerIntegrationTests
 
         controller.Request.Headers.Referer = "https://app.authcore.dev/seguranca/sessoes";
 
-        var result = await controller.RevokeSession("session-other", useCase, CreateServiceProvider(authCookieOptions));
+        var result = await controller.RevokeSession("session-other", useCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal(userId, useCase.LastCommand!.UserId);
         Assert.Equal("session-other", useCase.LastCommand.SessionId);
+    }
+
+    [Fact]
+    public async Task RevokeSession_WhenCsrfHeaderIsMissing_ShouldThrowForbiddenExceptionWithoutCallingUseCase()
+    {
+        var userId = Guid.NewGuid();
+        var useCase = new SpyRevokeUserSessionUseCase();
+        var authCookieOptions = Options.Create(new AuthCookieOptions
+        {
+            SessionCookieName = "sid",
+            Secure = false
+        });
+        var controller = CreateSessionController(
+            [
+                new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
+                new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-current")
+            ],
+            csrfRequestValidator: CreateSignedCsrfRequestValidator(authCookieOptions));
+        var csrfToken = CreateCsrfToken("session-current");
+
+        controller.Request.Headers.Origin = "https://app.authcore.dev";
+        SetRequestCookies(controller.HttpContext, ("sid", "session-current"), ("XSRF-TOKEN", csrfToken));
+
+        var exception = await Assert.ThrowsAsync<ForbiddenException>(() =>
+            controller.RevokeSession("session-other", useCase, authCookieOptions));
+
+        Assert.Equal("O token CSRF informado e invalido.", exception.Message);
+        Assert.Null(useCase.LastCommand);
     }
 
     [Fact]
@@ -512,7 +655,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-current")
         });
 
-        var result = await controller.RevokeSession("session-other", useCase, CreateServiceProvider(authCookieOptions));
+        var result = await controller.RevokeSession("session-other", useCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("session-other", useCase.LastCommand!.SessionId);
@@ -520,7 +663,7 @@ public sealed class AuthControllerIntegrationTests
     }
 
     [Fact]
-    public async Task RevokeSession_WhenUseCaseThrowsNotFoundException_ShouldReturnNotFoundWithoutDeletingCookie()
+    public async Task RevokeSession_WhenUseCaseThrowsNotFoundException_ShouldPropagateExceptionWithoutDeletingCookie()
     {
         var userId = Guid.NewGuid();
         var useCase = new ThrowingRevokeUserSessionUseCase(new NotFoundException("A sessão informada não foi encontrada para o usuário."));
@@ -535,12 +678,10 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-current")
         });
 
-        var result = await controller.RevokeSession("session-other", useCase, CreateServiceProvider(authCookieOptions));
+        var exception = await Assert.ThrowsAsync<NotFoundException>(() =>
+            controller.RevokeSession("session-other", useCase, authCookieOptions));
 
-        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
-        var response = Assert.IsType<ResponseErrorJson>(notFoundResult.Value);
-
-        Assert.Equal(["A sessão informada não foi encontrada para o usuário."], response.Errors);
+        Assert.Equal("A sessão informada não foi encontrada para o usuário.", exception.Message);
         Assert.True(string.IsNullOrWhiteSpace(controller.Response.Headers.SetCookie.ToString()));
     }
 
@@ -560,7 +701,7 @@ public sealed class AuthControllerIntegrationTests
             new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
         });
 
-        var result = await controller.LogoutAll(useCase, CreateServiceProvider(authCookieOptions));
+        var result = await controller.LogoutAll(useCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal(userId, useCase.LastCommand!.UserId);
@@ -568,7 +709,7 @@ public sealed class AuthControllerIntegrationTests
     }
 
     [Fact]
-    public async Task LogoutAll_WhenOriginAndRefererAreMissing_ShouldReturnForbiddenResponseErrorJson()
+    public async Task LogoutAll_WhenOriginAndRefererAreMissing_ShouldPropagateForbiddenException()
     {
         var userId = Guid.NewGuid();
         var useCase = new SpyLogoutAllSessionsUseCase();
@@ -584,13 +725,38 @@ public sealed class AuthControllerIntegrationTests
             ],
             csrfRequestValidator: CreateCsrfRequestValidator("https://app.authcore.dev"));
 
-        var result = await controller.LogoutAll(useCase, CreateServiceProvider(authCookieOptions));
+        var exception = await Assert.ThrowsAsync<ForbiddenException>(() =>
+            controller.LogoutAll(useCase, authCookieOptions));
 
-        var forbiddenResult = Assert.IsType<ObjectResult>(result);
-        var response = Assert.IsType<ResponseErrorJson>(forbiddenResult.Value);
+        Assert.Equal("A origem da requisição não é permitida.", exception.Message);
+        Assert.Null(useCase.LastCommand);
+    }
 
-        Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
-        Assert.Equal(["A origem da requisição não é permitida."], response.Errors);
+    [Fact]
+    public async Task LogoutAll_WhenCsrfHeaderIsMissing_ShouldThrowForbiddenExceptionWithoutCallingUseCase()
+    {
+        var userId = Guid.NewGuid();
+        var useCase = new SpyLogoutAllSessionsUseCase();
+        var authCookieOptions = Options.Create(new AuthCookieOptions
+        {
+            SessionCookieName = "sid",
+            Secure = false
+        });
+        var controller = CreateSessionController(
+            [
+                new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
+                new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
+            ],
+            csrfRequestValidator: CreateSignedCsrfRequestValidator(authCookieOptions));
+        var csrfToken = CreateCsrfToken("session-123");
+
+        controller.Request.Headers.Origin = "https://app.authcore.dev";
+        SetRequestCookies(controller.HttpContext, ("sid", "session-123"), ("XSRF-TOKEN", csrfToken));
+
+        var exception = await Assert.ThrowsAsync<ForbiddenException>(() =>
+            controller.LogoutAll(useCase, authCookieOptions));
+
+        Assert.Equal("O token CSRF informado e invalido.", exception.Message);
         Assert.Null(useCase.LastCommand);
     }
 
@@ -622,13 +788,13 @@ public sealed class AuthControllerIntegrationTests
 
         controller.HttpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("127.0.0.1");
 
-        _ = await controller.Login(useCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
+        _ = await controller.Login(useCase, authCookieOptions, new RequestSessionLoginJson
         {
             Email = "blocked@authcore.dev",
             Password = "ValidPassword#2026"
         });
 
-        var blockedResult = await controller.Login(useCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
+        var blockedResult = await controller.Login(useCase, authCookieOptions, new RequestSessionLoginJson
         {
             Email = "blocked@authcore.dev",
             Password = "ValidPassword#2026"
@@ -693,12 +859,14 @@ public sealed class AuthControllerIntegrationTests
         {
             ["Authentication:Jwt:Issuer"] = "authcore-tests",
             ["Authentication:Jwt:Audience"] = "authcore-tests",
-            ["Authentication:Jwt:SigningKey"] = "12345678901234567890123456789012",
-            ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "15",
+            ["Authentication:Jwt:SigningKey"] = "AuthCore-Tests-SigningKey-2026-Strong!",
+            ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "5",
             ["Authentication:Jwt:RefreshTokenLifetimeDays"] = "7",
             ["Authentication:Jwt:ClockSkewSeconds"] = "60",
             ["Auth:Cookie:SessionCookieName"] = "sid",
+            ["Auth:Cookie:AccessTokenCookieName"] = "at",
             ["Auth:Cookie:Secure"] = "false",
+            ["Auth:Csrf:SigningKey"] = "tests-csrf-signing-key-2026",
             ["ReverseProxy:KnownProxies:0"] = "10.0.0.10",
             ["ReverseProxy:KnownNetworks:0"] = "10.10.0.0/24",
             ["ReverseProxy:ForwardLimit"] = "3"
@@ -727,12 +895,14 @@ public sealed class AuthControllerIntegrationTests
         {
             ["Authentication:Jwt:Issuer"] = "authcore-tests",
             ["Authentication:Jwt:Audience"] = "authcore-tests",
-            ["Authentication:Jwt:SigningKey"] = "12345678901234567890123456789012",
-            ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "15",
+            ["Authentication:Jwt:SigningKey"] = "AuthCore-Tests-SigningKey-2026-Strong!",
+            ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "5",
             ["Authentication:Jwt:RefreshTokenLifetimeDays"] = "7",
             ["Authentication:Jwt:ClockSkewSeconds"] = "60",
             ["Auth:Cookie:SessionCookieName"] = "sid",
-            ["Auth:Cookie:Secure"] = "false"
+            ["Auth:Cookie:AccessTokenCookieName"] = "at",
+            ["Auth:Cookie:Secure"] = "false",
+            ["Auth:Csrf:SigningKey"] = "tests-csrf-signing-key-2026"
         });
 
         builder.Services.AddControllers()
@@ -755,6 +925,7 @@ public sealed class AuthControllerIntegrationTests
         Assert.Contains("api/auth/token/login", actions);
         Assert.Contains("api/auth/token/refresh", actions);
         Assert.Contains("api/auth/token/logout", actions);
+        Assert.Contains("api/auth/session/refresh", actions);
         Assert.Contains("api/auth/session/me", actions);
         Assert.Contains("api/auth/session/logout", actions);
         Assert.Contains("api/auth/session/sessions", actions);
@@ -773,7 +944,7 @@ public sealed class AuthControllerIntegrationTests
 
     private static AuthController CreateAuthController()
     {
-        return new AuthController(NullLogger<AuthController>.Instance)
+        return new AuthController
         {
             ControllerContext = new ControllerContext
             {
@@ -788,6 +959,14 @@ public sealed class AuthControllerIntegrationTests
         ILoginRateLimiter? loginRateLimiter = null)
     {
         var httpContext = new DefaultHttpContext();
+        httpContext.RequestServices = new ServiceCollection()
+            .AddSingleton(Options.Create(new CsrfOptions
+            {
+                CookieName = "XSRF-TOKEN",
+                HeaderName = "X-CSRF-TOKEN",
+                SigningKey = "tests-csrf-signing-key-2026"
+            }))
+            .BuildServiceProvider();
 
         if (claims is not null)
         {
@@ -797,7 +976,9 @@ public sealed class AuthControllerIntegrationTests
         }
 
         return new SessionAuthController(
+            new AuthenticatedSessionContext(httpContext.User),
             csrfRequestValidator ?? new AllowAllCsrfRequestValidator(),
+            new AllowAllCsrfTokenService(),
             loginRateLimiter ?? new AllowAllLoginRateLimiter(),
             NullLogger<SessionAuthController>.Instance)
         {
@@ -834,12 +1015,35 @@ public sealed class AuthControllerIntegrationTests
 
     private static ICsrfRequestValidator CreateCsrfRequestValidator(params string[] allowedOrigins)
     {
+        return new OriginOnlyCsrfRequestValidator(allowedOrigins);
+    }
+
+    private static ICsrfRequestValidator CreateSignedCsrfRequestValidator(IOptions<AuthCookieOptions> authCookieOptions)
+    {
+        var csrfOptions = CreateCsrfOptions();
+        var csrfTokenService = new CookieCsrfTokenService(csrfOptions);
+
         return new CookieCsrfRequestValidator(
             NullLogger<CookieCsrfRequestValidator>.Instance,
-            Options.Create(new CsrfOptions
-            {
-                AllowedOrigins = allowedOrigins
-            }));
+            csrfOptions,
+            authCookieOptions,
+            csrfTokenService);
+    }
+
+    private static string CreateCsrfToken(string sessionId)
+    {
+        return new CookieCsrfTokenService(CreateCsrfOptions()).Generate(sessionId);
+    }
+
+    private static IOptions<CsrfOptions> CreateCsrfOptions()
+    {
+        return Options.Create(new CsrfOptions
+        {
+            AllowedOrigins = ["https://app.authcore.dev"],
+            CookieName = "XSRF-TOKEN",
+            HeaderName = "X-CSRF-TOKEN",
+            SigningKey = "tests-csrf-signing-key-2026"
+        });
     }
 
     private static ILoginRateLimiter CreateLoginRateLimiter(LoginRateLimitOptions options)
@@ -849,11 +1053,13 @@ public sealed class AuthControllerIntegrationTests
             Options.Create(options));
     }
 
-    private static IServiceProvider CreateServiceProvider(IOptions<AuthCookieOptions> authCookieOptions)
+    private static void SetRequestCookies(HttpContext httpContext, params (string Name, string Value)[] cookies)
     {
-        return new ServiceCollection()
-            .AddSingleton(authCookieOptions)
-            .BuildServiceProvider();
+        var cookieDictionary = cookies.ToDictionary(cookie => cookie.Name, cookie => cookie.Value, StringComparer.Ordinal);
+        var cookieHeader = string.Join("; ", cookieDictionary.Select(cookie => $"{cookie.Key}={cookie.Value}"));
+
+        httpContext.Request.Headers.Cookie = cookieHeader;
+        httpContext.Features.Set<IRequestCookiesFeature>(new StaticRequestCookiesFeature(cookieDictionary));
     }
 
     private sealed class SpyLoginSessionUseCase : ILoginSessionUseCase
@@ -1019,6 +1225,19 @@ public sealed class AuthControllerIntegrationTests
         }
     }
 
+    private sealed class SpyRefreshBrowserSessionUseCase : IRefreshBrowserSessionUseCase
+    {
+        public RefreshBrowserSessionCommand? LastCommand { get; private set; }
+
+        public RefreshedSessionAccessResult Result { get; set; } = new();
+
+        public Task<RefreshedSessionAccessResult> Execute(RefreshBrowserSessionCommand command)
+        {
+            LastCommand = command;
+            return Task.FromResult(Result);
+        }
+    }
+
     private sealed class SpyRevokeUserSessionUseCase : IRevokeUserSessionUseCase
     {
         public RevokeUserSessionCommand? LastCommand { get; private set; }
@@ -1066,6 +1285,50 @@ public sealed class AuthControllerIntegrationTests
         }
     }
 
+    private sealed class AllowAllCsrfTokenService : ICsrfTokenService
+    {
+        public string Generate(string sessionId)
+        {
+            return "csrf-token";
+        }
+
+        public bool IsValid(string sessionId, string token)
+        {
+            return true;
+        }
+    }
+
+    private sealed class OriginOnlyCsrfRequestValidator : ICsrfRequestValidator
+    {
+        private readonly HashSet<string> _allowedOrigins;
+
+        public OriginOnlyCsrfRequestValidator(IEnumerable<string> allowedOrigins)
+        {
+            _allowedOrigins = allowedOrigins
+                .Select(origin => origin.Trim())
+                .Where(origin => !string.IsNullOrWhiteSpace(origin))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public void Validate(HttpRequest request)
+        {
+            var origin = request.Headers.Origin.ToString();
+
+            if (!string.IsNullOrWhiteSpace(origin) && _allowedOrigins.Contains(origin))
+                return;
+
+            var referer = request.Headers.Referer.ToString();
+
+            if (Uri.TryCreate(referer, UriKind.Absolute, out var refererUri)
+                && _allowedOrigins.Contains(refererUri.GetLeftPart(UriPartial.Authority)))
+            {
+                return;
+            }
+
+            throw new ForbiddenException("A origem da requisição não é permitida.");
+        }
+    }
+
     private sealed class AllowAllLoginRateLimiter : ILoginRateLimiter
     {
         public Task<LoginRateLimitResult> TryAcquireAsync(string? ipAddress, string? email)
@@ -1089,6 +1352,52 @@ public sealed class AuthControllerIntegrationTests
         public override DateTimeOffset GetUtcNow()
         {
             return _utcNow;
+        }
+    }
+
+    private sealed class StaticRequestCookiesFeature : IRequestCookiesFeature
+    {
+        public StaticRequestCookiesFeature(IDictionary<string, string> cookies)
+        {
+            Cookies = new StaticRequestCookieCollection(cookies);
+        }
+
+        public IRequestCookieCollection Cookies { get; set; }
+    }
+
+    private sealed class StaticRequestCookieCollection : IRequestCookieCollection
+    {
+        private readonly Dictionary<string, string> _cookies;
+
+        public StaticRequestCookieCollection(IDictionary<string, string> cookies)
+        {
+            _cookies = new Dictionary<string, string>(cookies, StringComparer.Ordinal);
+        }
+
+        public string this[string key] => _cookies.TryGetValue(key, out var value) ? value : string.Empty;
+
+        public int Count => _cookies.Count;
+
+        public ICollection<string> Keys => _cookies.Keys;
+
+        public bool ContainsKey(string key)
+        {
+            return _cookies.ContainsKey(key);
+        }
+
+        public IEnumerator<KeyValuePair<string, string>> GetEnumerator()
+        {
+            return _cookies.GetEnumerator();
+        }
+
+        public bool TryGetValue(string key, out string value)
+        {
+            return _cookies.TryGetValue(key, out value!);
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
         }
     }
 

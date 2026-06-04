@@ -298,6 +298,46 @@ public sealed class OcelotRouteTests
     }
 
     [Fact]
+    public async Task SessionRefreshRoute_WhenRequestHasCookieAndNoJwt_ShouldForwardCookieToAuthCore()
+    {
+        string? forwardedCookie = null;
+        string? forwardedAuthorization = null;
+
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapPost("/api/auth/session/refresh", (HttpContext context) =>
+            {
+                forwardedCookie = context.Request.Headers.Cookie.ToString();
+                forwardedAuthorization = context.Request.Headers.Authorization.ToString();
+                return Results.NoContent();
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/auth/session/refresh",
+                "/api/auth/session/refresh",
+                "POST",
+                authCore),
+            CreateRoute(
+                "/api/auth/{everything}",
+                "/api/auth/{everything}",
+                "POST",
+                authCore)
+        ]));
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Cookie", "sid=session-123; XSRF-TOKEN=csrf-token");
+        httpClient.DefaultRequestHeaders.Add("X-CSRF-TOKEN", "csrf-token");
+
+        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}/api/auth/session/refresh", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal("sid=session-123; XSRF-TOKEN=csrf-token", forwardedCookie);
+        Assert.True(string.IsNullOrWhiteSpace(forwardedAuthorization));
+    }
+
+    [Fact]
     public async Task PublicUserRegistrationRoute_WhenRequestHasNoJwt_ShouldNotForwardToAuthCore()
     {
         var authCoreWasCalled = false;
@@ -421,7 +461,38 @@ public sealed class OcelotRouteTests
         ]));
 
         using var httpClient = new HttpClient();
-        httpClient.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(signingKey: "invalid-signing-key-000000000000000"));
+        httpClient.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(signingKey: "Invalid-Gateway-SigningKey-2026-Strong!"));
+
+        using var response = await httpClient.GetAsync($"{GetAddress(gateway)}/api/users/profile");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.False(downstreamWasCalled);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenRequestHasInvalidAudience_ShouldReturnUnauthorized()
+    {
+        var downstreamWasCalled = false;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/users/profile", () =>
+            {
+                downstreamWasCalled = true;
+                return Results.Text("protected");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/profile",
+                "/api/users/profile",
+                "GET",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(audience: "wrong-audience"));
 
         using var response = await httpClient.GetAsync($"{GetAddress(gateway)}/api/users/profile");
 
@@ -531,7 +602,7 @@ public sealed class OcelotRouteTests
         {
             ["Authentication:Jwt:Issuer"] = "authcore-tests",
             ["Authentication:Jwt:Audience"] = "authcore-tests",
-            ["Authentication:Jwt:SigningKey"] = "12345678901234567890123456789012",
+            ["Authentication:Jwt:SigningKey"] = "Gateway-Tests-SigningKey-2026-Strong!",
             ["Authentication:Jwt:ClockSkewSeconds"] = "60",
             ["Authentication:Jwt:RequireHttpsMetadata"] = "false",
             ["GlobalConfiguration:BaseUrl"] = "http://localhost:8080"
@@ -686,7 +757,7 @@ public sealed class OcelotRouteTests
     private static string CreateAccessToken(
         string issuer = "authcore-tests",
         string audience = "authcore-tests",
-        string signingKey = "12345678901234567890123456789012")
+        string signingKey = "Gateway-Tests-SigningKey-2026-Strong!")
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);

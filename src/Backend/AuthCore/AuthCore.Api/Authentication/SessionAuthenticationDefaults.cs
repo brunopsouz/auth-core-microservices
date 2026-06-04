@@ -23,6 +23,11 @@ public static class SessionAuthenticationDefaults
     public const string SessionIdClaimType = "sid";
 
     /// <summary>
+    /// Tipo de claim com o identificador publico da sessao.
+    /// </summary>
+    public const string PublicSessionIdClaimType = "public_sid";
+
+    /// <summary>
     /// Tipo de claim com o status funcional do usuário.
     /// </summary>
     public const string UserStatusClaimType = AuthTokenClaimTypes.UserStatus;

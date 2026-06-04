@@ -22,4 +22,9 @@ public interface ISessionService
     /// <param name="referenceAtUtc">Instante de referência em UTC.</param>
     /// <returns>Data de expiração em UTC.</returns>
     DateTime GetSlidingExpiresAtUtc(DateTime referenceAtUtc);
+    /// <summary>
+    /// Operação para obter o intervalo minimo entre atualizações do ultimo uso da sessão.
+    /// </summary>
+    /// <returns>Intervalo minimo de atualização.</returns>
+    TimeSpan GetLastSeenUpdateInterval();
 }

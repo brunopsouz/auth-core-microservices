@@ -8,29 +8,18 @@ using Microsoft.AspNetCore.Mvc;
 namespace AuthCore.Api.Controllers;
 
 /// <summary>
-/// Representa controller responsável pelas operações de autenticação.
+/// Representa controller responsavel pelas operacoes de autenticacao.
 /// </summary>
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController : AuthControllerBase
+public sealed class AuthController : ControllerBase
 {
-
     /// <summary>
-    /// Operação para criar instância da classe.
+    /// Operacao para registrar um usuario pendente de verificacao.
     /// </summary>
-    /// <param name="logger">Logger do fluxo de autenticação.</param>
-    public AuthController(ILogger<AuthController> logger)
-        : base(logger)
-    {
-    }
-
-
-    /// <summary>
-    /// Operação para registrar um usuário pendente de verificação.
-    /// </summary>
-    /// <param name="useCase">Caso de uso responsável pelo registro do usuário.</param>
-    /// <param name="request">Dados da requisição de registro.</param>
-    /// <returns>Resposta com os dados do usuário registrado.</returns>
+    /// <param name="useCase">Caso de uso responsavel pelo registro do usuario.</param>
+    /// <param name="request">Dados da requisicao de registro.</param>
+    /// <returns>Resposta com os dados do usuario registrado.</returns>
     [HttpPost("register")]
     [ProducesResponseType(typeof(ResponseRegisteredUserJson), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ResponseErrorJson), StatusCodes.Status400BadRequest)]
@@ -58,11 +47,11 @@ public sealed class AuthController : AuthControllerBase
     }
 
     /// <summary>
-    /// Operação para validar o código OTP de verificação de e-mail.
+    /// Operacao para validar o codigo OTP de verificacao de e-mail.
     /// </summary>
-    /// <param name="useCase">Caso de uso responsável pela validação do e-mail.</param>
-    /// <param name="request">Dados da requisição de validação.</param>
-    /// <returns>Resposta sem conteúdo após a confirmação do e-mail.</returns>
+    /// <param name="useCase">Caso de uso responsavel pela validacao do e-mail.</param>
+    /// <param name="request">Dados da requisicao de validacao.</param>
+    /// <returns>Resposta sem conteudo apos a confirmacao do e-mail.</returns>
     [HttpPost("verify-email")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ResponseErrorJson), StatusCodes.Status400BadRequest)]
@@ -80,11 +69,11 @@ public sealed class AuthController : AuthControllerBase
     }
 
     /// <summary>
-    /// Operação para reenviar a verificação de e-mail pendente.
+    /// Operacao para reenviar a verificacao de e-mail pendente.
     /// </summary>
-    /// <param name="useCase">Caso de uso responsável pelo reenvio.</param>
-    /// <param name="request">Dados da requisição de reenvio.</param>
-    /// <returns>Resposta sem conteúdo após o reenvio.</returns>
+    /// <param name="useCase">Caso de uso responsavel pelo reenvio.</param>
+    /// <param name="request">Dados da requisicao de reenvio.</param>
+    /// <returns>Resposta sem conteudo apos o reenvio.</returns>
     [HttpPost("resend-verification")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult> ResendVerification(

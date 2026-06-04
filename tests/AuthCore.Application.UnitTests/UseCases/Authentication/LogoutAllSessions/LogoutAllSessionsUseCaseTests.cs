@@ -7,36 +7,31 @@ namespace AuthCore.Application.UnitTests.UseCases.Authentication.LogoutAllSessio
 public sealed class LogoutAllSessionsUseCaseTests
 {
     [Fact]
-    public async Task Execute_WhenUserHasSessions_ShouldRevokeAllUserSessions()
+    public async Task Execute_WhenUserHasSessions_ShouldRevokeDurableSessionsAndInvalidateCache()
     {
+        var durableSessionRepository = new FakeDurableSessionRepository();
         var sessionStore = new FakeSessionStore();
-        var useCase = new LogoutAllSessionsUseCase(sessionStore);
+        var useCase = new LogoutAllSessionsUseCase(durableSessionRepository, sessionStore);
         var userId = Guid.NewGuid();
-        sessionStore.Store(Session.Restore(
-            "session-1",
-            userId,
-            new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Utc),
-            new DateTime(2026, 4, 18, 12, 0, 0, DateTimeKind.Utc),
-            new DateTime(2026, 4, 18, 10, 15, 0, DateTimeKind.Utc),
-            "127.0.0.1",
-            "Browser A",
-            null));
-        sessionStore.Store(Session.Restore(
-            "session-2",
-            userId,
-            new DateTime(2026, 4, 18, 11, 0, 0, DateTimeKind.Utc),
-            new DateTime(2026, 4, 18, 13, 0, 0, DateTimeKind.Utc),
-            new DateTime(2026, 4, 18, 11, 15, 0, DateTimeKind.Utc),
-            "127.0.0.2",
-            "Browser B",
-            null));
+        var firstSession = Session.Issue(userId, DateTime.UtcNow.AddMinutes(30), "127.0.0.1", "Browser A");
+        var secondSession = Session.Issue(userId, DateTime.UtcNow.AddMinutes(30), "127.0.0.2", "Browser B");
+
+        durableSessionRepository.Store(firstSession);
+        durableSessionRepository.Store(secondSession);
+        sessionStore.Store(firstSession);
+        sessionStore.Store(secondSession);
 
         await useCase.Execute(new LogoutAllSessionsCommand
         {
             UserId = userId
         });
 
+        var updatedSessions = durableSessionRepository.UpdatedSessions;
+
+        Assert.Equal(2, updatedSessions.Count);
+        Assert.All(updatedSessions, session => Assert.Equal(SessionRevocationReason.UserLogout, session.RevocationReason));
         Assert.Equal([userId], sessionStore.RevokedAllUserIds);
-        Assert.Empty(await sessionStore.ListByUserIdAsync(userId));
+        Assert.Contains(firstSession.SessionId, sessionStore.RevokedSessionIds);
+        Assert.Contains(secondSession.SessionId, sessionStore.RevokedSessionIds);
     }
 }

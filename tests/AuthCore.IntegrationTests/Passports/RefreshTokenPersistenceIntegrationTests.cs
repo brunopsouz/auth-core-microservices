@@ -53,6 +53,7 @@ public sealed class RefreshTokenPersistenceIntegrationTests : IClassFixture<Post
         Assert.Equal(user.Id, persistedUser!.Id);
         Assert.Equal(user.UserIdentifier, persistedUser.UserIdentifier);
         Assert.Equal(user.Email.Value, persistedUser.Email.Value);
+        Assert.Equal(user.SecurityStamp, persistedUser.SecurityStamp);
 
         var initialToken = RefreshToken.IssueInitial(user.Id, " hash-inicial ", nowUtc.AddDays(7));
         await refreshTokenRepository.AddAsync(initialToken);

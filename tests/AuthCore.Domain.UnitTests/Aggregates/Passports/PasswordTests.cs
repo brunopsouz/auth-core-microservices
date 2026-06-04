@@ -109,4 +109,23 @@ public class PasswordTests
 
         Assert.Throws<DomainException>(() => password.ResetLoginAttempts(PasswordStatus.Blocked));
     }
+
+    /// <summary>
+    /// Verifica se a troca da senha preserva as invariantes e limpa o histórico de falhas.
+    /// </summary>
+    [Fact]
+    public void Change_WhenCalledWithValidState_ShouldResetAttemptsAndApplyNewStatus()
+    {
+        var password = Password.Create(Guid.NewGuid(), "hashed-password", PasswordStatus.Active);
+
+        for (var index = 0; index < 3; index++)
+            password = password.RegisterLoginFailure();
+
+        var updatedPassword = password.Change("new-hashed-password", PasswordStatus.Active);
+
+        Assert.Equal("new-hashed-password", updatedPassword.Value);
+        Assert.Equal(PasswordStatus.Active, updatedPassword.Status);
+        Assert.Equal(0, updatedPassword.LoginAttempt.FailedAttempts);
+        Assert.False(updatedPassword.IsLocked());
+    }
 }

@@ -5,6 +5,7 @@ using AuthCore.Application.UseCases.Authentication.LogoutCurrentSession;
 using AuthCore.Application.UseCases.Authentication.LogoutSession;
 using AuthCore.Application.UseCases.Authentication.GetUserSessions;
 using AuthCore.Application.UseCases.Authentication.RefreshSession;
+using AuthCore.Application.UseCases.Authentication.RefreshBrowserSession;
 using AuthCore.Application.UseCases.Authentication.ResendVerification;
 using AuthCore.Application.UseCases.Authentication.RevokeUserSession;
 using AuthCore.Application.UseCases.Authentication.VerifyEmail;
@@ -39,6 +40,7 @@ public static class ApplicationDependencyInjection
         services.AddScoped<IRevokeUserSessionUseCase, RevokeUserSessionUseCase>();
         services.AddScoped<ILogoutAllSessionsUseCase, LogoutAllSessionsUseCase>();
         services.AddScoped<IRefreshSessionUseCase, RefreshSessionUseCase>();
+        services.AddScoped<IRefreshBrowserSessionUseCase, RefreshBrowserSessionUseCase>();
         services.AddScoped<IVerifyEmailUseCase, VerifyEmailUseCase>();
         services.AddScoped<IResendVerificationUseCase, ResendVerificationUseCase>();
         services.AddScoped<IRegisterUserUseCase, RegisterUserUseCase>();

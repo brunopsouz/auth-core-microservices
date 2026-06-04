@@ -11,6 +11,16 @@ public sealed class AuthenticatedUserSessionResult
     public string SessionId { get; init; } = string.Empty;
 
     /// <summary>
+    /// Access token JWT emitido para a sessao.
+    /// </summary>
+    public string AccessToken { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Data de expiracao do access token em UTC.
+    /// </summary>
+    public DateTime AccessTokenExpiresAtUtc { get; init; }
+
+    /// <summary>
     /// Identificador público do usuário autenticado.
     /// </summary>
     public Guid UserIdentifier { get; init; }

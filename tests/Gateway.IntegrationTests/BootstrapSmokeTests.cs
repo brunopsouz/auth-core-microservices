@@ -93,14 +93,31 @@ public sealed class BootstrapSmokeTests
         await app.StopAsync();
     }
 
-    private static IConfiguration CreateGatewayConfiguration()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("short-key")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("QUJDREVGR0hJSktMTU5PUFFSU1RVVldY")]
+    public void AddGateway_WhenJwtSigningKeyIsInsecure_ShouldFailFast(string? signingKey)
+    {
+        var builder = WebApplication.CreateBuilder();
+
+        builder.Configuration.AddConfiguration(CreateGatewayConfiguration(signingKey));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddGateway(builder.Configuration));
+
+        Assert.Contains("JWT", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IConfiguration CreateGatewayConfiguration(string? signingKey = "Gateway-Tests-SigningKey-2026-Strong!")
     {
         return new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Authentication:Jwt:Issuer"] = "authcore-tests",
                 ["Authentication:Jwt:Audience"] = "authcore-tests",
-                ["Authentication:Jwt:SigningKey"] = "12345678901234567890123456789012",
+                ["Authentication:Jwt:SigningKey"] = signingKey,
                 ["Authentication:Jwt:ClockSkewSeconds"] = "60",
                 ["Authentication:Jwt:RequireHttpsMetadata"] = "false",
                 ["Routes:0:UpstreamPathTemplate"] = "/__unused",

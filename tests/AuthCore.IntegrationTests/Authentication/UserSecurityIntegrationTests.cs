@@ -56,6 +56,7 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         await using var provider = BuildApplicationServiceProvider(_fixture.DatabaseConnectionString);
         await using var scope = provider.CreateAsyncScope();
         var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var durableSessionRepository = scope.ServiceProvider.GetRequiredService<IDurableSessionRepository>();
         var passwordRepository = scope.ServiceProvider.GetRequiredService<IPasswordRepository>();
         var refreshTokenRepository = scope.ServiceProvider.GetRequiredService<IRefreshTokenRepository>();
         var passwordEncripter = scope.ServiceProvider.GetRequiredService<IPasswordEncripter>();
@@ -65,11 +66,14 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         var newPassword = "NewPassword#2026";
         var user = CreateVerifiedUser($"change-password.{Guid.NewGuid():N}@authcore.dev");
         var anotherUser = CreateVerifiedUser($"other-change-password.{Guid.NewGuid():N}@authcore.dev");
+        var previousSecurityStamp = user.SecurityStamp;
         var password = Password.Create(user.Id, passwordEncripter.Encrypt(currentPassword), PasswordStatus.Active);
         var activeToken = RefreshToken.IssueInitial(user.Id, $"active-hash-{Guid.NewGuid():N}", nowUtc.AddDays(7));
         var consumedToken = RefreshToken.IssueInitial(user.Id, $"consumed-hash-{Guid.NewGuid():N}", nowUtc.AddDays(7))
             .Consume(Guid.NewGuid(), nowUtc.AddMinutes(-10));
         var otherUserToken = RefreshToken.IssueInitial(anotherUser.Id, $"other-user-hash-{Guid.NewGuid():N}", nowUtc.AddDays(7));
+        var activeSession = Session.Issue(user.Id, user.SecurityStamp, nowUtc.AddDays(7), "127.0.0.1", "Browser A");
+        var anotherUserSession = Session.Issue(anotherUser.Id, anotherUser.SecurityStamp, nowUtc.AddDays(7), "127.0.0.2", "Browser B");
 
         await userRepository.AddAsync(user);
         await userRepository.AddAsync(anotherUser);
@@ -77,6 +81,8 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         await refreshTokenRepository.AddAsync(activeToken);
         await refreshTokenRepository.AddAsync(consumedToken);
         await refreshTokenRepository.AddAsync(otherUserToken);
+        await durableSessionRepository.AddAsync(activeSession);
+        await durableSessionRepository.AddAsync(anotherUserSession);
 
         await useCase.Execute(new ChangePasswordCommand
         {
@@ -87,13 +93,18 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         });
 
         var updatedPassword = await passwordRepository.GetByUserIdAsync(user.Id);
+        var updatedUser = await scope.ServiceProvider.GetRequiredService<IUserReadRepository>().GetByUserIdentifierAsync(user.UserIdentifier);
         var persistedActiveToken = await refreshTokenRepository.GetByHashAsync(activeToken.TokenHash);
         var persistedConsumedToken = await refreshTokenRepository.GetByHashAsync(consumedToken.TokenHash);
         var persistedOtherUserToken = await refreshTokenRepository.GetByHashAsync(otherUserToken.TokenHash);
+        var persistedActiveSession = await durableSessionRepository.GetByPublicSessionIdAsync(activeSession.PublicSessionId);
+        var persistedAnotherUserSession = await durableSessionRepository.GetByPublicSessionIdAsync(anotherUserSession.PublicSessionId);
 
         Assert.NotNull(updatedPassword);
+        Assert.NotNull(updatedUser);
         Assert.True(passwordEncripter.IsValid(newPassword, updatedPassword!.Value));
         Assert.Equal(PasswordStatus.Active, updatedPassword.Status);
+        Assert.NotEqual(previousSecurityStamp, updatedUser!.SecurityStamp);
         Assert.NotNull(persistedActiveToken);
         Assert.Equal("password-changed", persistedActiveToken!.RevocationReason);
         Assert.NotNull(persistedActiveToken.RevokedAtUtc);
@@ -101,6 +112,11 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         Assert.Null(persistedConsumedToken!.RevokedAtUtc);
         Assert.NotNull(persistedOtherUserToken);
         Assert.Null(persistedOtherUserToken!.RevokedAtUtc);
+        Assert.NotNull(persistedActiveSession);
+        Assert.Equal(SessionStatus.Revoked, persistedActiveSession!.Status);
+        Assert.Equal(SessionRevocationReason.PasswordChanged, persistedActiveSession.RevocationReason);
+        Assert.NotNull(persistedAnotherUserSession);
+        Assert.Equal(SessionStatus.Active, persistedAnotherUserSession!.Status);
     }
 
     /// <summary>
@@ -327,8 +343,8 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
                 ["Database:Migrations:AdminDatabase"] = "postgres",
                 ["Authentication:Jwt:Issuer"] = "authcore-tests",
                 ["Authentication:Jwt:Audience"] = "authcore-tests",
-                ["Authentication:Jwt:SigningKey"] = "12345678901234567890123456789012",
-                ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "15",
+                ["Authentication:Jwt:SigningKey"] = "AuthCore-Tests-SigningKey-2026-Strong!",
+                ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "5",
                 ["Authentication:Jwt:RefreshTokenLifetimeDays"] = "7",
                 ["Authentication:Jwt:ClockSkewSeconds"] = "60",
                 ["Redis:ConnectionString"] = "localhost:6379",

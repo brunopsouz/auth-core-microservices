@@ -50,4 +50,13 @@ internal sealed class SessionService : ISessionService
     {
         return referenceAtUtc.AddMinutes(_sessionOptions.TtlMinutes);
     }
+
+    /// <summary>
+    /// Operacao para obter o intervalo minimo entre atualizacoes de ultimo uso.
+    /// </summary>
+    /// <returns>Intervalo minimo de atualizacao.</returns>
+    public TimeSpan GetLastSeenUpdateInterval()
+    {
+        return TimeSpan.FromSeconds(_sessionOptions.LastSeenUpdateIntervalSeconds);
+    }
 }

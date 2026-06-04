@@ -33,8 +33,8 @@ internal sealed class JwtOptions
     /// <summary>
     /// Tempo de vida do access token em minutos.
     /// </summary>
-    [Range(1, 1440)]
-    public int AccessTokenLifetimeMinutes { get; init; } = 15;
+    [Range(1, 5)]
+    public int AccessTokenLifetimeMinutes { get; init; } = 5;
 
     /// <summary>
     /// Tempo de vida do refresh token em dias.

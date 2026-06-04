@@ -8,55 +8,48 @@ namespace AuthCore.Application.UnitTests.UseCases.Authentication.RevokeUserSessi
 public sealed class RevokeUserSessionUseCaseTests
 {
     [Fact]
-    public async Task Execute_WhenSessionBelongsToAuthenticatedUser_ShouldRevokeSession()
+    public async Task Execute_WhenSessionBelongsToAuthenticatedUser_ShouldRevokeDurableSessionAndInvalidateCache()
     {
+        var durableSessionRepository = new FakeDurableSessionRepository();
         var sessionStore = new FakeSessionStore();
-        var useCase = new RevokeUserSessionUseCase(sessionStore);
+        var useCase = new RevokeUserSessionUseCase(durableSessionRepository, sessionStore);
         var userId = Guid.NewGuid();
-        var session = Session.Restore(
-            "session-123",
-            userId,
-            new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Utc),
-            new DateTime(2026, 4, 18, 12, 0, 0, DateTimeKind.Utc),
-            new DateTime(2026, 4, 18, 10, 15, 0, DateTimeKind.Utc),
-            "127.0.0.1",
-            "Browser A",
-            null);
+        var session = Session.Issue(userId, DateTime.UtcNow.AddMinutes(30), "127.0.0.1", "Browser A");
+
+        durableSessionRepository.Store(session);
         sessionStore.Store(session);
 
         await useCase.Execute(new RevokeUserSessionCommand
         {
             UserId = userId,
-            SessionId = session.SessionId
+            SessionId = session.PublicSessionId
         });
 
+        var updatedSession = Assert.Single(durableSessionRepository.UpdatedSessions);
+
+        Assert.Equal(SessionRevocationReason.UserRevokedDevice, updatedSession.RevocationReason);
         Assert.Equal([session.SessionId], sessionStore.RevokedSessionIds);
-        Assert.Null(await sessionStore.GetByIdAsync(session.SessionId));
     }
 
     [Fact]
     public async Task Execute_WhenSessionDoesNotBelongToAuthenticatedUser_ShouldThrowNotFoundException()
     {
+        var durableSessionRepository = new FakeDurableSessionRepository();
         var sessionStore = new FakeSessionStore();
-        var useCase = new RevokeUserSessionUseCase(sessionStore);
-        var storedSession = Session.Restore(
-            "session-123",
-            Guid.NewGuid(),
-            new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Utc),
-            new DateTime(2026, 4, 18, 12, 0, 0, DateTimeKind.Utc),
-            new DateTime(2026, 4, 18, 10, 15, 0, DateTimeKind.Utc),
-            "127.0.0.1",
-            "Browser A",
-            null);
+        var useCase = new RevokeUserSessionUseCase(durableSessionRepository, sessionStore);
+        var storedSession = Session.Issue(Guid.NewGuid(), DateTime.UtcNow.AddMinutes(30), "127.0.0.1", "Browser A");
+
+        durableSessionRepository.Store(storedSession);
         sessionStore.Store(storedSession);
 
         var exception = await Assert.ThrowsAsync<NotFoundException>(() => useCase.Execute(new RevokeUserSessionCommand
         {
             UserId = Guid.NewGuid(),
-            SessionId = storedSession.SessionId
+            SessionId = storedSession.PublicSessionId
         }));
 
         Assert.Equal("A sessão informada não foi encontrada para o usuário.", exception.Message);
         Assert.Empty(sessionStore.RevokedSessionIds);
+        Assert.Empty(durableSessionRepository.UpdatedSessions);
     }
 }

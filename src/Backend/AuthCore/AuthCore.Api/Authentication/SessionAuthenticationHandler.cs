@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Users.Repositories;
@@ -88,7 +89,19 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
         if (user is null)
             return AuthenticateResult.Fail("O usuário autenticado não está disponível.");
 
-        if (_sessionService.UseSlidingExpiration && user.CanSignIn)
+        if (!user.CanSignIn)
+            return AuthenticateResult.Fail("O usuario autenticado nao pode autenticar no momento.");
+
+        try
+        {
+            session.EnsureCanIssueAccessToken(nowUtc, user.SecurityStamp);
+        }
+        catch (DomainException exception)
+        {
+            return AuthenticateResult.Fail(exception.Message);
+        }
+
+        if (_sessionService.UseSlidingExpiration)
         {
             session = session.Touch(nowUtc, _sessionService.GetSlidingExpiresAtUtc(nowUtc));
             await _sessionStore.SaveAsync(session);
@@ -104,6 +117,7 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
             new("user_identifier", user.UserIdentifier.ToString()),
             new(SessionAuthenticationDefaults.InternalUserIdClaimType, user.Id.ToString()),
             new(SessionAuthenticationDefaults.SessionIdClaimType, session.SessionId),
+            new(SessionAuthenticationDefaults.PublicSessionIdClaimType, session.PublicSessionId),
             new(SessionAuthenticationDefaults.UserStatusClaimType, user.Status.ToString()),
             new(SessionAuthenticationDefaults.UserIsActiveClaimType, user.IsActive.ToString())
         };

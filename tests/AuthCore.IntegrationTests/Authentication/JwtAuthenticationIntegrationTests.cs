@@ -3,6 +3,7 @@ using System.Security.Claims;
 using AuthCore.Api;
 using AuthCore.Api.Controllers;
 using AuthCore.Application;
+using AuthCore.Domain.Passports;
 using AuthCore.Domain.Security.Tokens;
 using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Domain.Users;
@@ -74,12 +75,77 @@ public sealed class JwtAuthenticationIntegrationTests
         Assert.Equal(authenticatedUser.UserIdentifier.ToString(), authenticateResult.Principal!.FindFirstValue(ClaimTypes.NameIdentifier));
     }
 
+    /// <summary>
+    /// Verifica se a emissao com sessao inclui a claim sid e nao expõe o security stamp bruto.
+    /// </summary>
+    [Fact]
+    public async Task Generate_WhenSessionIsProvided_ShouldIncludeSidWithoutExposingSecurityStamp()
+    {
+        await using var app = BuildApplication();
+        await using var scope = app.Services.CreateAsyncScope();
+        var accessTokenGenerator = scope.ServiceProvider.GetRequiredService<IAccessTokenGenerator>();
+        var authenticatedUser = CreateVerifiedUser();
+        var session = Session.Issue(
+            authenticatedUser.Id,
+            authenticatedUser.SecurityStamp,
+            DateTime.UtcNow.AddHours(8),
+            "127.0.0.1",
+            "JwtIntegrationTests/1.0");
+
+        var accessTokenResult = accessTokenGenerator.Generate(authenticatedUser, session);
+        var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(accessTokenResult.Token);
+
+        Assert.Equal(session.SessionId, GetClaimValue(jwtToken.Claims, AuthTokenClaimTypes.SessionId));
+        Assert.DoesNotContain(jwtToken.Claims, claim => claim.Value == authenticatedUser.SecurityStamp.Value);
+        Assert.DoesNotContain(jwtToken.Claims, claim => claim.Type == "sst");
+    }
+
+    /// <summary>
+    /// Verifica se a expiracao curta configurada do access token e respeitada.
+    /// </summary>
+    [Fact]
+    public async Task Generate_WhenTokenIsIssued_ShouldRespectShortConfiguredExpiration()
+    {
+        await using var app = BuildApplication();
+        await using var scope = app.Services.CreateAsyncScope();
+        var accessTokenGenerator = scope.ServiceProvider.GetRequiredService<IAccessTokenGenerator>();
+        var authenticatedUser = CreateVerifiedUser();
+
+        var beforeGenerationUtc = DateTime.UtcNow;
+        var accessTokenResult = accessTokenGenerator.Generate(authenticatedUser);
+        var afterGenerationUtc = DateTime.UtcNow;
+
+        Assert.InRange(
+            accessTokenResult.ExpiresAtUtc,
+            beforeGenerationUtc.AddMinutes(5).AddSeconds(-5),
+            afterGenerationUtc.AddMinutes(5).AddSeconds(5));
+    }
+
+    /// <summary>
+    /// Verifica se a configuracao insegura do JWT falha cedo no bootstrap.
+    /// </summary>
+    /// <param name="signingKey">Chave de assinatura configurada.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("short-key")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("QUJDREVGR0hJSktMTU5PUFFSU1RVVldY")]
+    public void BuildApplication_WhenJwtSigningKeyIsInsecure_ShouldFailFast(string? signingKey)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => BuildApplication(signingKey: signingKey));
+
+        Assert.Contains("JWT", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
 
     /// <summary>
     /// Operação para criar a aplicação usada nos testes de autenticação.
     /// </summary>
     /// <returns>Aplicação com as dependências registradas.</returns>
-    private static WebApplication BuildApplication()
+    private static WebApplication BuildApplication(
+        string? signingKey = "AuthCore-Tests-SigningKey-2026-Strong!",
+        string accessTokenLifetimeMinutes = "5")
     {
         var builder = WebApplication.CreateBuilder();
 
@@ -91,10 +157,11 @@ public sealed class JwtAuthenticationIntegrationTests
             ["Database:Migrations:AdminDatabase"] = "postgres",
             ["Authentication:Jwt:Issuer"] = "authcore-tests",
             ["Authentication:Jwt:Audience"] = "authcore-tests",
-            ["Authentication:Jwt:SigningKey"] = "12345678901234567890123456789012",
-            ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "15",
+            ["Authentication:Jwt:SigningKey"] = signingKey,
+            ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = accessTokenLifetimeMinutes,
             ["Authentication:Jwt:RefreshTokenLifetimeDays"] = "7",
             ["Authentication:Jwt:ClockSkewSeconds"] = "60",
+            ["Auth:Csrf:SigningKey"] = "tests-csrf-signing-key-2026",
             ["Redis:ConnectionString"] = "localhost:6379",
             ["Redis:KeyPrefix"] = "authcore-tests",
             ["RabbitMq:Host"] = "localhost",

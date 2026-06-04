@@ -1,21 +1,31 @@
 using AuthCore.Application.UseCases.Authentication.Models;
-using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Enums;
+using AuthCore.Domain.Common.Exceptions;
+using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Security.Cryptography;
+using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 
 namespace AuthCore.Application.UseCases.Authentication.LoginSession;
 
 /// <summary>
-/// Representa caso de uso para autenticar um usuário por sessão.
+/// Representa caso de uso para autenticar um usuario por sessao.
 /// </summary>
 internal sealed class LoginSessionUseCase : ILoginSessionUseCase
 {
-    private const string INVALID_CREDENTIALS_MESSAGE = "As credenciais informadas são inválidas.";
+    private const string INVALID_CREDENTIALS_MESSAGE = "As credenciais informadas sao invalidas.";
 
+    /// <summary>
+    /// Campo que armazena access token generator.
+    /// </summary>
+    private readonly IAccessTokenGenerator _accessTokenGenerator;
+    /// <summary>
+    /// Campo que armazena durable session repository.
+    /// </summary>
+    private readonly IDurableSessionRepository _durableSessionRepository;
     /// <summary>
     /// Campo que armazena password encripter.
     /// </summary>
@@ -33,39 +43,61 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
     /// </summary>
     private readonly ISessionStore _sessionStore;
     /// <summary>
+    /// Campo que armazena unit of work.
+    /// </summary>
+    private readonly IUnitOfWork _unitOfWork;
+    /// <summary>
     /// Campo que armazena user read repository.
     /// </summary>
     private readonly IUserReadRepository _userReadRepository;
 
 
     /// <summary>
-    /// Operação para criar instância da classe.
+    /// Operacao para criar instancia da classe.
     /// </summary>
-    /// <param name="userReadRepository">Repositório de leitura de usuário.</param>
-    /// <param name="passwordRepository">Repositório de senha.</param>
-    /// <param name="passwordEncripter">Serviço de criptografia de senha.</param>
-    /// <param name="sessionStore">Store de sessão autenticada.</param>
-    /// <param name="sessionService">Serviço de cálculo de expiração da sessão.</param>
+    /// <param name="userReadRepository">Repositorio de leitura de usuario.</param>
+    /// <param name="passwordRepository">Repositorio de senha.</param>
+    /// <param name="passwordEncripter">Servico de criptografia de senha.</param>
+    /// <param name="durableSessionRepository">Repositorio duravel da sessao autenticada.</param>
+    /// <param name="sessionStore">Store de sessao autenticada.</param>
+    /// <param name="sessionService">Servico de calculo de expiracao da sessao.</param>
+    /// <param name="accessTokenGenerator">Gerador do access token curto.</param>
+    /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
     public LoginSessionUseCase(
         IUserReadRepository userReadRepository,
         IPasswordRepository passwordRepository,
         IPasswordEncripter passwordEncripter,
+        IDurableSessionRepository durableSessionRepository,
         ISessionStore sessionStore,
-        ISessionService sessionService)
+        ISessionService sessionService,
+        IAccessTokenGenerator accessTokenGenerator,
+        IUnitOfWork unitOfWork)
     {
+        ArgumentNullException.ThrowIfNull(userReadRepository);
+        ArgumentNullException.ThrowIfNull(passwordRepository);
+        ArgumentNullException.ThrowIfNull(passwordEncripter);
+        ArgumentNullException.ThrowIfNull(durableSessionRepository);
+        ArgumentNullException.ThrowIfNull(sessionStore);
+        ArgumentNullException.ThrowIfNull(sessionService);
+        ArgumentNullException.ThrowIfNull(accessTokenGenerator);
+        ArgumentNullException.ThrowIfNull(unitOfWork);
+
         _userReadRepository = userReadRepository;
         _passwordRepository = passwordRepository;
         _passwordEncripter = passwordEncripter;
+        _durableSessionRepository = durableSessionRepository;
         _sessionStore = sessionStore;
         _sessionService = sessionService;
+        _accessTokenGenerator = accessTokenGenerator;
+        _unitOfWork = unitOfWork;
     }
 
 
     /// <summary>
-    /// Operação para autenticar um usuário por sessão.
+    /// Operacao para autenticar um usuario por sessao.
     /// </summary>
-    /// <param name="command">Comando com as credenciais e metadados da sessão.</param>
-    /// <returns>Resultado da autenticação por sessão.</returns>
+    /// <param name="command">Comando com as credenciais e metadados da sessao.</param>
+    /// <returns>Resultado da autenticacao por sessao.</returns>
     public async Task<AuthenticatedUserSessionResult> Execute(LoginSessionCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -102,12 +134,12 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
 
 
     /// <summary>
-    /// Operação para concluir a autenticação por sessão.
+    /// Operacao para concluir a autenticacao por sessao.
     /// </summary>
-    /// <param name="user">Usuário autenticado.</param>
-    /// <param name="password">Senha válida do usuário.</param>
-    /// <param name="command">Comando com os metadados da sessão.</param>
-    /// <returns>Resultado da autenticação por sessão.</returns>
+    /// <param name="user">Usuario autenticado.</param>
+    /// <param name="password">Senha valida do usuario.</param>
+    /// <param name="command">Comando com os metadados da sessao.</param>
+    /// <returns>Resultado da autenticacao por sessao.</returns>
     private async Task<AuthenticatedUserSessionResult> AuthenticateAsync(
         User user,
         Password password,
@@ -122,15 +154,31 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
             _sessionService.GetExpiresAtUtc(),
             command.IpAddress,
             command.UserAgent);
+        var accessToken = _accessTokenGenerator.Generate(user, session);
 
-        if (updatedPassword is not null)
-            await _passwordRepository.UpdateAsync(updatedPassword);
+        await _unitOfWork.BeginTransactionAsync();
+
+        try
+        {
+            if (updatedPassword is not null)
+                await _passwordRepository.UpdateAsync(updatedPassword);
+
+            await _durableSessionRepository.AddAsync(session);
+            await _unitOfWork.CommitAsync();
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync();
+            throw;
+        }
 
         await _sessionStore.SaveAsync(session);
 
         return new AuthenticatedUserSessionResult
         {
             SessionId = session.SessionId,
+            AccessToken = accessToken.Token,
+            AccessTokenExpiresAtUtc = accessToken.ExpiresAtUtc,
             UserIdentifier = user.UserIdentifier,
             Email = user.Email.Value,
             ExpiresAtUtc = session.ExpiresAtUtc
@@ -138,7 +186,7 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
     }
 
     /// <summary>
-    /// Operação para registrar uma falha de autenticação na senha persistida.
+    /// Operacao para registrar uma falha de autenticacao na senha persistida.
     /// </summary>
     /// <param name="password">Senha a ser atualizada.</param>
     private async Task RegisterLoginFailureAsync(Password password)
@@ -148,10 +196,10 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
     }
 
     /// <summary>
-    /// Operação para verificar se a senha pode ser usada na autenticação.
+    /// Operacao para verificar se a senha pode ser usada na autenticacao.
     /// </summary>
-    /// <param name="password">Senha do usuário.</param>
-    /// <returns><c>true</c> quando a senha pode autenticar; caso contrário, <c>false</c>.</returns>
+    /// <param name="password">Senha do usuario.</param>
+    /// <returns><c>true</c> quando a senha pode autenticar; caso contrario, <c>false</c>.</returns>
     private static bool CanAuthenticate(Password password)
     {
         return password.Status is PasswordStatus.Active or PasswordStatus.FirstAccess
@@ -159,20 +207,20 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
     }
 
     /// <summary>
-    /// Operação para indicar se o login bem-sucedido precisa limpar o histórico de falhas.
+    /// Operacao para indicar se o login bem-sucedido precisa limpar o historico de falhas.
     /// </summary>
     /// <param name="password">Senha autenticada.</param>
-    /// <returns><c>true</c> quando as tentativas devem ser resetadas; caso contrário, <c>false</c>.</returns>
+    /// <returns><c>true</c> quando as tentativas devem ser resetadas; caso contrario, <c>false</c>.</returns>
     private static bool ShouldResetLoginAttempts(Password password)
     {
         return password.LoginAttempt.FailedAttempts > 0 || password.IsLocked();
     }
 
     /// <summary>
-    /// Operação para obter o status que a senha deve manter após autenticação válida.
+    /// Operacao para obter o status que a senha deve manter apos autenticacao valida.
     /// </summary>
     /// <param name="password">Senha autenticada.</param>
-    /// <returns>Status consistente após reset das tentativas.</returns>
+    /// <returns>Status consistente apos reset das tentativas.</returns>
     private static PasswordStatus GetAuthenticatedPasswordStatus(Password password)
     {
         return password.Status == PasswordStatus.FirstAccess
@@ -181,7 +229,7 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
     }
 
     /// <summary>
-    /// Operação para normalizar o e-mail informado.
+    /// Operacao para normalizar o e-mail informado.
     /// </summary>
     /// <param name="email">E-mail informado.</param>
     /// <returns>E-mail normalizado.</returns>
@@ -193,27 +241,26 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
     }
 
     /// <summary>
-    /// Operação para criar a falha genérica de autenticação.
+    /// Operacao para criar a falha generica de autenticacao.
     /// </summary>
-    /// <returns>Exceção de acesso não autorizado.</returns>
+    /// <returns>Excecao de acesso nao autorizado.</returns>
     private static UnauthorizedAccessException CreateInvalidCredentialsException()
     {
         return new UnauthorizedAccessException(INVALID_CREDENTIALS_MESSAGE);
     }
 
     /// <summary>
-    /// Operação para criar a falha de autenticação por estado do usuário.
+    /// Operacao para criar a falha de autenticacao por estado do usuario.
     /// </summary>
-    /// <param name="user">Usuário alvo da autenticação.</param>
-    /// <returns>Exceção de acesso proibido.</returns>
+    /// <param name="user">Usuario alvo da autenticacao.</param>
+    /// <returns>Excecao de acesso proibido.</returns>
     private static ForbiddenException CreateCannotSignInException(User user)
     {
         return user.Status switch
         {
-            UserStatus.PendingEmailVerification => new ForbiddenException("O usuário precisa verificar o e-mail antes de autenticar."),
-            UserStatus.Blocked => new ForbiddenException("O usuário está bloqueado para autenticação."),
-            _ => new ForbiddenException("O usuário não pode autenticar no momento.")
+            UserStatus.PendingEmailVerification => new ForbiddenException("O usuario precisa verificar o e-mail antes de autenticar."),
+            UserStatus.Blocked => new ForbiddenException("O usuario esta bloqueado para autenticacao."),
+            _ => new ForbiddenException("O usuario nao pode autenticar no momento.")
         };
     }
-
 }

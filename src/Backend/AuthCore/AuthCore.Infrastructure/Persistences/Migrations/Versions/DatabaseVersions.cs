@@ -44,4 +44,14 @@ internal static class DatabaseVersions
     /// Versão de criação da tabela de outbox.
     /// </summary>
     public const long TABLE_OUTBOX_MESSAGES = 8;
+
+    /// <summary>
+    /// Versao de inclusao do carimbo de seguranca do usuario.
+    /// </summary>
+    public const long USERS_SECURITY_STAMP = 9;
+
+    /// <summary>
+    /// Versao de criacao da tabela de sessoes duraveis.
+    /// </summary>
+    public const long TABLE_AUTH_SESSIONS = 10;
 }

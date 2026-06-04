@@ -92,6 +92,26 @@ internal sealed class FakePasswordRepository : IPasswordRepository
     }
 }
 
+internal sealed class ThrowingPasswordRepository : IPasswordRepository
+{
+    public Exception ExceptionToThrow { get; set; } = new InvalidOperationException("password-repository-failure");
+
+    public Task AddAsync(Password password)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task<Password?> GetByUserIdAsync(Guid userId)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task UpdateAsync(Password password)
+    {
+        throw ExceptionToThrow;
+    }
+}
+
 internal sealed class FakeUserRepository : IUserRepository
 {
     /// <summary>
@@ -315,6 +335,36 @@ internal sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
     }
 }
 
+internal sealed class ThrowingRefreshTokenRepository : IRefreshTokenRepository
+{
+    public Exception ExceptionToThrow { get; set; } = new InvalidOperationException("refresh-token-repository-failure");
+
+    public Task AddAsync(RefreshToken refreshToken)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task<RefreshToken?> GetByHashAsync(string tokenHash)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task UpdateAsync(RefreshToken refreshToken)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task RevokeFamilyAsync(Guid familyId, DateTime revokedAtUtc, string reason)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task RevokeActiveByUserIdAsync(Guid userId, DateTime revokedAtUtc, string reason)
+    {
+        throw ExceptionToThrow;
+    }
+}
+
 internal sealed class FakePasswordEncripter : IPasswordEncripter
 {
     public bool IsValidResult { get; set; } = true;
@@ -341,9 +391,12 @@ internal sealed class FakeAccessTokenGenerator : IAccessTokenGenerator
 
     public User? LastGeneratedUser { get; private set; }
 
-    public AccessTokenResult Generate(User user)
+    public Session? LastGeneratedSession { get; private set; }
+
+    public AccessTokenResult Generate(User user, Session? session = null)
     {
         LastGeneratedUser = user;
+        LastGeneratedSession = session;
         return Result;
     }
 }
@@ -461,7 +514,10 @@ internal sealed class FakeSessionStore : ISessionStore
         RevokedAllUserIds.Add(userId);
 
         foreach (var session in _sessionsById.Values.Where(session => session.UserId == userId).ToArray())
+        {
+            RevokedSessionIds.Add(session.SessionId);
             _sessionsById.Remove(session.SessionId);
+        }
 
         return Task.CompletedTask;
     }
@@ -469,6 +525,142 @@ internal sealed class FakeSessionStore : ISessionStore
     public void Store(Session session)
     {
         _sessionsById[session.SessionId] = session;
+    }
+}
+
+internal sealed class ThrowingSessionStore : ISessionStore
+{
+    public Exception ExceptionToThrow { get; set; } = new InvalidOperationException("session-store-failure");
+
+    public Task SaveAsync(Session session)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task<Session?> GetByIdAsync(string sessionId)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task<IReadOnlyCollection<Session>> ListByUserIdAsync(Guid userId)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task RevokeAsync(string sessionId)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task RevokeAllAsync(Guid userId)
+    {
+        throw ExceptionToThrow;
+    }
+}
+
+internal sealed class FakeDurableSessionRepository : IDurableSessionRepository
+{
+    private readonly Dictionary<string, Session> _sessionsByHash = [];
+    private readonly Dictionary<string, Session> _sessionsByPublicSessionId = [];
+
+    public List<Session> AddedSessions { get; } = [];
+
+    public List<Session> UpdatedSessions { get; } = [];
+
+    public Task AddAsync(Session session)
+    {
+        AddedSessions.Add(session);
+        Store(session);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(Session session)
+    {
+        UpdatedSessions.Add(session);
+        Store(session);
+        return Task.CompletedTask;
+    }
+
+    public Task<Session?> GetByIdentifierHashAsync(string sessionIdentifierHash, SessionIdentifier identifier)
+    {
+        _sessionsByHash.TryGetValue(sessionIdentifierHash.Trim(), out var session);
+        return Task.FromResult(session);
+    }
+
+    public Task<Session?> GetByPublicSessionIdAsync(string publicSessionId)
+    {
+        _sessionsByPublicSessionId.TryGetValue(publicSessionId.Trim(), out var session);
+        return Task.FromResult(session);
+    }
+
+    public Task<IReadOnlyCollection<Session>> ListByUserIdAsync(Guid userId)
+    {
+        IReadOnlyCollection<Session> sessions = _sessionsByPublicSessionId.Values
+            .Where(session => session.UserId == userId)
+            .ToArray();
+
+        return Task.FromResult(sessions);
+    }
+
+    public Task RevokeActiveByUserIdAsync(Guid userId, SessionRevocationReason reason, DateTime revokedAtUtc)
+    {
+        foreach (var session in _sessionsByPublicSessionId.Values.Where(current => current.UserId == userId).ToArray())
+        {
+            var revokedSession = session.Revoke(reason, revokedAtUtc);
+            UpdatedSessions.Add(revokedSession);
+            Store(revokedSession);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public void Store(Session session)
+    {
+        _sessionsByHash[$"{session.SessionId.Trim()}-hash"] = session;
+        _sessionsByPublicSessionId[session.PublicSessionId] = session;
+    }
+}
+
+internal sealed class ThrowingDurableSessionRepository : IDurableSessionRepository
+{
+    public Exception ExceptionToThrow { get; set; } = new InvalidOperationException("durable-session-repository-failure");
+
+    public Task AddAsync(Session session)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task UpdateAsync(Session session)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task<Session?> GetByIdentifierHashAsync(string sessionIdentifierHash, SessionIdentifier identifier)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task<Session?> GetByPublicSessionIdAsync(string publicSessionId)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task<IReadOnlyCollection<Session>> ListByUserIdAsync(Guid userId)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task RevokeActiveByUserIdAsync(Guid userId, SessionRevocationReason reason, DateTime revokedAtUtc)
+    {
+        throw ExceptionToThrow;
+    }
+}
+
+internal sealed class FakeSessionIdentifierHasher : ISessionIdentifierHasher
+{
+    public string ComputeHash(SessionIdentifier identifier)
+    {
+        return $"{identifier.Value.Trim()}-hash";
     }
 }
 
@@ -480,6 +672,8 @@ internal sealed class FakeSessionService : ISessionService
 
     public DateTime? SlidingExpiresAtUtc { get; set; }
 
+    public TimeSpan LastSeenUpdateInterval { get; set; } = TimeSpan.FromMinutes(1);
+
     public DateTime GetExpiresAtUtc()
     {
         return ExpiresAtUtc ?? DateTime.UtcNow.AddHours(8);
@@ -488,6 +682,11 @@ internal sealed class FakeSessionService : ISessionService
     public DateTime GetSlidingExpiresAtUtc(DateTime referenceAtUtc)
     {
         return SlidingExpiresAtUtc ?? referenceAtUtc.AddHours(8);
+    }
+
+    public TimeSpan GetLastSeenUpdateInterval()
+    {
+        return LastSeenUpdateInterval;
     }
 }
 

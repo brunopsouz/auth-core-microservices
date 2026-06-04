@@ -24,6 +24,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
+app.UseCors("AuthCoreBrowserSession");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health", new HealthCheckOptions

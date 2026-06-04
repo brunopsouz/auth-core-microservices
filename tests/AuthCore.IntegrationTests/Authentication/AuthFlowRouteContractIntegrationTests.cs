@@ -57,12 +57,14 @@ public sealed class AuthFlowRouteContractIntegrationTests
         {
             ["Authentication:Jwt:Issuer"] = "authcore-tests",
             ["Authentication:Jwt:Audience"] = "authcore-tests",
-            ["Authentication:Jwt:SigningKey"] = "12345678901234567890123456789012",
-            ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "15",
+            ["Authentication:Jwt:SigningKey"] = "AuthCore-Tests-SigningKey-2026-Strong!",
+            ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "5",
             ["Authentication:Jwt:RefreshTokenLifetimeDays"] = "7",
             ["Authentication:Jwt:ClockSkewSeconds"] = "60",
             ["Auth:Cookie:SessionCookieName"] = "sid",
-            ["Auth:Cookie:Secure"] = "false"
+            ["Auth:Cookie:AccessTokenCookieName"] = "at",
+            ["Auth:Cookie:Secure"] = "false",
+            ["Auth:Csrf:SigningKey"] = "tests-csrf-signing-key-2026"
         });
 
         builder.Services.AddControllers()

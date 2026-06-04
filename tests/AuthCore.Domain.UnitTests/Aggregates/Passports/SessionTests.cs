@@ -114,13 +114,15 @@ public sealed class SessionTests
     public void EnsureCanIssueAccessToken_WhenSessionIsRevoked_ShouldThrowDomainException()
     {
         var securityStamp = SecurityStamp.Create();
-        var session = Session.Issue(
+        var activeSession = Session.Issue(
             Guid.NewGuid(),
             securityStamp,
             DateTime.UtcNow.AddDays(7),
             ipAddress: null,
-            userAgent: null)
-            .Revoke(SessionRevocationReason.UserLogout, DateTime.UtcNow);
+            userAgent: null);
+        var session = activeSession.Revoke(
+            SessionRevocationReason.UserLogout,
+            activeSession.CreatedAtUtc.AddMinutes(1));
 
         Assert.Throws<DomainException>(() =>
             session.EnsureCanIssueAccessToken(DateTime.UtcNow, securityStamp));
@@ -161,15 +163,19 @@ public sealed class SessionTests
     [Fact]
     public void Revoke_WhenSessionIsAlreadyRevoked_ShouldKeepCurrentState()
     {
-        var session = Session.Issue(
+        var activeSession = Session.Issue(
             Guid.NewGuid(),
             SecurityStamp.Create(),
             DateTime.UtcNow.AddDays(7),
             ipAddress: null,
-            userAgent: null)
-            .Revoke(SessionRevocationReason.UserLogout, DateTime.UtcNow);
+            userAgent: null);
+        var session = activeSession.Revoke(
+            SessionRevocationReason.UserLogout,
+            activeSession.CreatedAtUtc.AddMinutes(1));
 
-        var updatedSession = session.Revoke(SessionRevocationReason.PasswordChanged, DateTime.UtcNow.AddMinutes(1));
+        var updatedSession = session.Revoke(
+            SessionRevocationReason.PasswordChanged,
+            activeSession.CreatedAtUtc.AddMinutes(2));
 
         Assert.Same(session, updatedSession);
     }

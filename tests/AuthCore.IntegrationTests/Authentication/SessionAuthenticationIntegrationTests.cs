@@ -11,17 +11,21 @@ using AuthCore.Application.UseCases.Authentication.LoginSession;
 using AuthCore.Application.UseCases.Authentication.LogoutAllSessions;
 using AuthCore.Application.UseCases.Authentication.LogoutCurrentSession;
 using AuthCore.Application.UseCases.Authentication.GetUserSessions;
+using AuthCore.Application.UseCases.Authentication.RefreshBrowserSession;
 using AuthCore.Application.UseCases.Authentication.RevokeUserSession;
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Security.Cryptography;
+using AuthCore.Domain.Security.Tokens.Models;
+using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,12 +66,8 @@ public sealed class SessionAuthenticationIntegrationTests
         var loginUseCase = serviceProvider.GetRequiredService<ILoginSessionUseCase>();
         var logoutUseCase = serviceProvider.GetRequiredService<ILogoutCurrentSessionUseCase>();
         var authCookieOptions = serviceProvider.GetRequiredService<IOptions<AuthCookieOptions>>();
-        var authenticationHandlerProvider = serviceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
-        var authenticationSchemeProvider = serviceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
-        var sessionAuthenticationScheme = await authenticationSchemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
-
         var loginController = CreateController(serviceProvider);
-        var loginResult = await loginController.Login(loginUseCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
+        var loginResult = await loginController.Login(loginUseCase, authCookieOptions, new RequestSessionLoginJson
         {
             Email = user.Email.Value,
             Password = "ValidPassword#2026"
@@ -79,19 +79,13 @@ public sealed class SessionAuthenticationIntegrationTests
         Assert.Equal(user.UserIdentifier, loginResponse.UserId);
         Assert.Equal(user.Email.Value, loginResponse.Email);
 
+        var storedSession = await sessionStore.GetByIdAsync(sessionId);
+        Assert.NotNull(storedSession);
         var meContext = new DefaultHttpContext
         {
-            RequestServices = serviceProvider
+            RequestServices = serviceProvider,
+            User = CreateSessionPrincipal(user, storedSession!)
         };
-        meContext.Request.Headers.Cookie = $"sid={sessionId}";
-
-        var authenticationHandlerBeforeLogout = await authenticationHandlerProvider.GetHandlerAsync(
-            meContext,
-            sessionAuthenticationScheme!.Name);
-        var authenticateBeforeLogout = await authenticationHandlerBeforeLogout!.AuthenticateAsync();
-
-        Assert.True(authenticateBeforeLogout.Succeeded);
-        meContext.User = authenticateBeforeLogout.Principal!;
 
         var meController = CreateController(serviceProvider, meContext);
         var meResult = meController.Me();
@@ -104,33 +98,16 @@ public sealed class SessionAuthenticationIntegrationTests
         var logoutContext = new DefaultHttpContext
         {
             RequestServices = serviceProvider,
-            User = authenticateBeforeLogout.Principal!
+            User = meContext.User
         };
         var logoutController = CreateController(serviceProvider, logoutContext);
-        var logoutResult = await logoutController.Logout(logoutUseCase, CreateServiceProvider(authCookieOptions));
+        var logoutResult = await logoutController.Logout(logoutUseCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(logoutResult);
         Assert.Contains(sessionId, sessionStore.RevokedSessionIds);
         Assert.Null(await sessionStore.GetByIdAsync(sessionId));
-
-        await using var reAuthenticationScope = provider.CreateAsyncScope();
-        var reAuthenticationServiceProvider = reAuthenticationScope.ServiceProvider;
-        var reAuthenticationHandlerProvider = reAuthenticationServiceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
-
-        var afterLogoutContext = new DefaultHttpContext
-        {
-            RequestServices = reAuthenticationServiceProvider
-        };
-        afterLogoutContext.Request.Headers.Cookie = $"sid={sessionId}";
-
-        var authenticationHandlerAfterLogout = await reAuthenticationHandlerProvider.GetHandlerAsync(
-            afterLogoutContext,
-            sessionAuthenticationScheme.Name);
-        var authenticateAfterLogout = await authenticationHandlerAfterLogout!.AuthenticateAsync();
-
-        Assert.False(authenticateAfterLogout.Succeeded);
-        Assert.Equal(0, unitOfWork.BegunTransactions);
-        Assert.Equal(0, unitOfWork.CommittedTransactions);
+        Assert.Equal(1, unitOfWork.BegunTransactions);
+        Assert.Equal(1, unitOfWork.CommittedTransactions);
     }
 
     [Fact]
@@ -151,13 +128,14 @@ public sealed class SessionAuthenticationIntegrationTests
             sessionService,
             new SpyUnitOfWork());
         var user = CreatePendingUser();
-        var session = Session.Issue(user.Id, DateTime.UtcNow.AddMinutes(30), "127.0.0.1", "IntegrationTests/1.0");
+        var session = Session.Issue(user.Id, user.SecurityStamp, DateTime.UtcNow.AddMinutes(30), "127.0.0.1", "IntegrationTests/1.0");
 
         userRepository.Store(user);
         sessionStore.Store(session);
 
         await using var authScope = provider.CreateAsyncScope();
         var authServiceProvider = authScope.ServiceProvider;
+        var authCookieOptions = authServiceProvider.GetRequiredService<IOptions<AuthCookieOptions>>().Value;
         var authenticationHandlerProvider = authServiceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
         var authenticationSchemeProvider = authServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
         var sessionAuthenticationScheme = await authenticationSchemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
@@ -165,33 +143,27 @@ public sealed class SessionAuthenticationIntegrationTests
         {
             RequestServices = authServiceProvider
         };
-        httpContext.Request.Headers.Cookie = $"sid={session.SessionId}";
+        SetRequestCookies(httpContext, ("sid", session.SessionId));
+        Assert.Equal("sid", authCookieOptions.SessionCookieName);
+        Assert.True(httpContext.Request.Cookies.TryGetValue("sid", out var currentSessionId));
+        Assert.Equal(session.SessionId, currentSessionId);
 
         var authenticationHandler = await authenticationHandlerProvider.GetHandlerAsync(
             httpContext,
             sessionAuthenticationScheme!.Name);
         var authenticateResult = await authenticationHandler!.AuthenticateAsync();
 
-        Assert.True(authenticateResult.Succeeded);
+        Assert.False(authenticateResult.Succeeded);
         Assert.True(string.IsNullOrWhiteSpace(httpContext.Response.Headers.SetCookie.ToString()));
-
-        httpContext.User = authenticateResult.Principal!;
-
-        var controller = CreateController(authServiceProvider, httpContext);
-        var result = controller.Me();
-        var forbiddenResult = Assert.IsType<ObjectResult>(result.Result);
-        var response = Assert.IsType<ResponseErrorJson>(forbiddenResult.Value);
-
-        Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
-        Assert.Equal(["O usuário precisa verificar o e-mail antes de autenticar."], response.Errors);
     }
 
     [Fact]
-    public async Task AuthenticateAsync_WhenSlidingExpirationIsEnabled_ShouldRenewSessionCookie()
+    public async Task Refresh_WhenSlidingExpirationIsEnabled_ShouldRenewSessionCookie()
     {
         var userRepository = new InMemoryUserReadRepository();
         var passwordRepository = new InMemoryPasswordRepository();
         var sessionStore = new InMemorySessionStore();
+        var passwordEncripter = new AlwaysValidPasswordEncripter();
         var sessionService = new FixedSessionService
         {
             UseSlidingExpiration = true,
@@ -201,36 +173,42 @@ public sealed class SessionAuthenticationIntegrationTests
             userRepository,
             passwordRepository,
             sessionStore,
-            new AlwaysValidPasswordEncripter(),
+            passwordEncripter,
             sessionService,
             new SpyUnitOfWork());
         var user = CreateVerifiedUser();
-        var session = Session.Issue(user.Id, DateTime.UtcNow.AddMinutes(30), "127.0.0.1", "IntegrationTests/1.0");
         var expectedCookieDate = new DateTimeOffset(sessionService.SlidingExpiresAtUtc)
             .ToString("ddd, dd MMM yyyy HH':'mm':'ss 'GMT'", CultureInfo.InvariantCulture);
+        var password = Password.Create(user.Id, "stored-password-hash", PasswordStatus.Active);
 
         userRepository.Store(user);
-        sessionStore.Store(session);
+        passwordRepository.Store(password);
 
         await using var authScope = provider.CreateAsyncScope();
         var authServiceProvider = authScope.ServiceProvider;
-        var authenticationHandlerProvider = authServiceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
-        var authenticationSchemeProvider = authServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
-        var sessionAuthenticationScheme = await authenticationSchemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
-        var httpContext = new DefaultHttpContext
+        var loginUseCase = authServiceProvider.GetRequiredService<ILoginSessionUseCase>();
+        var refreshUseCase = authServiceProvider.GetRequiredService<IRefreshBrowserSessionUseCase>();
+        var authCookieOptions = authServiceProvider.GetRequiredService<IOptions<AuthCookieOptions>>();
+        var loginController = CreateController(authServiceProvider);
+        var loginResult = await loginController.Login(loginUseCase, authCookieOptions, new RequestSessionLoginJson
+        {
+            Email = user.Email.Value,
+            Password = "ValidPassword#2026"
+        });
+        _ = Assert.IsType<OkObjectResult>(loginResult.Result);
+        var sessionId = ExtractCookieValue(loginController.Response.Headers.SetCookie.ToString(), "sid");
+
+        var refreshContext = new DefaultHttpContext
         {
             RequestServices = authServiceProvider
         };
-        httpContext.Request.Headers.Cookie = $"sid={session.SessionId}";
+        SetRequestCookies(refreshContext, ("sid", sessionId), ("XSRF-TOKEN", "csrf-token"));
+        var refreshController = CreateController(authServiceProvider, refreshContext);
+        var refreshResult = await refreshController.Refresh(refreshUseCase, authCookieOptions);
 
-        var authenticationHandler = await authenticationHandlerProvider.GetHandlerAsync(
-            httpContext,
-            sessionAuthenticationScheme!.Name);
-        var authenticateResult = await authenticationHandler!.AuthenticateAsync();
-
-        Assert.True(authenticateResult.Succeeded);
-        Assert.Contains($"sid={session.SessionId}", httpContext.Response.Headers.SetCookie.ToString(), StringComparison.Ordinal);
-        Assert.Contains(expectedCookieDate, httpContext.Response.Headers.SetCookie.ToString(), StringComparison.Ordinal);
+        Assert.IsType<NoContentResult>(refreshResult);
+        Assert.Contains($"sid={sessionId}", refreshController.Response.Headers.SetCookie.ToString(), StringComparison.Ordinal);
+        Assert.Contains(expectedCookieDate, refreshController.Response.Headers.SetCookie.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -266,7 +244,7 @@ public sealed class SessionAuthenticationIntegrationTests
         var sessionAuthenticationScheme = await authenticationSchemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
 
         var loginController = CreateController(serviceProvider);
-        var loginResult = await loginController.Login(loginUseCase, CreateServiceProvider(authCookieOptions), new RequestSessionLoginJson
+        var loginResult = await loginController.Login(loginUseCase, authCookieOptions, new RequestSessionLoginJson
         {
             Email = user.Email.Value,
             Password = "ValidPassword#2026"
@@ -279,7 +257,7 @@ public sealed class SessionAuthenticationIntegrationTests
         {
             RequestServices = serviceProvider
         };
-        sessionsContext.Request.Headers.Cookie = $"sid={sessionId}";
+        SetRequestCookies(sessionsContext, ("sid", sessionId));
 
         var authenticationHandler = await authenticationHandlerProvider.GetHandlerAsync(
             sessionsContext,
@@ -294,8 +272,10 @@ public sealed class SessionAuthenticationIntegrationTests
         var sessionsOkResult = Assert.IsType<OkObjectResult>(sessionsResult.Result);
         var sessionsResponse = Assert.IsType<ResponseUserSessionsJson>(sessionsOkResult.Value);
 
-        Assert.Equal(sessionId, sessionsResponse.CurrentSid);
-        Assert.Contains(sessionsResponse.Sessions, session => session.Sid == sessionId);
+        var storedSession = await sessionStore.GetByIdAsync(sessionId);
+        Assert.NotNull(storedSession);
+        Assert.Equal(storedSession!.PublicSessionId, sessionsResponse.CurrentSid);
+        Assert.Contains(sessionsResponse.Sessions, session => session.Sid == storedSession.PublicSessionId);
 
         var revokeContext = new DefaultHttpContext
         {
@@ -303,7 +283,7 @@ public sealed class SessionAuthenticationIntegrationTests
             User = authenticateResult.Principal!
         };
         var revokeController = CreateController(serviceProvider, revokeContext);
-        var revokeResult = await revokeController.RevokeSession(sessionId, revokeUserSessionUseCase, CreateServiceProvider(authCookieOptions));
+        var revokeResult = await revokeController.RevokeSession(sessionsResponse.CurrentSid, revokeUserSessionUseCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(revokeResult);
         Assert.Contains(sessionId, sessionStore.RevokedSessionIds);
@@ -318,7 +298,7 @@ public sealed class SessionAuthenticationIntegrationTests
         {
             RequestServices = reAuthenticationServiceProvider
         };
-        afterRevokeContext.Request.Headers.Cookie = $"sid={sessionId}";
+        SetRequestCookies(afterRevokeContext, ("sid", sessionId));
 
         var authenticationHandlerAfterRevoke = await reAuthenticationHandlerProvider.GetHandlerAsync(
             afterRevokeContext,
@@ -326,8 +306,8 @@ public sealed class SessionAuthenticationIntegrationTests
         var authenticateAfterRevoke = await authenticationHandlerAfterRevoke!.AuthenticateAsync();
 
         Assert.False(authenticateAfterRevoke.Succeeded);
-        Assert.Equal(0, unitOfWork.BegunTransactions);
-        Assert.Equal(0, unitOfWork.CommittedTransactions);
+        Assert.Equal(1, unitOfWork.BegunTransactions);
+        Assert.Equal(1, unitOfWork.CommittedTransactions);
     }
 
     [Fact]
@@ -367,7 +347,7 @@ public sealed class SessionAuthenticationIntegrationTests
         };
 
         var controller = CreateController(serviceProvider, httpContext);
-        var result = await controller.LogoutAll(logoutAllUseCase, CreateServiceProvider(authCookieOptions));
+        var result = await controller.LogoutAll(logoutAllUseCase, authCookieOptions);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Contains(currentSession.SessionId, sessionStore.RevokedSessionIds);
@@ -390,21 +370,38 @@ public sealed class SessionAuthenticationIntegrationTests
             {
                 ["Authentication:Jwt:Issuer"] = "authcore-tests",
                 ["Authentication:Jwt:Audience"] = "authcore-tests",
-                ["Authentication:Jwt:SigningKey"] = "12345678901234567890123456789012",
-                ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "15",
+                ["Authentication:Jwt:SigningKey"] = "AuthCore-Tests-SigningKey-2026-Strong!",
+                ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "5",
                 ["Authentication:Jwt:RefreshTokenLifetimeDays"] = "7",
                 ["Authentication:Jwt:ClockSkewSeconds"] = "60",
                 ["Auth:Cookie:SessionCookieName"] = "sid",
-                ["Auth:Cookie:Secure"] = "false"
+                ["Auth:Cookie:AccessTokenCookieName"] = "at",
+                ["Auth:Cookie:Secure"] = "false",
+                ["Auth:Csrf:SigningKey"] = "tests-csrf-signing-key-2026"
             })
             .Build();
 
         return new ServiceCollection()
             .AddLogging()
+            .AddSingleton<IOptions<AuthCookieOptions>>(Options.Create(new AuthCookieOptions
+            {
+                SessionCookieName = "sid",
+                AccessTokenCookieName = "at",
+                Secure = false
+            }))
+            .AddSingleton<IOptions<CsrfOptions>>(Options.Create(new CsrfOptions
+            {
+                CookieName = "XSRF-TOKEN",
+                HeaderName = "X-CSRF-TOKEN",
+                SigningKey = "tests-csrf-signing-key-2026"
+            }))
             .AddSingleton<IUserReadRepository>(userRepository)
             .AddSingleton<IPasswordRepository>(passwordRepository)
+            .AddSingleton<IDurableSessionRepository>(new InMemoryDurableSessionRepository())
             .AddSingleton<ISessionStore>(sessionStore)
             .AddSingleton<IPasswordEncripter>(passwordEncripter)
+            .AddSingleton<IAccessTokenGenerator, FixedAccessTokenGenerator>()
+            .AddSingleton<ISessionIdentifierHasher, InMemorySessionIdentifierHasher>()
             .AddSingleton<ISessionService>(sessionService)
             .AddSingleton<IUnitOfWork>(unitOfWork)
             .AddApi(configuration)
@@ -420,7 +417,9 @@ public sealed class SessionAuthenticationIntegrationTests
         resolvedHttpContext.RequestServices = serviceProvider;
 
         return new SessionAuthController(
+            new AuthenticatedSessionContext(resolvedHttpContext.User),
             serviceProvider.GetRequiredService<ICsrfRequestValidator>(),
+            new AllowAllCsrfTokenService(),
             serviceProvider.GetRequiredService<ILoginRateLimiter>(),
             serviceProvider.GetRequiredService<ILogger<SessionAuthController>>())
         {
@@ -431,13 +430,6 @@ public sealed class SessionAuthenticationIntegrationTests
         };
     }
 
-    private static IServiceProvider CreateServiceProvider(IOptions<AuthCookieOptions> authCookieOptions)
-    {
-        return new ServiceCollection()
-            .AddSingleton(authCookieOptions)
-            .BuildServiceProvider();
-    }
-
     private static string ExtractCookieValue(string setCookieHeader, string cookieName)
     {
         var prefix = $"{cookieName}=";
@@ -446,6 +438,32 @@ public sealed class SessionAuthenticationIntegrationTests
             .First(segment => segment.StartsWith(prefix, StringComparison.Ordinal));
 
         return cookieSegment[prefix.Length..];
+    }
+
+    private static ClaimsPrincipal CreateSessionPrincipal(User user, Session session)
+    {
+        return new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.NameIdentifier, user.UserIdentifier.ToString()),
+            new Claim(ClaimTypes.Email, user.Email.Value),
+            new Claim("sub", user.UserIdentifier.ToString()),
+            new Claim("user_identifier", user.UserIdentifier.ToString()),
+            new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, user.Id.ToString()),
+            new Claim(SessionAuthenticationDefaults.SessionIdClaimType, session.SessionId),
+            new Claim(SessionAuthenticationDefaults.PublicSessionIdClaimType, session.PublicSessionId),
+            new Claim(SessionAuthenticationDefaults.UserStatusClaimType, user.Status.ToString()),
+            new Claim(SessionAuthenticationDefaults.UserIsActiveClaimType, user.IsActive.ToString())
+        ],
+        SessionAuthenticationDefaults.AuthenticationScheme));
+    }
+
+    private static void SetRequestCookies(HttpContext httpContext, params (string Name, string Value)[] cookies)
+    {
+        var cookieDictionary = cookies.ToDictionary(cookie => cookie.Name, cookie => cookie.Value, StringComparer.Ordinal);
+        var cookieHeader = string.Join("; ", cookieDictionary.Select(cookie => $"{cookie.Key}={cookie.Value}"));
+
+        httpContext.Request.Headers.Cookie = cookieHeader;
+        httpContext.Features.Set<IRequestCookiesFeature>(new StaticRequestCookiesFeature(cookieDictionary));
     }
 
     private static User CreateVerifiedUser()
@@ -517,6 +535,19 @@ public sealed class SessionAuthenticationIntegrationTests
     {
         public void Validate(HttpRequest request)
         {
+        }
+    }
+
+    private sealed class AllowAllCsrfTokenService : ICsrfTokenService
+    {
+        public string Generate(string sessionId)
+        {
+            return "csrf-token";
+        }
+
+        public bool IsValid(string sessionId, string token)
+        {
+            return true;
         }
     }
 
@@ -626,6 +657,27 @@ public sealed class SessionAuthenticationIntegrationTests
         }
     }
 
+    private sealed class FixedAccessTokenGenerator : IAccessTokenGenerator
+    {
+        public AccessTokenResult Generate(User user, Session? session = null)
+        {
+            return new AccessTokenResult
+            {
+                Token = "integration-access-token",
+                TokenId = Guid.NewGuid(),
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5)
+            };
+        }
+    }
+
+    private sealed class InMemorySessionIdentifierHasher : ISessionIdentifierHasher
+    {
+        public string ComputeHash(SessionIdentifier identifier)
+        {
+            return $"{identifier.Value}-hash";
+        }
+    }
+
     private sealed class FixedSessionService : ISessionService
     {
         public bool UseSlidingExpiration { get; set; }
@@ -633,6 +685,8 @@ public sealed class SessionAuthenticationIntegrationTests
         public DateTime ExpiresAtUtc { get; set; } = DateTime.UtcNow.AddHours(8);
 
         public DateTime SlidingExpiresAtUtc { get; set; } = DateTime.UtcNow.AddHours(9);
+
+        public TimeSpan LastSeenUpdateInterval { get; set; } = TimeSpan.FromMinutes(1);
 
         public DateTime GetExpiresAtUtc()
         {
@@ -642,6 +696,105 @@ public sealed class SessionAuthenticationIntegrationTests
         public DateTime GetSlidingExpiresAtUtc(DateTime referenceAtUtc)
         {
             return SlidingExpiresAtUtc;
+        }
+
+        public TimeSpan GetLastSeenUpdateInterval()
+        {
+            return LastSeenUpdateInterval;
+        }
+    }
+
+    private sealed class StaticRequestCookiesFeature : IRequestCookiesFeature
+    {
+        public StaticRequestCookiesFeature(IDictionary<string, string> cookies)
+        {
+            Cookies = new StaticRequestCookieCollection(cookies);
+        }
+
+        public IRequestCookieCollection Cookies { get; set; }
+    }
+
+    private sealed class StaticRequestCookieCollection : IRequestCookieCollection
+    {
+        private readonly Dictionary<string, string> _cookies;
+
+        public StaticRequestCookieCollection(IDictionary<string, string> cookies)
+        {
+            _cookies = new Dictionary<string, string>(cookies, StringComparer.Ordinal);
+        }
+
+        public string this[string key] => _cookies.TryGetValue(key, out var value) ? value : string.Empty;
+
+        public int Count => _cookies.Count;
+
+        public ICollection<string> Keys => _cookies.Keys;
+
+        public bool ContainsKey(string key)
+        {
+            return _cookies.ContainsKey(key);
+        }
+
+        public IEnumerator<KeyValuePair<string, string>> GetEnumerator()
+        {
+            return _cookies.GetEnumerator();
+        }
+
+        public bool TryGetValue(string key, out string value)
+        {
+            return _cookies.TryGetValue(key, out value!);
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
+
+    private sealed class InMemoryDurableSessionRepository : IDurableSessionRepository
+    {
+        private readonly Dictionary<string, Session> _sessionsByHash = [];
+
+        public Task AddAsync(Session session)
+        {
+            _sessionsByHash[$"{session.SessionId}-hash"] = session;
+            return Task.CompletedTask;
+        }
+
+        public Task UpdateAsync(Session session)
+        {
+            _sessionsByHash[$"{session.SessionId}-hash"] = session;
+            return Task.CompletedTask;
+        }
+
+        public Task<Session?> GetByIdentifierHashAsync(string sessionIdentifierHash, SessionIdentifier identifier)
+        {
+            _sessionsByHash.TryGetValue(sessionIdentifierHash.Trim(), out var session);
+            return Task.FromResult(session);
+        }
+
+        public Task<Session?> GetByPublicSessionIdAsync(string publicSessionId)
+        {
+            var session = _sessionsByHash.Values.FirstOrDefault(current =>
+                string.Equals(current.PublicSessionId, publicSessionId.Trim(), StringComparison.Ordinal));
+
+            return Task.FromResult(session);
+        }
+
+        public Task<IReadOnlyCollection<Session>> ListByUserIdAsync(Guid userId)
+        {
+            IReadOnlyCollection<Session> sessions = _sessionsByHash.Values
+                .Where(session => session.UserId == userId)
+                .ToArray();
+
+            return Task.FromResult(sessions);
+        }
+
+        public Task RevokeActiveByUserIdAsync(Guid userId, SessionRevocationReason reason, DateTime revokedAtUtc)
+        {
+            foreach (var session in _sessionsByHash.Values.Where(current => current.UserId == userId).ToArray())
+                _sessionsByHash[$"{session.SessionId}-hash"] = session.Revoke(reason, revokedAtUtc);
+
+            return Task.CompletedTask;
         }
     }
 

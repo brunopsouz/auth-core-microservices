@@ -49,7 +49,8 @@ internal sealed class UserRepository : IUserRepository
                 "UserIdentifier",
                 "Role",
                 "Status",
-                "EmailVerifiedAt"
+                "EmailVerifiedAt",
+                "SecurityStamp"
             )
             VALUES
             (
@@ -65,7 +66,8 @@ internal sealed class UserRepository : IUserRepository
                 @UserIdentifier,
                 @Role,
                 @Status,
-                @EmailVerifiedAt
+                @EmailVerifiedAt,
+                @SecurityStamp
             );
             """;
 
@@ -85,6 +87,7 @@ internal sealed class UserRepository : IUserRepository
         command.Parameters.AddWithValue("Role", (int)user.Role);
         command.Parameters.AddWithValue("Status", (int)user.Status);
         command.Parameters.AddWithValue("EmailVerifiedAt", user.EmailVerifiedAt ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("SecurityStamp", user.SecurityStamp.Value);
 
         await command.ExecuteNonQueryAsync();
     }
@@ -109,7 +112,8 @@ internal sealed class UserRepository : IUserRepository
                 "Contact" = @Contact,
                 "Role" = @Role,
                 "Status" = @Status,
-                "EmailVerifiedAt" = @EmailVerifiedAt
+                "EmailVerifiedAt" = @EmailVerifiedAt,
+                "SecurityStamp" = @SecurityStamp
             WHERE "Id" = @Id;
             """;
 
@@ -127,6 +131,7 @@ internal sealed class UserRepository : IUserRepository
         command.Parameters.AddWithValue("Role", (int)user.Role);
         command.Parameters.AddWithValue("Status", (int)user.Status);
         command.Parameters.AddWithValue("EmailVerifiedAt", user.EmailVerifiedAt ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("SecurityStamp", user.SecurityStamp.Value);
 
         await command.ExecuteNonQueryAsync();
     }

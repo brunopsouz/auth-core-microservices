@@ -9,18 +9,18 @@ namespace AuthCore.Application.UseCases.Authentication.GetUserSessions;
 internal sealed class GetUserSessionsUseCase : IGetUserSessionsUseCase
 {
     /// <summary>
-    /// Campo que armazena session store.
+    /// Campo que armazena durable session repository.
     /// </summary>
-    private readonly ISessionStore _sessionStore;
-
-
+    private readonly IDurableSessionRepository _durableSessionRepository;
     /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
-    /// <param name="sessionStore">Store de sessão autenticada.</param>
-    public GetUserSessionsUseCase(ISessionStore sessionStore)
+    /// <param name="durableSessionRepository">Repositório durável da sessão autenticada.</param>
+    public GetUserSessionsUseCase(IDurableSessionRepository durableSessionRepository)
     {
-        _sessionStore = sessionStore;
+        ArgumentNullException.ThrowIfNull(durableSessionRepository);
+
+        _durableSessionRepository = durableSessionRepository;
     }
 
 
@@ -33,16 +33,20 @@ internal sealed class GetUserSessionsUseCase : IGetUserSessionsUseCase
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var sessions = await _sessionStore.ListByUserIdAsync(query.UserId);
+        var sessions = await _durableSessionRepository.ListByUserIdAsync(query.UserId);
+        var currentSessionId = sessions
+            .FirstOrDefault(session => string.Equals(session.SessionId, query.CurrentSessionId, StringComparison.Ordinal))
+            ?.PublicSessionId
+            ?? string.Empty;
 
         return new UserSessionsResult
         {
-            CurrentSessionId = query.CurrentSessionId,
+            CurrentSessionId = currentSessionId,
             Sessions = sessions
                 .OrderByDescending(session => session.LastSeenAtUtc ?? session.CreatedAtUtc)
                 .Select(session => new UserSessionResult
                 {
-                    SessionId = session.SessionId,
+                    SessionId = session.PublicSessionId,
                     CreatedAtUtc = session.CreatedAtUtc,
                     LastSeenAtUtc = session.LastSeenAtUtc,
                     IpAddress = session.IpAddress,
