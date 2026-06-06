@@ -6,7 +6,7 @@ namespace NotificationCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migração de seed dos templates transacionais iniciais.
 /// </summary>
-internal sealed class Version0000002 : VersionBase
+public sealed class Version0000002 : VersionBase
 {
     private const int EMAIL_CHANNEL = 1;
     private const string AUTH_EMAIL_CONFIRMATION_TEMPLATE_KEY = "auth.email-confirmation";

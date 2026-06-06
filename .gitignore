@@ -429,9 +429,10 @@ obj/
 src/.env
 
 # Ignore
-*.agents
 docs/explain
 docs/specs
-AGENTS.md
 .env.*
 !src/Backend/.env.development.example
+AGENTS.md
+!.agents/
+!.agents/**

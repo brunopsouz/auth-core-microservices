@@ -46,7 +46,7 @@ Responsabilidades que não devem ir para controller:
 - persistência
 - composição complexa de infraestrutura
 
-Mesmo que a API referencie `Infrastructure` no projeto para permitir o bootstrap, controllers não devem expor tipos concretos da infraestrutura em contratos HTTP, responses, requests ou superfície pública das actions. Detalhes técnicos da infraestrutura devem permanecer encapsulados; o ponto público esperado da camada é apenas o registro de DI.
+Mesmo que a API referencie `Infrastructure` no projeto para permitir o bootstrap, controllers não devem expor tipos concretos da infraestrutura em contratos HTTP, responses, requests ou superfície pública das actions. Detalhes técnicos da infraestrutura devem permanecer encapsulados. Tipos públicos por exigência técnica de frameworks, como migrations descobertas por reflexão, não devem ser tratados como contratos disponíveis para a API.
 
 O padrão atual está bem representado em:
 

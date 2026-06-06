@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a base para migrações versionadas do banco.
 /// </summary>
-internal abstract class VersionBase : ForwardOnlyMigration
+public abstract class VersionBase : ForwardOnlyMigration
 {
     /// <summary>
     /// Operação para criar uma tabela padrão com colunas compartilhadas.

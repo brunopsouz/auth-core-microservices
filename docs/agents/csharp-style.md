@@ -152,7 +152,9 @@ Na camada `AuthCore.Infrastructure`, o padrão dominante é:
 
 A infraestrutura implementa detalhes, mas não redefine o modelo do domínio.
 
-A única classe pública esperada em `Infrastructure` é a classe responsável por registrar dependências no contêiner de injeção de dependência, como `InfrastructureDependencyInjection`. Options, migrações, repositórios, conexões, factories técnicas, implementações de serviços, métricas e modelos auxiliares não devem compor a superfície pública do assembly.
+As classes públicas esperadas em `Infrastructure` devem ser exceções pontuais. A principal exceção é a classe responsável por registrar dependências no contêiner de injeção de dependência, como `InfrastructureDependencyInjection`. Também são aceitáveis tipos que precisam ser públicos por exigência técnica de frameworks de discovery ou reflexão, como migrations versionadas do `FluentMigrator` quando usadas pelo scanner padrão.
+
+Options, repositórios, conexões, factories técnicas, implementações de serviços, métricas e modelos auxiliares não devem compor a superfície pública do assembly. Migrations públicas não representam contrato da aplicação; representam apenas uma exigência operacional do framework que as descobre.
 
 ### Configurações e Options
 
@@ -230,7 +232,7 @@ Antes de concluir uma alteração C# neste projeto, revise:
 
 - o arquivo usa `namespace` file-scoped
 - a classe, interface ou tipo segue a convenção dominante do módulo
-- tipos de `Infrastructure` permanecem `internal`, exceto a classe pública de registro de DI
+- tipos de `Infrastructure` permanecem `internal` por padrão, exceto a classe pública de registro de DI e exceções técnicas de discovery/reflection
 - a ordem de membros está alinhada ao padrão predominante
 - o arquivo não introduz `#region` ou `#endregion`
 - a documentação XML está em português e segue o padrão textual do projeto

@@ -7,7 +7,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migracao de criacao da tabela de sessoes duraveis.
 /// </summary>
-internal sealed class Version0000010 : ForwardOnlyMigration
+public sealed class Version0000010 : ForwardOnlyMigration
 {
     /// <summary>
     /// Operacao para aplicar a migracao da versao atual.

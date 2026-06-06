@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migração de criação da tabela de outbox.
 /// </summary>
-internal sealed class Version0000008 : VersionBase
+public sealed class Version0000008 : VersionBase
 {
     /// <summary>
     /// Operação para aplicar a migração da versão atual.

@@ -67,7 +67,7 @@ O fluxo de dependência implementado hoje é o seguinte:
 
 Uma regra importante da solução é que **`AuthCore.Application` não depende diretamente de `AuthCore.Infrastructure`**. A aplicação trabalha apenas com contratos do domínio, enquanto a infraestrutura fornece implementações concretas por injeção de dependência.
 
-Mesmo quando `AuthCore.Api` referencia `AuthCore.Infrastructure` para compor o processo, essa referência deve ser tratada como uma borda de bootstrap. A infraestrutura deve manter seus detalhes técnicos encapsulados com tipos `internal`. A exceção pública esperada é a classe de registro de dependências, como `InfrastructureDependencyInjection`, responsável por expor o método de composição da camada para o host.
+Mesmo quando `AuthCore.Api` referencia `AuthCore.Infrastructure` para compor o processo, essa referência deve ser tratada como uma borda de bootstrap. A infraestrutura deve manter seus detalhes técnicos encapsulados com tipos `internal` por padrão. As exceções públicas esperadas são a classe de registro de dependências, como `InfrastructureDependencyInjection`, e tipos que precisam ser públicos por exigência técnica de frameworks de discovery ou reflexão.
 
 ```mermaid
 flowchart TD
@@ -183,7 +183,9 @@ A camada `AuthCore.Infrastructure` implementa detalhes técnicos sem absorver re
 
 Mesmo quando a infraestrutura materializa agregados de domínio, ela faz isso respeitando o modelo central, normalmente por meio de factories como `Restore(...)`.
 
-Por encapsulamento, classes concretas, options, migrações, repositórios, factories técnicas, workers de infraestrutura e modelos auxiliares da camada devem permanecer `internal`. A camada não deve expor seus detalhes como API pública do assembly. O ponto público de entrada deve ser somente a classe de composição de dependências da infraestrutura.
+Por encapsulamento, classes concretas, options, repositórios, factories técnicas, workers de infraestrutura e modelos auxiliares da camada devem permanecer `internal`. A camada não deve expor seus detalhes como API pública do assembly sem necessidade técnica real.
+
+As migrations versionadas do `FluentMigrator` são uma exceção técnica: elas podem permanecer `public` quando o scanner padrão do framework precisar descobri-las por reflexão. Essa exposição não deve ser tratada como contrato de consumo da aplicação; é apenas uma exigência operacional do mecanismo de migrations. O mesmo critério vale para outros frameworks que exijam tipos públicos para discovery, desde que a exceção seja pontual e justificada.
 
 ### Camada de Testes
 
@@ -369,14 +371,14 @@ Ao evoluir o sistema:
 - novos casos de uso devem seguir o padrão de vertical slice na aplicação
 - novos endpoints devem manter controllers finos e contratos `Request...Json` e `Response...Json`
 - novas integrações técnicas devem respeitar o fluxo atual de dependências
-- novas classes em `Infrastructure` devem ser `internal`, salvo a classe pública de registro de injeção de dependência
+- novas classes em `Infrastructure` devem ser `internal` por padrão, salvo a classe pública de registro de injeção de dependência e exceções técnicas exigidas por frameworks de discovery ou reflexão
 - novos documentos e novas implementações devem seguir o padrão recente da `Domain`, inclusive na documentação XML pública em português quando aplicável
 
 Também é recomendado evitar estes desvios comuns:
 
 - levar regra de negócio para controllers, services utilitários ou infraestrutura
 - introduzir dependência direta de `Application` para `Infrastructure`
-- tornar públicos detalhes técnicos da `Infrastructure` que deveriam permanecer encapsulados
+- tornar públicos detalhes técnicos da `Infrastructure` sem necessidade técnica clara
 
 ## Leitura Final
 

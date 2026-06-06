@@ -6,7 +6,7 @@ namespace AuthCore.Infrastructure.Persistences.Migrations.Versions;
 /// <summary>
 /// Representa a migracao de inclusao do carimbo de seguranca do usuario.
 /// </summary>
-internal sealed class Version0000009 : VersionBase
+public sealed class Version0000009 : VersionBase
 {
     /// <summary>
     /// Operacao para aplicar a migracao da versao atual.
