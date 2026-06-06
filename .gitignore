@@ -435,3 +435,4 @@ docs/specs
 !src/Backend/.env.development.example
 AGENTS.md
 *.agents
+.codex
