@@ -1,9 +1,11 @@
 using System.Net;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Gateway.Api;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -338,6 +340,42 @@ public sealed class OcelotRouteTests
     }
 
     [Fact]
+    public async Task PublicAuthRoute_WhenRequestHasJwtCookie_ShouldForwardWithoutAuthorization()
+    {
+        string? forwardedCookie = null;
+        string? forwardedAuthorization = null;
+
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapPost("/api/auth/session/login", (HttpContext context) =>
+            {
+                forwardedCookie = context.Request.Headers.Cookie.ToString();
+                forwardedAuthorization = context.Request.Headers.Authorization.ToString();
+                return Results.Ok();
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/auth/session/login",
+                "/api/auth/session/login",
+                "POST",
+                authCore)
+        ]));
+
+        var accessToken = CreateAccessToken();
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"at={accessToken}");
+
+        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}/api/auth/session/login", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal($"at={accessToken}", forwardedCookie);
+        Assert.True(string.IsNullOrWhiteSpace(forwardedAuthorization));
+    }
+
+    [Fact]
     public async Task PublicUserRegistrationRoute_WhenRequestHasNoJwt_ShouldNotForwardToAuthCore()
     {
         var authCoreWasCalled = false;
@@ -536,6 +574,313 @@ public sealed class OcelotRouteTests
     }
 
     [Fact]
+    public async Task ProtectedAuthRoute_WhenRequestHasValidJwtCookie_ShouldForwardAuthorizationToDownstream()
+    {
+        string? forwardedAuthorization = null;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/users/profile", (HttpContext context) =>
+            {
+                forwardedAuthorization = context.Request.Headers.Authorization.ToString();
+
+                return Results.Text("protected");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/profile",
+                "/api/users/profile",
+                "GET",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        var accessToken = CreateAccessToken();
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"at={accessToken}");
+
+        using var response = await httpClient.GetAsync($"{GetAddress(gateway)}/api/users/profile");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("protected", await response.Content.ReadAsStringAsync());
+        Assert.Equal($"Bearer {accessToken}", forwardedAuthorization);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenRequestHasBearerAndCookie_ShouldPreferBearer()
+    {
+        string? forwardedAuthorization = null;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/users/profile", (HttpContext context) =>
+            {
+                forwardedAuthorization = context.Request.Headers.Authorization.ToString();
+
+                return Results.Text("protected");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/profile",
+                "/api/users/profile",
+                "GET",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        var bearerAccessToken = CreateAccessToken();
+        var cookieAccessToken = CreateAccessToken();
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization = new("Bearer", bearerAccessToken);
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"at={cookieAccessToken}");
+
+        using var response = await httpClient.GetAsync($"{GetAddress(gateway)}/api/users/profile");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal($"Bearer {bearerAccessToken}", forwardedAuthorization);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenRequestHasInvalidBearerAndValidCookie_ShouldReturnUnauthorized()
+    {
+        var downstreamWasCalled = false;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/users/profile", () =>
+            {
+                downstreamWasCalled = true;
+                return Results.Text("protected");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/profile",
+                "/api/users/profile",
+                "GET",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization = new(
+            "Bearer",
+            CreateAccessToken(signingKey: "Invalid-Gateway-SigningKey-2026-Strong!"));
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"at={CreateAccessToken()}");
+
+        using var response = await httpClient.GetAsync($"{GetAddress(gateway)}/api/users/profile");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.False(downstreamWasCalled);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenPostUsesJwtCookieAndValidCsrf_ShouldForwardToDownstream()
+    {
+        var downstreamWasCalled = false;
+        string? forwardedAuthorization = null;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapPost("/api/users/change-password", (HttpContext context) =>
+            {
+                downstreamWasCalled = true;
+                forwardedAuthorization = context.Request.Headers.Authorization.ToString();
+
+                return Results.NoContent();
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/change-password",
+                "/api/users/change-password",
+                "POST",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        var accessToken = CreateAccessToken();
+        var sessionId = "session-123";
+        var csrfToken = CreateCsrfToken(sessionId);
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"sid={sessionId}; at={accessToken}; XSRF-TOKEN={csrfToken}");
+        httpClient.DefaultRequestHeaders.Add("X-CSRF-TOKEN", csrfToken);
+        httpClient.DefaultRequestHeaders.Add("Origin", "https://app.authcore.dev");
+
+        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}/api/users/change-password", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(downstreamWasCalled);
+        Assert.Equal($"Bearer {accessToken}", forwardedAuthorization);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenPostUsesJwtCookieWithoutCsrf_ShouldReturnForbidden()
+    {
+        var downstreamWasCalled = false;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapPost("/api/users/change-password", () =>
+            {
+                downstreamWasCalled = true;
+                return Results.NoContent();
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/change-password",
+                "/api/users/change-password",
+                "POST",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"sid=session-123; at={CreateAccessToken()}");
+
+        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}/api/users/change-password", content: null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.False(downstreamWasCalled);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenPostUsesJwtCookieWithInvalidCsrf_ShouldReturnForbidden()
+    {
+        var downstreamWasCalled = false;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapPost("/api/users/change-password", () =>
+            {
+                downstreamWasCalled = true;
+                return Results.NoContent();
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/change-password",
+                "/api/users/change-password",
+                "POST",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        var sessionId = "session-123";
+        var csrfToken = CreateCsrfToken(sessionId);
+        var invalidCsrfToken = CreateCsrfToken("another-session");
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"sid={sessionId}; at={CreateAccessToken()}; XSRF-TOKEN={csrfToken}");
+        httpClient.DefaultRequestHeaders.Add("X-CSRF-TOKEN", invalidCsrfToken);
+        httpClient.DefaultRequestHeaders.Add("Origin", "https://app.authcore.dev");
+
+        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}/api/users/change-password", content: null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.False(downstreamWasCalled);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenPostUsesBearerWithoutCsrf_ShouldForwardToDownstream()
+    {
+        var downstreamWasCalled = false;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapPost("/api/users/change-password", () =>
+            {
+                downstreamWasCalled = true;
+                return Results.NoContent();
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/change-password",
+                "/api/users/change-password",
+                "POST",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken());
+
+        using var response = await httpClient.PostAsync($"{GetAddress(gateway)}/api/users/change-password", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(downstreamWasCalled);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenRequestHasInvalidJwtCookie_ShouldReturnUnauthorized()
+    {
+        var downstreamWasCalled = false;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/users/profile", () =>
+            {
+                downstreamWasCalled = true;
+                return Results.Text("protected");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/profile",
+                "/api/users/profile",
+                "GET",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"at={CreateAccessToken(signingKey: "Invalid-Gateway-SigningKey-2026-Strong!")}");
+
+        using var response = await httpClient.GetAsync($"{GetAddress(gateway)}/api/users/profile");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.False(downstreamWasCalled);
+    }
+
+    [Fact]
+    public async Task ProtectedAuthRoute_WhenRequestHasExpiredJwtCookie_ShouldReturnUnauthorized()
+    {
+        var downstreamWasCalled = false;
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/users/profile", () =>
+            {
+                downstreamWasCalled = true;
+                return Results.Text("protected");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/users/profile",
+                "/api/users/profile",
+                "GET",
+                authCore,
+                requiresAuthentication: true)
+        ]));
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Cookie", $"at={CreateAccessToken(expiresAtUtc: DateTime.UtcNow.AddMinutes(-5))}");
+
+        using var response = await httpClient.GetAsync($"{GetAddress(gateway)}/api/users/profile");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.False(downstreamWasCalled);
+    }
+
+    [Fact]
     public async Task HealthRoutes_WhenRequested_ShouldForwardToDownstreamHealthChecks()
     {
         await using var authCore = await StartDownstreamAsync(app =>
@@ -573,6 +918,7 @@ public sealed class OcelotRouteTests
 
         app.UseForwardedHeaders();
         app.UseAuthentication();
+        app.UseGatewayCookieAccessToken();
         app.UseAuthorization();
         app.UseGatewayRateLimitClientIdentity();
         await app.UseOcelot();
@@ -605,6 +951,12 @@ public sealed class OcelotRouteTests
             ["Authentication:Jwt:SigningKey"] = "Gateway-Tests-SigningKey-2026-Strong!",
             ["Authentication:Jwt:ClockSkewSeconds"] = "60",
             ["Authentication:Jwt:RequireHttpsMetadata"] = "false",
+            ["Auth:Cookie:SessionCookieName"] = "sid",
+            ["Auth:Cookie:AccessTokenCookieName"] = "at",
+            ["Auth:Csrf:CookieName"] = "XSRF-TOKEN",
+            ["Auth:Csrf:HeaderName"] = "X-CSRF-TOKEN",
+            ["Auth:Csrf:SigningKey"] = "tests-csrf-signing-key-2026",
+            ["Auth:Csrf:AllowedOrigins:0"] = "https://app.authcore.dev",
             ["GlobalConfiguration:BaseUrl"] = "http://localhost:8080"
         };
         var rateLimitRouteKeyIndex = 0;
@@ -757,8 +1109,13 @@ public sealed class OcelotRouteTests
     private static string CreateAccessToken(
         string issuer = "authcore-tests",
         string audience = "authcore-tests",
-        string signingKey = "Gateway-Tests-SigningKey-2026-Strong!")
+        string signingKey = "Gateway-Tests-SigningKey-2026-Strong!",
+        DateTime? expiresAtUtc = null)
     {
+        var expiration = expiresAtUtc ?? DateTime.UtcNow.AddMinutes(15);
+        var issuedAt = expiration <= DateTime.UtcNow
+            ? expiration.AddMinutes(-15)
+            : DateTime.UtcNow;
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
         var descriptor = new SecurityTokenDescriptor
@@ -769,7 +1126,9 @@ public sealed class OcelotRouteTests
                 new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Role, "User")
             ]),
-            Expires = DateTime.UtcNow.AddMinutes(15),
+            NotBefore = issuedAt,
+            IssuedAt = issuedAt,
+            Expires = expiration,
             SigningCredentials = credentials
         };
 
@@ -777,6 +1136,18 @@ public sealed class OcelotRouteTests
         var token = tokenHandler.CreateToken(descriptor);
 
         return tokenHandler.WriteToken(token);
+    }
+
+    private static string CreateCsrfToken(string sessionId)
+    {
+        var nonce = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes("tests-csrf-signing-key-2026"));
+        var payloadBytes = Encoding.UTF8.GetBytes($"{sessionId}:{nonce}");
+        var signatureBytes = hmac.ComputeHash(payloadBytes);
+        var signature = WebEncoders.Base64UrlEncode(signatureBytes);
+
+        return $"{nonce}.{signature}";
     }
 
     private static string GetOcelotJsonPath()

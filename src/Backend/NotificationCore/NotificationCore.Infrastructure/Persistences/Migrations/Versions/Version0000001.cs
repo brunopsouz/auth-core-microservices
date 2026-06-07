@@ -27,14 +27,19 @@ public sealed class Version0000001 : VersionBase
     private void CreateInboxMessagesTable()
     {
         Create.Table("InboxMessages")
+            .WithColumn("Id").AsGuid().NotNullable().PrimaryKey()
             .WithColumn("MessageId").AsGuid().NotNullable()
             .WithColumn("Source").AsString(100).NotNullable()
-            .WithColumn("Type").AsString(200).NotNullable()
+            .WithColumn("MessageType").AsString(200).NotNullable()
+            .WithColumn("ConsumerName").AsString(200).NotNullable()
             .WithColumn("Payload").AsString(int.MaxValue).NotNullable()
             .WithColumn("ReceivedAtUtc").AsCustom("timestamp with time zone").NotNullable()
             .WithColumn("ProcessedAtUtc").AsCustom("timestamp with time zone").Nullable()
             .WithColumn("Status").AsInt32().NotNullable()
-            .WithColumn("Error").AsString(2000).Nullable();
+            .WithColumn("Error").AsString(2000).Nullable()
+            .WithColumn("RetryCount").AsInt32().NotNullable().WithDefaultValue(0)
+            .WithColumn("CreatedAtUtc").AsCustom("timestamp with time zone").NotNullable()
+            .WithColumn("UpdatedAtUtc").AsCustom("timestamp with time zone").NotNullable();
     }
 
     /// <summary>
@@ -102,10 +107,21 @@ public sealed class Version0000001 : VersionBase
     /// </summary>
     private void CreateIndexes()
     {
-        Create.Index("IX_InboxMessages_MessageId")
+        Create.Index("IX_InboxMessages_MessageId_MessageType_ConsumerName")
             .OnTable("InboxMessages")
             .OnColumn("MessageId").Ascending()
+            .OnColumn("MessageType").Ascending()
+            .OnColumn("ConsumerName").Ascending()
             .WithOptions().Unique();
+
+        Create.Index("IX_InboxMessages_Status_CreatedAtUtc")
+            .OnTable("InboxMessages")
+            .OnColumn("Status").Ascending()
+            .OnColumn("CreatedAtUtc").Ascending();
+
+        Create.Index("IX_InboxMessages_ProcessedAtUtc")
+            .OnTable("InboxMessages")
+            .OnColumn("ProcessedAtUtc").Ascending();
 
         Create.Index("IX_Notifications_IdempotencyKey")
             .OnTable("Notifications")

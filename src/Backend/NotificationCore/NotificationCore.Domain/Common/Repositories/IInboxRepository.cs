@@ -1,72 +1,112 @@
-using NotificationCore.Domain.Common.Messaging;
-
 namespace NotificationCore.Domain.Common.Repositories;
 
 /// <summary>
-/// Define operações de persistência para mensagens de inbox.
+/// Define operacoes de persistencia para controle idempotente de mensagens consumidas.
 /// </summary>
 public interface IInboxRepository
 {
     /// <summary>
-    /// Operação para adicionar uma mensagem de inbox.
-    /// </summary>
-    /// <param name="message">Mensagem a ser persistida.</param>
-    Task AddAsync(InboxMessage message);
-
-    /// <summary>
-    /// Operação para tentar adicionar uma mensagem de inbox de forma idempotente.
-    /// </summary>
-    /// <param name="message">Mensagem a ser persistida.</param>
-    /// <returns>Verdadeiro quando a mensagem foi adicionada.</returns>
-    Task<bool> TryAddAsync(InboxMessage message);
-
-    /// <summary>
-    /// Operação para obter uma mensagem pelo identificador idempotente.
+    /// Operacao para tentar iniciar o processamento idempotente da mensagem.
     /// </summary>
     /// <param name="messageId">Identificador idempotente da mensagem.</param>
-    /// <returns>Mensagem encontrada ou nula.</returns>
-    Task<InboxMessage?> GetByMessageIdAsync(Guid messageId);
+    /// <param name="messageType">Tipo logico da mensagem.</param>
+    /// <param name="consumerName">Nome do consumidor.</param>
+    /// <param name="payload">Conteudo serializado da mensagem.</param>
+    /// <param name="receivedAtUtc">Data de recebimento em UTC.</param>
+    /// <returns>Resultado da tentativa de inicio.</returns>
+    Task<InboxProcessingStartResult> TryStartProcessingAsync(
+        Guid messageId,
+        string messageType,
+        string consumerName,
+        string payload,
+        DateTime receivedAtUtc);
 
     /// <summary>
-    /// Operação para obter a mensagem original pela chave de idempotência da notificação.
+    /// Operacao para obter o payload original pela chave de idempotencia da notificacao.
     /// </summary>
-    /// <param name="idempotencyKey">Chave de idempotência da notificação.</param>
-    /// <returns>Mensagem encontrada ou nula.</returns>
-    Task<InboxMessage?> GetByNotificationIdempotencyKeyAsync(string idempotencyKey);
+    /// <param name="idempotencyKey">Chave de idempotencia da notificacao.</param>
+    /// <returns>Payload encontrado ou nulo.</returns>
+    Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(string idempotencyKey);
 
     /// <summary>
-    /// Operação para obter mensagens recebidas e ainda não processadas.
-    /// </summary>
-    /// <param name="take">Quantidade máxima de mensagens.</param>
-    /// <returns>Coleção de mensagens pendentes.</returns>
-    Task<IReadOnlyCollection<InboxMessage>> GetPendingAsync(int take);
-
-    /// <summary>
-    /// Operação para buscar mensagens de inbox por filtros administrativos.
-    /// </summary>
-    /// <param name="messageId">Identificador idempotente opcional.</param>
-    /// <param name="source">Sistema de origem opcional.</param>
-    /// <param name="status">Status opcional da mensagem.</param>
-    /// <param name="skip">Quantidade de registros ignorados.</param>
-    /// <param name="take">Quantidade máxima de registros.</param>
-    /// <returns>Coleção de mensagens encontradas.</returns>
-    Task<IReadOnlyCollection<InboxMessage>> SearchAsync(
-        Guid? messageId,
-        string? source,
-        InboxMessageStatus? status,
-        int skip,
-        int take);
-
-    /// <summary>
-    /// Operação para verificar se uma mensagem já foi recebida.
+    /// Operacao para marcar mensagem como processada.
     /// </summary>
     /// <param name="messageId">Identificador idempotente da mensagem.</param>
-    /// <returns>Verdadeiro quando a mensagem já existe.</returns>
-    Task<bool> ExistsByMessageIdAsync(Guid messageId);
+    /// <param name="messageType">Tipo logico da mensagem.</param>
+    /// <param name="consumerName">Nome do consumidor.</param>
+    /// <param name="processedAtUtc">Data de processamento em UTC.</param>
+    Task MarkAsProcessedAsync(
+        Guid messageId,
+        string messageType,
+        string consumerName,
+        DateTime processedAtUtc);
 
     /// <summary>
-    /// Operação para atualizar uma mensagem de inbox.
+    /// Operacao para marcar mensagem como falha.
     /// </summary>
-    /// <param name="message">Mensagem atualizada.</param>
-    Task UpdateAsync(InboxMessage message);
+    /// <param name="messageId">Identificador idempotente da mensagem.</param>
+    /// <param name="messageType">Tipo logico da mensagem.</param>
+    /// <param name="consumerName">Nome do consumidor.</param>
+    /// <param name="payload">Conteudo serializado da mensagem.</param>
+    /// <param name="receivedAtUtc">Data de recebimento em UTC.</param>
+    /// <param name="error">Erro sanitizado da tentativa.</param>
+    Task MarkAsFailedAsync(
+        Guid messageId,
+        string messageType,
+        string consumerName,
+        string payload,
+        DateTime receivedAtUtc,
+        string error);
+}
+
+/// <summary>
+/// Representa resultado da tentativa de processamento de inbox.
+/// </summary>
+public sealed class InboxProcessingStartResult
+{
+    /// <summary>
+    /// Indica se esta instancia deve processar a mensagem.
+    /// </summary>
+    public bool ShouldProcess { get; init; }
+
+    /// <summary>
+    /// Indica se a mensagem ja havia sido processada antes.
+    /// </summary>
+    public bool WasAlreadyProcessed { get; init; }
+
+    /// <summary>
+    /// Quantidade atual de tentativas registradas.
+    /// </summary>
+    public int RetryCount { get; init; }
+
+    /// <summary>
+    /// Operacao para criar resultado de processamento iniciado.
+    /// </summary>
+    /// <param name="retryCount">Quantidade atual de tentativas.</param>
+    /// <returns>Resultado criado.</returns>
+    public static InboxProcessingStartResult Started(int retryCount)
+    {
+        return new InboxProcessingStartResult
+        {
+            ShouldProcess = true,
+            WasAlreadyProcessed = false,
+            RetryCount = retryCount
+        };
+    }
+
+    /// <summary>
+    /// Operacao para criar resultado de mensagem duplicada.
+    /// </summary>
+    /// <param name="wasAlreadyProcessed">Indica se a mensagem ja estava processada.</param>
+    /// <param name="retryCount">Quantidade atual de tentativas.</param>
+    /// <returns>Resultado criado.</returns>
+    public static InboxProcessingStartResult Skipped(bool wasAlreadyProcessed, int retryCount)
+    {
+        return new InboxProcessingStartResult
+        {
+            ShouldProcess = false,
+            WasAlreadyProcessed = wasAlreadyProcessed,
+            RetryCount = retryCount
+        };
+    }
 }

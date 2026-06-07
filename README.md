@@ -7,7 +7,7 @@
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3-FF6600?logo=rabbitmq&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-AuthCore é uma solução backend em .NET 10 para autenticação, gestão de usuários e notificações transacionais. O projeto evoluiu para uma arquitetura com microserviços, API Gateway, mensageria assíncrona e serviços organizados por camadas com influência de Clean Architecture e DDD tático.
+AuthCore é uma solução backend em .NET 10 para autenticação, gestão de usuários e notificações transacionais. A base está organizada por serviços backend, API Gateway, mensageria assíncrona e camadas internas com influência de Clean Architecture e DDD tático.
 
 O objetivo é oferecer um núcleo de autenticação robusto para aplicações backend, mantendo regras de negócio no domínio, casos de uso na aplicação, detalhes técnicos na infraestrutura e comunicação entre serviços por contratos explícitos.
 
@@ -21,6 +21,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 - [Instalação](#instalação)
 - [Uso](#uso)
 - [Configuração](#configuração)
+- [Autenticação](#autenticação)
 - [Endpoints principais](#endpoints-principais)
 - [Testes](#testes)
 - [Estrutura do projeto](#estrutura-do-projeto)
@@ -30,8 +31,9 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 
 - Registro de usuários com validação de dados e senha.
 - Verificação de e-mail por código OTP.
-- Login por sessão com cookie HTTP.
+- Login por sessão com cookies `HttpOnly`.
 - Login token-based com access token JWT e refresh token.
+- Autenticação híbrida para Browser/PWA com sessão server-side e JWT curto em cookie `HttpOnly`.
 - Renovação e revogação de sessões.
 - Logout da sessão atual, logout por token e logout global.
 - Listagem e revogação de sessões ativas do usuário.
@@ -47,7 +49,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 
 ## Serviços
 
-- `Gateway.Api`: API Gateway com Ocelot, autenticação JWT e roteamento para os serviços internos.
+- `Gateway.Api`: API Gateway com Ocelot, autenticação JWT, suporte a JWT via cookie `HttpOnly`, proteção CSRF para mutações por cookie e roteamento para os serviços internos.
 - `AuthCore.Api`: serviço de autenticação e usuários.
 - `NotificationCore.Api`: serviço de notificações transacionais, templates e envio de e-mail.
 - `BuildingBlocks.Messaging.Contracts`: contratos compartilhados de mensageria e utilitários de payload sensível.
@@ -71,7 +73,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 
 ## Arquitetura
 
-A solução combina microserviços e organização em camadas dentro de cada serviço de negócio:
+A solução organiza serviços backend com separação de responsabilidades e camadas internas por contexto de negócio:
 
 ```mermaid
 flowchart TD
@@ -107,7 +109,7 @@ flowchart TD
 
 Responsabilidades principais:
 
-- `Gateway.Api`: borda pública em Docker Compose, roteamento, rate limiting e validação JWT para rotas protegidas.
+- `Gateway.Api`: borda pública em Docker Compose, roteamento, rate limiting, validação JWT para rotas protegidas e suporte ao fluxo Browser/PWA com JWT em cookie `HttpOnly`.
 - `AuthCore.Api`: controllers HTTP, contratos JSON, autenticação, autorização, Swagger e health checks.
 - `AuthCore.Application`: orquestração dos casos de uso de autenticação e usuários.
 - `AuthCore.Domain`: agregados, entidades, value objects, invariantes, eventos e contratos centrais de autenticação.
@@ -246,6 +248,79 @@ Serviços padrão em desenvolvimento:
 
 Credenciais, senhas e chave de assinatura JWT devem ficar no `.env.development` local ou no mecanismo de segredos do ambiente de deploy. O `docker-compose.yml` apenas referencia essas variáveis.
 
+## Autenticação
+
+O projeto possui dois fluxos de autenticação para desenvolvimento e validação local.
+
+### Browser/PWA: sessão server-side + JWT curto em cookie
+
+Esse é o fluxo recomendado para aplicações browser. O login em `POST /api/auth/session/login` cria uma sessão server-side no AuthCore e emite cookies de autenticação:
+
+| Cookie | HttpOnly | Uso |
+| --- | --- | --- |
+| `sid` | Sim | Identificador opaco da sessão server-side |
+| `at` | Sim | JWT curto usado pelo Gateway para autenticar rotas protegidas |
+| `XSRF-TOKEN` | Não | Token CSRF que o frontend lê e envia no header `X-CSRF-TOKEN` |
+
+O JWT do cookie `at` não é retornado no corpo da resposta e não precisa ser lido por JavaScript. Em requisições para rotas protegidas via Gateway, o navegador envia os cookies automaticamente com `credentials: "include"`. O Gateway valida o JWT de forma stateless e encaminha internamente `Authorization: Bearer <jwt>` para o serviço downstream.
+
+Para métodos mutáveis autenticados por cookie, o Gateway exige CSRF válido:
+
+- exige CSRF: `POST`, `PUT`, `PATCH`, `DELETE`
+- não exige CSRF: `GET`, `HEAD`, `OPTIONS`
+
+O token CSRF é assinado e vinculado ao `sid`. A validação não é apenas comparação simples entre cookie e header.
+
+As rotas `/api/auth/...` continuam sob responsabilidade do AuthCore. Isso permite que login, refresh, logout e rotas públicas de autenticação usem as validações próprias do AuthCore, incluindo sessão por cookie e CSRF.
+
+### API/mobile: Authorization Bearer
+
+Clientes API, mobile ou integrações podem usar o fluxo token-based em `POST /api/auth/token/login`. Nesse caso, o access token é retornado no corpo da resposta e deve ser enviado como:
+
+```http
+Authorization: Bearer <access-token>
+```
+
+Quando `Authorization: Bearer` está presente, ele tem prioridade sobre qualquer cookie `at` enviado junto na requisição. Esse fluxo não exige CSRF.
+
+### Teste manual do fluxo Browser/PWA
+
+1. Suba a aplicação completa com Docker Compose.
+2. Acesse o Swagger do AuthCore em `http://localhost:8081/swagger`.
+3. Registre e verifique um usuário.
+4. Faça login em `POST /api/auth/session/login`.
+5. No navegador, abra DevTools > Application > Cookies e confirme `sid`, `at` e `XSRF-TOKEN`.
+6. Confirme que `sid` e `at` estão com `HttpOnly`.
+7. Chame `GET http://localhost:8080/api/users/profile` com `credentials: "include"`.
+8. Para `POST`, `PUT`, `PATCH` ou `DELETE` via Gateway, envie também o header `X-CSRF-TOKEN` com o valor do cookie `XSRF-TOKEN`.
+
+Exemplo no console do navegador:
+
+```javascript
+const csrf = document.cookie
+  .split("; ")
+  .find(value => value.startsWith("XSRF-TOKEN="))
+  ?.split("=")[1];
+
+await fetch("http://localhost:8080/api/users/profile", {
+  method: "GET",
+  credentials: "include"
+});
+
+await fetch("http://localhost:8080/api/users/change-password", {
+  method: "PUT",
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+    "X-CSRF-TOKEN": csrf
+  },
+  body: JSON.stringify({
+    currentPassword: "Senha@123456",
+    newPassword: "NovaSenha@123456"
+  })
+});
+```
+
 ## Endpoints principais
 
 Quando a aplicação completa está em Docker, prefira acessar as rotas publicadas pelo Gateway em `http://localhost:8080`.
@@ -282,7 +357,7 @@ Quando a aplicação completa está em Docker, prefira acessar as rotas publicad
 | `GET` | `/api/notifications/{id}` | Consulta uma notificação pelo identificador |
 | `POST` | `/api/notifications/test-email` | Envia uma notificação de teste |
 
-As rotas de `NotificationCore` publicadas pelo Gateway exigem Bearer token.
+As rotas de `NotificationCore` publicadas pelo Gateway exigem autenticação. Clientes browser podem usar o cookie `at` emitido pelo fluxo de sessão; clientes API/mobile podem usar `Authorization: Bearer`.
 
 ### Health checks
 
@@ -325,7 +400,7 @@ curl -X POST http://localhost:8080/api/auth/verify-email \
   }'
 ```
 
-### Exemplo: login com token
+### Exemplo: login com token para API/mobile
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/token/login \
@@ -336,11 +411,22 @@ curl -X POST http://localhost:8080/api/auth/token/login \
   }'
 ```
 
-### Exemplo: consultar perfil autenticado
+### Exemplo: consultar perfil autenticado com Bearer
 
 ```bash
 curl http://localhost:8080/api/users/profile \
   -H "Authorization: Bearer <access-token>"
+```
+
+### Exemplo: consultar perfil autenticado com cookies do browser
+
+Depois do login em `POST /api/auth/session/login`, o navegador envia os cookies automaticamente quando a chamada usa credenciais:
+
+```javascript
+await fetch("http://localhost:8080/api/users/profile", {
+  method: "GET",
+  credentials: "include"
+});
 ```
 
 ### Exemplo: enviar e-mail de teste

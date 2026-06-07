@@ -1,6 +1,5 @@
 using BuildingBlocks.Messaging.Contracts.Notifications;
 using NotificationCore.Application.UseCases.Notifications.RegisterNotificationRequest;
-using NotificationCore.Domain.Common.Messaging;
 using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Domain.Notifications.Aggregates;
 using NotificationCore.Domain.Notifications.Enums;
@@ -11,7 +10,7 @@ namespace NotificationCore.Application.UnitTests.UseCases.Notifications.Register
 public sealed class RegisterNotificationRequestUseCaseTests
 {
     [Fact]
-    public async Task Execute_WhenMessageIsNew_ShouldRegisterInboxAndCreatePendingNotificationInTransaction()
+    public async Task Execute_WhenMessageIsNew_ShouldStartInboxAndCreatePendingNotificationInTransaction()
     {
         var inboxRepository = new FakeInboxRepository();
         var notificationRepository = new FakeNotificationRepository();
@@ -27,19 +26,16 @@ public sealed class RegisterNotificationRequestUseCaseTests
 
         var result = await useCase.Execute(command);
 
-        var inboxMessage = Assert.Single(inboxRepository.AddedMessages);
-        var updatedInboxMessage = Assert.Single(inboxRepository.UpdatedMessages);
+        var startedMessage = Assert.Single(inboxRepository.StartedMessages);
+        var processedMessage = Assert.Single(inboxRepository.ProcessedMessages);
         var notification = Assert.Single(notificationRepository.AddedNotifications);
 
         Assert.True(result.WasCreated);
         Assert.False(result.WasDuplicate);
         Assert.Equal(notification.Id, result.NotificationId);
-        Assert.Equal(command.Request.MessageId, inboxMessage.MessageId);
-        Assert.Equal(nameof(SendTransactionalNotificationRequested), inboxMessage.Type);
-        Assert.Equal(InboxMessageStatus.Processed, updatedInboxMessage.Status);
+        Assert.Equal(command.Request.MessageId, startedMessage.MessageId);
+        Assert.Equal(command.Request.MessageId, processedMessage.MessageId);
         Assert.Equal(NotificationStatus.Pending, notification.Status);
-        Assert.Equal(NotificationChannel.Email, notification.Channel);
-        Assert.Equal(NotificationPriority.High, notification.Priority);
         Assert.Equal(command.Request.IdempotencyKey, notification.IdempotencyKey.Value);
         Assert.Equal(1, unitOfWork.BegunTransactions);
         Assert.Equal(1, unitOfWork.CommittedTransactions);
@@ -47,7 +43,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenMessageIdAlreadyExists_ShouldReturnDuplicateWithoutCreatingNotification()
+    public async Task Execute_WhenMessageIdAlreadyProcessed_ShouldReturnDuplicateWithoutCreatingNotification()
     {
         var request = CreateRequest();
         var inboxRepository = new FakeInboxRepository();
@@ -58,7 +54,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
             notificationRepository,
             unitOfWork);
 
-        inboxRepository.ExistingMessageIds.Add(request.MessageId);
+        inboxRepository.ProcessedMessageIds.Add(request.MessageId);
 
         var result = await useCase.Execute(new RegisterNotificationRequestCommand
         {
@@ -68,8 +64,8 @@ public sealed class RegisterNotificationRequestUseCaseTests
         Assert.False(result.WasCreated);
         Assert.True(result.WasDuplicate);
         Assert.Null(result.NotificationId);
-        Assert.Empty(inboxRepository.AddedMessages);
-        Assert.Empty(inboxRepository.UpdatedMessages);
+        Assert.Empty(inboxRepository.StartedMessages);
+        Assert.Empty(inboxRepository.ProcessedMessages);
         Assert.Empty(notificationRepository.AddedNotifications);
         Assert.Equal(1, unitOfWork.BegunTransactions);
         Assert.Equal(1, unitOfWork.CommittedTransactions);
@@ -77,7 +73,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenIdempotencyKeyAlreadyExists_ShouldRegisterInboxAndReturnDuplicateWithoutCreatingNotification()
+    public async Task Execute_WhenIdempotencyKeyAlreadyExists_ShouldMarkInboxProcessedAndReturnDuplicate()
     {
         var request = CreateRequest();
         var inboxRepository = new FakeInboxRepository();
@@ -96,14 +92,11 @@ public sealed class RegisterNotificationRequestUseCaseTests
             Request = request
         });
 
-        var inboxMessage = Assert.Single(inboxRepository.AddedMessages);
-        var updatedInboxMessage = Assert.Single(inboxRepository.UpdatedMessages);
-
         Assert.False(result.WasCreated);
         Assert.True(result.WasDuplicate);
         Assert.Equal(existingNotification.Id, result.NotificationId);
-        Assert.Equal(request.MessageId, inboxMessage.MessageId);
-        Assert.Equal(InboxMessageStatus.Processed, updatedInboxMessage.Status);
+        Assert.Single(inboxRepository.StartedMessages);
+        Assert.Single(inboxRepository.ProcessedMessages);
         Assert.Empty(notificationRepository.AddedNotifications);
         Assert.Equal(1, unitOfWork.BegunTransactions);
         Assert.Equal(1, unitOfWork.CommittedTransactions);
@@ -111,7 +104,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenNotificationRepositoryFails_ShouldRollbackTransaction()
+    public async Task Execute_WhenNotificationRepositoryFails_ShouldRollbackAndMarkInboxAsFailed()
     {
         var inboxRepository = new FakeInboxRepository();
         var notificationRepository = new FakeNotificationRepository
@@ -130,9 +123,56 @@ public sealed class RegisterNotificationRequestUseCaseTests
                 Request = CreateRequest()
             }));
 
-        Assert.Single(inboxRepository.AddedMessages);
-        Assert.Empty(inboxRepository.UpdatedMessages);
+        Assert.Single(inboxRepository.StartedMessages);
+        Assert.Single(inboxRepository.FailedMessages);
+        Assert.Empty(inboxRepository.ProcessedMessages);
         Assert.Empty(notificationRepository.AddedNotifications);
+        Assert.Equal(2, unitOfWork.BegunTransactions);
+        Assert.Equal(1, unitOfWork.CommittedTransactions);
+        Assert.Equal(1, unitOfWork.RolledBackTransactions);
+    }
+
+    [Fact]
+    public async Task Execute_WhenSameMessageIsProcessedTwice_ShouldNotCreateNotificationTwice()
+    {
+        var request = CreateRequest();
+        var inboxRepository = new FakeInboxRepository();
+        var notificationRepository = new FakeNotificationRepository();
+        var unitOfWork = new SpyUnitOfWork();
+        var useCase = new RegisterNotificationRequestUseCase(
+            inboxRepository,
+            notificationRepository,
+            unitOfWork);
+
+        await useCase.Execute(new RegisterNotificationRequestCommand { Request = request });
+        var secondResult = await useCase.Execute(new RegisterNotificationRequestCommand { Request = request });
+
+        Assert.True(secondResult.WasDuplicate);
+        Assert.Single(notificationRepository.AddedNotifications);
+        Assert.Single(inboxRepository.StartedMessages);
+        Assert.Single(inboxRepository.ProcessedMessages);
+    }
+
+    [Fact]
+    public async Task Execute_WhenMessageIsAlreadyBeingProcessed_ShouldRollbackWithoutCreatingNotificationOrFailingInbox()
+    {
+        var request = CreateRequest();
+        var inboxRepository = new FakeInboxRepository();
+        var notificationRepository = new FakeNotificationRepository();
+        var unitOfWork = new SpyUnitOfWork();
+        var useCase = new RegisterNotificationRequestUseCase(
+            inboxRepository,
+            notificationRepository,
+            unitOfWork);
+
+        inboxRepository.ProcessingMessageIds.Add(request.MessageId);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            useCase.Execute(new RegisterNotificationRequestCommand { Request = request }));
+
+        Assert.Empty(notificationRepository.AddedNotifications);
+        Assert.Empty(inboxRepository.StartedMessages);
+        Assert.Empty(inboxRepository.FailedMessages);
         Assert.Equal(1, unitOfWork.BegunTransactions);
         Assert.Equal(0, unitOfWork.CommittedTransactions);
         Assert.Equal(1, unitOfWork.RolledBackTransactions);
@@ -144,6 +184,9 @@ public sealed class RegisterNotificationRequestUseCaseTests
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = "correlation-123",
+            CausationId = "causation-123",
+            EventType = nameof(SendTransactionalNotificationRequested),
+            Version = 1,
             Source = "AuthCore",
             Channel = channel,
             Recipient = "bruno@example.com",
@@ -155,7 +198,8 @@ public sealed class RegisterNotificationRequestUseCaseTests
             },
             Priority = "High",
             IdempotencyKey = $"auth-email-confirmation:{Guid.NewGuid()}",
-            RequestedAtUtc = new DateTime(2026, 5, 6, 12, 0, 0, DateTimeKind.Utc)
+            RequestedAtUtc = new DateTime(2026, 5, 6, 12, 0, 0, DateTimeKind.Utc),
+            OccurredAtUtc = new DateTime(2026, 5, 6, 12, 0, 0, DateTimeKind.Utc)
         };
     }
 
@@ -174,95 +218,73 @@ public sealed class RegisterNotificationRequestUseCaseTests
 
     private sealed class FakeInboxRepository : IInboxRepository
     {
-        public HashSet<Guid> ExistingMessageIds { get; } = [];
+        public HashSet<Guid> ProcessedMessageIds { get; } = [];
 
-        public List<InboxMessage> AddedMessages { get; } = [];
+        public HashSet<Guid> ProcessingMessageIds { get; } = [];
 
-        public List<InboxMessage> UpdatedMessages { get; } = [];
+        public List<InboxCall> StartedMessages { get; } = [];
 
-        public Task AddAsync(InboxMessage message)
+        public List<InboxCall> ProcessedMessages { get; } = [];
+
+        public List<InboxCall> FailedMessages { get; } = [];
+
+        public Task<InboxProcessingStartResult> TryStartProcessingAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            string payload,
+            DateTime receivedAtUtc)
         {
-            AddedMessages.Add(message);
-            ExistingMessageIds.Add(message.MessageId);
+            if (ProcessedMessageIds.Contains(messageId))
+                return Task.FromResult(InboxProcessingStartResult.Skipped(wasAlreadyProcessed: true, retryCount: 0));
+
+            if (ProcessingMessageIds.Contains(messageId))
+                return Task.FromResult(InboxProcessingStartResult.Skipped(wasAlreadyProcessed: false, retryCount: 0));
+
+            StartedMessages.Add(new InboxCall(messageId, messageType, consumerName, payload));
+
+            return Task.FromResult(InboxProcessingStartResult.Started(retryCount: 0));
+        }
+
+        public Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(string idempotencyKey)
+        {
+            return Task.FromResult<string?>(null);
+        }
+
+        public Task MarkAsProcessedAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            DateTime processedAtUtc)
+        {
+            ProcessedMessageIds.Add(messageId);
+            ProcessedMessages.Add(new InboxCall(messageId, messageType, consumerName, string.Empty));
 
             return Task.CompletedTask;
         }
 
-        public Task<bool> TryAddAsync(InboxMessage message)
+        public Task MarkAsFailedAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            string payload,
+            DateTime receivedAtUtc,
+            string error)
         {
-            if (ExistingMessageIds.Contains(message.MessageId))
-                return Task.FromResult(false);
-
-            AddedMessages.Add(message);
-            ExistingMessageIds.Add(message.MessageId);
-
-            return Task.FromResult(true);
-        }
-
-        public Task<InboxMessage?> GetByMessageIdAsync(Guid messageId)
-        {
-            return Task.FromResult(AddedMessages.SingleOrDefault(message => message.MessageId == messageId));
-        }
-
-        public Task<InboxMessage?> GetByNotificationIdempotencyKeyAsync(string idempotencyKey)
-        {
-            return Task.FromResult<InboxMessage?>(null);
-        }
-
-        public Task<IReadOnlyCollection<InboxMessage>> GetPendingAsync(int take)
-        {
-            IReadOnlyCollection<InboxMessage> messages = AddedMessages
-                .Where(message => message.Status == InboxMessageStatus.Received)
-                .Take(take)
-                .ToList();
-
-            return Task.FromResult(messages);
-        }
-
-        public Task<IReadOnlyCollection<InboxMessage>> SearchAsync(
-            Guid? messageId,
-            string? source,
-            InboxMessageStatus? status,
-            int skip,
-            int take)
-        {
-            IEnumerable<InboxMessage> query = AddedMessages;
-
-            if (messageId.HasValue)
-                query = query.Where(message => message.MessageId == messageId.Value);
-
-            if (!string.IsNullOrWhiteSpace(source))
-                query = query.Where(message => message.Source == source);
-
-            if (status.HasValue)
-                query = query.Where(message => message.Status == status.Value);
-
-            IReadOnlyCollection<InboxMessage> messages = query
-                .Skip(skip)
-                .Take(take)
-                .ToList();
-
-            return Task.FromResult(messages);
-        }
-
-        public Task<bool> ExistsByMessageIdAsync(Guid messageId)
-        {
-            return Task.FromResult(ExistingMessageIds.Contains(messageId));
-        }
-
-        public Task UpdateAsync(InboxMessage message)
-        {
-            UpdatedMessages.Add(message);
+            FailedMessages.Add(new InboxCall(messageId, messageType, consumerName, payload));
 
             return Task.CompletedTask;
         }
     }
 
+    private sealed record InboxCall(
+        Guid MessageId,
+        string MessageType,
+        string ConsumerName,
+        string Payload);
+
     private sealed class FakeNotificationRepository : INotificationRepository
     {
-        /// <summary>
-        /// Campo que armazena notifications by idempotency key.
-        /// </summary>
         private readonly Dictionary<string, Notification> _notificationsByIdempotencyKey = [];
 
         public bool ThrowOnAdd { get; init; }
@@ -272,7 +294,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         public Task AddAsync(Notification notification)
         {
             if (ThrowOnAdd)
-                throw new InvalidOperationException("Falha ao persistir notificação.");
+                throw new InvalidOperationException("Falha ao persistir notificacao.");
 
             AddedNotifications.Add(notification);
             _notificationsByIdempotencyKey[notification.IdempotencyKey.Value] = notification;
@@ -283,7 +305,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         public Task<bool> TryAddAsync(Notification notification)
         {
             if (ThrowOnAdd)
-                throw new InvalidOperationException("Falha ao persistir notificação.");
+                throw new InvalidOperationException("Falha ao persistir notificacao.");
 
             if (_notificationsByIdempotencyKey.ContainsKey(notification.IdempotencyKey.Value))
                 return Task.FromResult(false);
@@ -309,24 +331,12 @@ public sealed class RegisterNotificationRequestUseCaseTests
 
         public Task<IReadOnlyCollection<Notification>> GetPendingForDispatchAsync(DateTime dueAtUtc, int take)
         {
-            IReadOnlyCollection<Notification> notifications = _notificationsByIdempotencyKey.Values
-                .Where(notification => notification.Status is NotificationStatus.Pending or NotificationStatus.RetryScheduled)
-                .Where(notification => notification.ScheduledAtUtc <= dueAtUtc)
-                .Take(take)
-                .ToList();
-
-            return Task.FromResult(notifications);
+            return Task.FromResult<IReadOnlyCollection<Notification>>([]);
         }
 
         public Task<IReadOnlyCollection<Notification>> GetProcessingTimedOutAsync(DateTime dueAtUtc, int take)
         {
-            IReadOnlyCollection<Notification> notifications = _notificationsByIdempotencyKey.Values
-                .Where(notification => notification.Status == NotificationStatus.Processing)
-                .Where(notification => notification.ScheduledAtUtc <= dueAtUtc)
-                .Take(take)
-                .ToList();
-
-            return Task.FromResult(notifications);
+            return Task.FromResult<IReadOnlyCollection<Notification>>([]);
         }
 
         public Task<IReadOnlyCollection<Notification>> SearchAsync(
@@ -335,20 +345,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
             int skip,
             int take)
         {
-            IEnumerable<Notification> query = _notificationsByIdempotencyKey.Values;
-
-            if (!string.IsNullOrWhiteSpace(correlationId))
-                query = query.Where(notification => notification.CorrelationId == correlationId);
-
-            if (status.HasValue)
-                query = query.Where(notification => notification.Status == status.Value);
-
-            IReadOnlyCollection<Notification> notifications = query
-                .Skip(skip)
-                .Take(take)
-                .ToList();
-
-            return Task.FromResult(notifications);
+            return Task.FromResult<IReadOnlyCollection<Notification>>([]);
         }
 
         public Task UpdateAsync(Notification notification)
@@ -360,8 +357,6 @@ public sealed class RegisterNotificationRequestUseCaseTests
 
         public Task<bool> TryUpdateProcessingTimedOutAsync(Notification notification, DateTime processingTimeoutAtUtc)
         {
-            _notificationsByIdempotencyKey[notification.IdempotencyKey.Value] = notification;
-
             return Task.FromResult(true);
         }
 

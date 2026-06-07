@@ -24,6 +24,9 @@ internal sealed class EmailVerificationNotificationOutboxFactory : IEmailVerific
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = Guid.NewGuid().ToString("D"),
+            CausationId = verification.Id.ToString("D"),
+            EventType = nameof(SendTransactionalNotificationRequested),
+            Version = 1,
             Source = "AuthCore",
             Channel = "Email",
             Recipient = verification.Email,
@@ -38,7 +41,8 @@ internal sealed class EmailVerificationNotificationOutboxFactory : IEmailVerific
             IdempotencyKey = string.Create(
                 CultureInfo.InvariantCulture,
                 $"auth-email-confirmation:{verification.Id:D}:{requestedAtUtc.Ticks}"),
-            RequestedAtUtc = requestedAtUtc
+            RequestedAtUtc = requestedAtUtc,
+            OccurredAtUtc = requestedAtUtc
         };
 
         return OutboxMessage.Create(

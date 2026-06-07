@@ -2,7 +2,6 @@ using System.Text.Json;
 using BuildingBlocks.Messaging.Contracts.Notifications;
 using NotificationCore.Application.UseCases.Notifications.DispatchPendingNotification;
 using NotificationCore.Domain.Common.Exceptions;
-using NotificationCore.Domain.Common.Messaging;
 using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Domain.Notifications.Aggregates;
 using NotificationCore.Domain.Notifications.Enums;
@@ -354,18 +353,9 @@ public sealed class DispatchPendingNotificationUseCaseTests
         };
     }
 
-    private static InboxMessage CreateInboxMessage(SendTransactionalNotificationRequested request)
+    private static string CreateInboxMessage(SendTransactionalNotificationRequested request)
     {
-        var message = InboxMessage.Create(
-            request.MessageId,
-            request.Source,
-            nameof(SendTransactionalNotificationRequested),
-            JsonSerializer.Serialize(request),
-            new DateTime(2026, 5, 6, 12, 0, 1, DateTimeKind.Utc));
-
-        message.MarkAsProcessed(new DateTime(2026, 5, 6, 12, 0, 2, DateTimeKind.Utc));
-
-        return message;
+        return JsonSerializer.Serialize(request);
     }
 
     private sealed class FakeNotificationRepository : INotificationRepository
@@ -474,93 +464,57 @@ public sealed class DispatchPendingNotificationUseCaseTests
     private sealed class FakeInboxRepository : IInboxRepository
     {
         /// <summary>
-        /// Campo que armazena messages.
+        /// Campo que armazena payloads.
         /// </summary>
-        private readonly List<InboxMessage> _messages = [];
+        private readonly List<string> _payloads = [];
 
-        public Task AddAsync(InboxMessage message)
+        public Task<InboxProcessingStartResult> TryStartProcessingAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            string payload,
+            DateTime receivedAtUtc)
         {
-            _messages.Add(message);
+            _payloads.Add(payload);
 
-            return Task.CompletedTask;
+            return Task.FromResult(InboxProcessingStartResult.Started(retryCount: 0));
         }
 
-        public Task<bool> TryAddAsync(InboxMessage message)
+        public Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(string idempotencyKey)
         {
-            if (_messages.Any(current => current.MessageId == message.MessageId))
-                return Task.FromResult(false);
-
-            _messages.Add(message);
-
-            return Task.FromResult(true);
-        }
-
-        public Task<InboxMessage?> GetByMessageIdAsync(Guid messageId)
-        {
-            return Task.FromResult(_messages.SingleOrDefault(message => message.MessageId == messageId));
-        }
-
-        public Task<InboxMessage?> GetByNotificationIdempotencyKeyAsync(string idempotencyKey)
-        {
-            var message = _messages.SingleOrDefault(message =>
+            var payload = _payloads.SingleOrDefault(payload =>
             {
-                var request = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(message.Payload);
+                var request = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(payload);
 
                 return request?.IdempotencyKey == idempotencyKey;
             });
 
-            return Task.FromResult(message);
+            return Task.FromResult(payload);
         }
 
-        public Task<IReadOnlyCollection<InboxMessage>> GetPendingAsync(int take)
-        {
-            IReadOnlyCollection<InboxMessage> messages = _messages
-                .Where(message => message.Status == InboxMessageStatus.Received)
-                .Take(take)
-                .ToList();
-
-            return Task.FromResult(messages);
-        }
-
-        public Task<IReadOnlyCollection<InboxMessage>> SearchAsync(
-            Guid? messageId,
-            string? source,
-            InboxMessageStatus? status,
-            int skip,
-            int take)
-        {
-            IEnumerable<InboxMessage> query = _messages;
-
-            if (messageId.HasValue)
-                query = query.Where(message => message.MessageId == messageId.Value);
-
-            if (!string.IsNullOrWhiteSpace(source))
-                query = query.Where(message => message.Source == source);
-
-            if (status.HasValue)
-                query = query.Where(message => message.Status == status.Value);
-
-            IReadOnlyCollection<InboxMessage> messages = query
-                .Skip(skip)
-                .Take(take)
-                .ToList();
-
-            return Task.FromResult(messages);
-        }
-
-        public Task<bool> ExistsByMessageIdAsync(Guid messageId)
-        {
-            return Task.FromResult(_messages.Any(message => message.MessageId == messageId));
-        }
-
-        public Task UpdateAsync(InboxMessage message)
+        public Task MarkAsProcessedAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            DateTime processedAtUtc)
         {
             return Task.CompletedTask;
         }
 
-        public void Store(InboxMessage message)
+        public Task MarkAsFailedAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            string payload,
+            DateTime receivedAtUtc,
+            string error)
         {
-            _messages.Add(message);
+            return Task.CompletedTask;
+        }
+
+        public void Store(string payload)
+        {
+            _payloads.Add(payload);
         }
     }
 

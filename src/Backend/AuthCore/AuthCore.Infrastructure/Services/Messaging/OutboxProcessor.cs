@@ -271,6 +271,9 @@ internal sealed class OutboxProcessor : IOutboxProcessor
         {
             MessageId = message.Id,
             CorrelationId = message.Id.ToString("D"),
+            CausationId = message.Id.ToString("D"),
+            EventType = nameof(SendTransactionalNotificationRequested),
+            Version = 1,
             Source = SOURCE,
             Channel = CHANNEL,
             Recipient = outboxEvent.Email,
@@ -284,7 +287,8 @@ internal sealed class OutboxProcessor : IOutboxProcessor
             IdempotencyKey = string.Create(
                 CultureInfo.InvariantCulture,
                 $"{LEGACY_IDEMPOTENCY_KEY_PREFIX}:{outboxEvent.UserId:D}:{outboxEvent.RequestedAtUtc.Ticks}"),
-            RequestedAtUtc = outboxEvent.RequestedAtUtc
+            RequestedAtUtc = outboxEvent.RequestedAtUtc,
+            OccurredAtUtc = outboxEvent.RequestedAtUtc
         };
     }
 

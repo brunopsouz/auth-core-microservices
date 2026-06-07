@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
-using NotificationCore.Domain.Common.Messaging;
 using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Domain.Notifications.Aggregates;
 using NotificationCore.Domain.Notifications.Enums;
@@ -38,49 +37,60 @@ public sealed class NotificationRepositoryPersistenceTests : IClassFixture<Postg
 
         await using var scope = _fixture.Services.CreateAsyncScope();
         var inboxRepository = scope.ServiceProvider.GetRequiredService<IInboxRepository>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var messageId = Guid.NewGuid();
         var idempotencyKey = $"auth-email-confirmation:{Guid.NewGuid():N}";
         var receivedAtUtc = new DateTime(2026, 5, 8, 12, 0, 0, DateTimeKind.Utc);
-        var message = InboxMessage.Create(
+        var payload = CreatePayload(messageId, idempotencyKey, receivedAtUtc);
+        var messageType = "SendTransactionalNotificationRequested";
+        var consumerName = "NotificationCore.RabbitMqNotificationConsumer";
+
+        await unitOfWork.BeginTransactionAsync();
+        var started = await inboxRepository.TryStartProcessingAsync(
             messageId,
-            "AuthCore",
-            "SendTransactionalNotificationRequested",
-            CreatePayload(messageId, idempotencyKey, receivedAtUtc),
+            messageType,
+            consumerName,
+            payload,
             receivedAtUtc);
+        await unitOfWork.CommitAsync();
 
-        Assert.True(await inboxRepository.TryAddAsync(message));
-        Assert.False(await inboxRepository.TryAddAsync(message));
-        Assert.True(await inboxRepository.ExistsByMessageIdAsync(messageId));
+        Assert.True(started.ShouldProcess);
 
-        var persisted = await inboxRepository.GetByMessageIdAsync(messageId);
-
-        Assert.NotNull(persisted);
-        Assert.Equal(messageId, persisted!.MessageId);
-        Assert.Equal(InboxMessageStatus.Received, persisted.Status);
-        Assert.Equal(receivedAtUtc, persisted.ReceivedAtUtc);
-
-        var pending = await inboxRepository.GetPendingAsync(10);
-
-        Assert.Contains(pending, inboxMessage => inboxMessage.MessageId == messageId);
-
-        persisted.MarkAsProcessed(receivedAtUtc.AddMinutes(1));
-        await inboxRepository.UpdateAsync(persisted);
-
-        var processed = await inboxRepository.GetByNotificationIdempotencyKeyAsync(idempotencyKey);
-
-        Assert.NotNull(processed);
-        Assert.Equal(messageId, processed!.MessageId);
-        Assert.Equal(InboxMessageStatus.Processed, processed.Status);
-        Assert.Equal(receivedAtUtc.AddMinutes(1), processed.ProcessedAtUtc);
-
-        var searchResult = await inboxRepository.SearchAsync(
+        await unitOfWork.BeginTransactionAsync();
+        var duplicate = await inboxRepository.TryStartProcessingAsync(
             messageId,
-            "AuthCore",
-            InboxMessageStatus.Processed,
-            skip: 0,
-            take: 10);
+            messageType,
+            consumerName,
+            payload,
+            receivedAtUtc.AddSeconds(1));
+        await unitOfWork.CommitAsync();
 
-        Assert.Single(searchResult);
+        Assert.False(duplicate.ShouldProcess);
+        Assert.False(duplicate.WasAlreadyProcessed);
+
+        await unitOfWork.BeginTransactionAsync();
+        await inboxRepository.MarkAsProcessedAsync(
+            messageId,
+            messageType,
+            consumerName,
+            receivedAtUtc.AddMinutes(1));
+        await unitOfWork.CommitAsync();
+
+        var persistedPayload = await inboxRepository.GetPayloadByNotificationIdempotencyKeyAsync(idempotencyKey);
+
+        Assert.Equal(payload, persistedPayload);
+
+        await unitOfWork.BeginTransactionAsync();
+        var processedDuplicate = await inboxRepository.TryStartProcessingAsync(
+            messageId,
+            messageType,
+            consumerName,
+            payload,
+            receivedAtUtc.AddMinutes(2));
+        await unitOfWork.CommitAsync();
+
+        Assert.False(processedDuplicate.ShouldProcess);
+        Assert.True(processedDuplicate.WasAlreadyProcessed);
     }
 
     /// <summary>

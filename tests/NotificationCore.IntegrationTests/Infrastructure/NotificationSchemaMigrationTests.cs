@@ -22,14 +22,18 @@ public sealed class NotificationSchemaMigrationTests : IClassFixture<PostgreSqlI
 
         await AssertColumnsAsync(
             "InboxMessages",
+            "Id",
             "MessageId",
-            "Source",
-            "Type",
+            "MessageType",
+            "ConsumerName",
             "Payload",
             "ReceivedAtUtc",
             "ProcessedAtUtc",
             "Status",
-            "Error");
+            "Error",
+            "RetryCount",
+            "CreatedAtUtc",
+            "UpdatedAtUtc");
 
         await AssertColumnsAsync(
             "Notifications",
@@ -76,7 +80,9 @@ public sealed class NotificationSchemaMigrationTests : IClassFixture<PostgreSqlI
             "UpdatedAtUtc");
 
         await AssertIndexesAsync(
-            "IX_InboxMessages_MessageId",
+            "IX_InboxMessages_MessageId_MessageType_ConsumerName",
+            "IX_InboxMessages_Status_CreatedAtUtc",
+            "IX_InboxMessages_ProcessedAtUtc",
             "IX_Notifications_IdempotencyKey",
             "IX_Notifications_Status",
             "IX_Notifications_CorrelationId",
@@ -85,7 +91,7 @@ public sealed class NotificationSchemaMigrationTests : IClassFixture<PostgreSqlI
             "IX_NotificationTemplates_TemplateKey_Channel_Version");
 
         await AssertUniqueIndexesAsync(
-            "IX_InboxMessages_MessageId",
+            "IX_InboxMessages_MessageId_MessageType_ConsumerName",
             "IX_Notifications_IdempotencyKey",
             "IX_NotificationDeliveryAttempts_NotificationId_AttemptNumber",
             "IX_NotificationTemplates_TemplateKey_Channel_Version");
@@ -93,6 +99,8 @@ public sealed class NotificationSchemaMigrationTests : IClassFixture<PostgreSqlI
         await AssertTimestampWithTimeZoneColumnsAsync(
             ("InboxMessages", "ReceivedAtUtc"),
             ("InboxMessages", "ProcessedAtUtc"),
+            ("InboxMessages", "CreatedAtUtc"),
+            ("InboxMessages", "UpdatedAtUtc"),
             ("Notifications", "RequestedAtUtc"),
             ("Notifications", "ScheduledAtUtc"),
             ("Notifications", "CreatedAtUtc"),

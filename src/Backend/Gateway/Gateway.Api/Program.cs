@@ -13,6 +13,7 @@ var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseRouting();
 app.UseAuthentication();
+app.UseGatewayCookieAccessToken();
 app.UseAuthorization();
 app.UseGatewayRateLimitClientIdentity();
 #pragma warning disable ASP0014

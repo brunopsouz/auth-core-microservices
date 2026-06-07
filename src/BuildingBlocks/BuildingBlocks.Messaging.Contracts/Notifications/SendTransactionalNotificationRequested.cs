@@ -16,6 +16,21 @@ public sealed class SendTransactionalNotificationRequested
     public string CorrelationId { get; init; } = string.Empty;
 
     /// <summary>
+    /// Identificador da mensagem que causou esta publicacao.
+    /// </summary>
+    public string CausationId { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Tipo logico do evento publicado.
+    /// </summary>
+    public string EventType { get; init; } = nameof(SendTransactionalNotificationRequested);
+
+    /// <summary>
+    /// Versao do contrato da mensagem.
+    /// </summary>
+    public int Version { get; init; } = 1;
+
+    /// <summary>
     /// Nome do sistema que originou a solicitação.
     /// </summary>
     public string Source { get; init; } = string.Empty;
@@ -54,4 +69,9 @@ public sealed class SendTransactionalNotificationRequested
     /// Data e hora UTC em que a solicitação foi criada.
     /// </summary>
     public DateTime RequestedAtUtc { get; init; } = DateTime.UnixEpoch;
+
+    /// <summary>
+    /// Data e hora UTC em que o evento ocorreu.
+    /// </summary>
+    public DateTime OccurredAtUtc { get; init; } = DateTime.UnixEpoch;
 }

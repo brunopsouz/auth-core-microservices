@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Gateway.Api.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
@@ -30,6 +31,18 @@ public static class GatewayApplicationBuilderExtensions
 
             await next();
         });
+    }
+
+    /// <summary>
+    /// Operacao para adicionar suporte ao access token JWT recebido por cookie HttpOnly.
+    /// </summary>
+    /// <param name="app">Construtor do pipeline HTTP.</param>
+    /// <returns>Construtor do pipeline HTTP atualizado.</returns>
+    public static IApplicationBuilder UseGatewayCookieAccessToken(this IApplicationBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        return app.UseMiddleware<CookieAccessTokenGatewayMiddleware>();
     }
 
     private static string GetClientId(HttpContext context)

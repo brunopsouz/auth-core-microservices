@@ -1,6 +1,6 @@
 # Backend
 
-Este diretorio concentra os microservicos backend do projeto. A raiz do repositorio pode conter outros clientes ou aplicacoes, como um frontend Angular, sem misturar o ciclo de build do backend.
+Este diretorio concentra os servicos backend do projeto. A raiz do repositorio pode conter outros clientes ou aplicacoes, como um frontend Angular, sem misturar o ciclo de build do backend.
 
 ## Estrutura
 
@@ -26,15 +26,15 @@ src/Backend
 `-- .env.development.example
 ```
 
-Cada microservico possui sua propria solucao (`*.Service.sln`) com projetos de producao. A solucao `Backend.sln` funciona como agregadora de producao do backend. A solucao da raiz do repositorio funciona apenas como agregadora global do monorepo.
+Cada servico possui sua propria solucao (`*.Service.sln`) com projetos de producao. A solucao `Backend.sln` funciona como agregadora de producao do backend. A solucao da raiz do repositorio funciona apenas como agregadora global do monorepo.
 
-## Microservicos
+## Servicos
 
 | Servico | Responsabilidade | Solucao |
 | --- | --- | --- |
 | AuthCore | Autenticacao, sessao, credenciais e emissao de eventos de notificacao. | `src/Backend/AuthCore/AuthCore.Service.sln` |
 | NotificationCore | Consumo de eventos, persistencia e envio de notificacoes. | `src/Backend/NotificationCore/NotificationCore.Service.sln` |
-| Gateway | Borda de entrada HTTP para roteamento das APIs. | `src/Backend/Gateway/Gateway.Service.sln` |
+| Gateway | Borda de entrada HTTP, validacao JWT, suporte a JWT via cookie HttpOnly e roteamento das APIs. | `src/Backend/Gateway/Gateway.Service.sln` |
 
 ## Rotas canonicas do AuthCore
 
@@ -48,6 +48,17 @@ Responsabilidades atuais:
 - `UserController`: operacoes autenticadas de perfil, senha e exclusao em `GET /api/users/profile`, `PUT /api/users/profile`, `PUT /api/users/change-password` e `DELETE /api/users`.
 
 `RegisterUserUseCase` representa o autocadastro publico usado por `POST /api/auth/register`. `POST /api/users` nao e contrato de registro publico. Convite de usuario e criacao administrativa multitenant estao fora do escopo atual e devem ser especificados futuramente em fluxos proprios.
+
+## Autenticacao na borda
+
+O backend suporta dois fluxos principais:
+
+- Browser/PWA: `POST /api/auth/session/login` cria uma sessao server-side no AuthCore e emite cookies `sid`, `at` e `XSRF-TOKEN`. O Gateway aceita o JWT curto do cookie `at`, valida o token de forma stateless e encaminha `Authorization: Bearer` para o servico downstream.
+- API/mobile: `POST /api/auth/token/login` retorna access token e refresh token no corpo da resposta. O cliente envia `Authorization: Bearer <access-token>` nas rotas protegidas.
+
+Quando `Authorization: Bearer` esta presente, ele tem prioridade sobre o cookie `at`. Mutacoes autenticadas via cookie (`POST`, `PUT`, `PATCH`, `DELETE`) exigem `X-CSRF-TOKEN` valido. Requisicoes autenticadas por Bearer nao exigem CSRF.
+
+As rotas `/api/auth/...` permanecem sob responsabilidade do AuthCore, inclusive login, refresh, logout, sessao por cookie e validacao CSRF propria dessas operacoes.
 
 ## Solucoes
 
@@ -127,13 +138,13 @@ Sem Bash, a execucao local direta da API tambem exige exportar as variaveis espe
 
 ## Builds separados
 
-O build padrao compila apenas os projetos de producao dos microservicos. Esse e o comando recomendado para pipeline de build quando o objetivo e validar se as APIs compilam:
+O build padrao compila apenas os projetos de producao dos servicos. Esse e o comando recomendado para pipeline de build quando o objetivo e validar se as APIs compilam:
 
 ```bash
 ./run.sh build
 ```
 
-Build por microservico:
+Build por servico:
 
 ```bash
 ./run.sh build-authcore
@@ -141,7 +152,7 @@ Build por microservico:
 ./run.sh build-gateway
 ```
 
-Tambem e possivel entrar na pasta do microservico e executar `dotnet build`, porque a `*.Service.sln` local contem apenas os projetos de producao:
+Tambem e possivel entrar na pasta do servico e executar `dotnet build`, porque a `*.Service.sln` local contem apenas os projetos de producao:
 
 ```bash
 cd src/Backend/AuthCore
@@ -174,7 +185,7 @@ Comando equivalente sem Bash:
 dotnet build src/Backend/Backend.sln -c Release
 ```
 
-Use `build-backend` como diagnostico dos projetos de producao do backend e `build-all` como diagnostico global do monorepo. Para microservicos, prefira os builds por servico.
+Use `build-backend` como diagnostico dos projetos de producao do backend e `build-all` como diagnostico global do monorepo. Para servicos especificos, prefira os builds por servico.
 
 ## Testes
 
@@ -184,7 +195,7 @@ Executar apenas a suite atualmente estavel:
 ./run.sh test
 ```
 
-Executar testes por microservico. Estes comandos executam os projetos de teste diretamente, nao as `*.Service.sln`:
+Executar testes por servico. Estes comandos executam os projetos de teste diretamente, nao as `*.Service.sln`:
 
 ```bash
 ./run.sh test-authcore
@@ -192,7 +203,7 @@ Executar testes por microservico. Estes comandos executam os projetos de teste d
 ./run.sh test-gateway
 ```
 
-Executar a validacao completa por projetos de teste dos microservicos:
+Executar a validacao completa por projetos de teste dos servicos:
 
 ```bash
 ./run.sh test-all
@@ -202,7 +213,7 @@ Observacao: `test-all` e intencionalmente mais amplo e pode revelar pendencias e
 
 ## Convencao para crescimento
 
-Ao adicionar um novo microservico:
+Ao adicionar um novo servico:
 
 1. Crie uma pasta em `src/Backend/<NomeDoServico>`.
 2. Mantenha projetos separados por camada quando o servico tiver dominio proprio: `Api`, `Application`, `Domain` e `Infrastructure`.
@@ -221,4 +232,4 @@ Os servicos devem preservar a separacao de responsabilidades:
 - `Domain` concentra regras de negocio e invariantes.
 - `Infrastructure` implementa persistencia, mensageria, cache, migracoes e integracoes tecnicas.
 
-Evite dependencias diretas entre microservicos. A integracao entre servicos deve ser feita por contratos explicitos, mensageria ou chamadas HTTP atraves de uma borda bem definida.
+Evite dependencias diretas entre servicos. A integracao entre servicos deve ser feita por contratos explicitos, mensageria ou chamadas HTTP atraves de uma borda bem definida.

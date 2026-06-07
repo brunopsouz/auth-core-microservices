@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BuildingBlocks.Messaging.Contracts.Notifications;
 using NotificationCore.Domain.Common.Exceptions;
-using NotificationCore.Domain.Common.Messaging;
 using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Domain.Notifications.Aggregates;
 using NotificationCore.Domain.Notifications.Enums;
@@ -289,11 +288,11 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
     /// <returns>Mensagem original ou nula.</returns>
     private async Task<SendTransactionalNotificationRequested?> GetOriginalRequestAsync(Notification notification)
     {
-        var inboxMessage = await _inboxRepository.GetByNotificationIdempotencyKeyAsync(notification.IdempotencyKey.Value);
+        var payload = await _inboxRepository.GetPayloadByNotificationIdempotencyKeyAsync(notification.IdempotencyKey.Value);
 
-        return inboxMessage is null
+        return payload is null
             ? null
-            : DeserializeRequest(inboxMessage);
+            : DeserializeRequest(payload);
     }
 
     /// <summary>
@@ -422,11 +421,11 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
     /// </summary>
     /// <param name="inboxMessage">Mensagem de inbox.</param>
     /// <returns>Mensagem transacional ou nula.</returns>
-    private static SendTransactionalNotificationRequested? DeserializeRequest(InboxMessage inboxMessage)
+    private static SendTransactionalNotificationRequested? DeserializeRequest(string payload)
     {
         try
         {
-            return JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(inboxMessage.Payload);
+            return JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(payload);
         }
         catch (JsonException)
         {

@@ -72,8 +72,8 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
         properties.DeliveryMode = 2;
         properties.MessageId = request.MessageId.ToString("D");
         properties.CorrelationId = request.CorrelationId;
-        properties.Type = nameof(SendTransactionalNotificationRequested);
-        properties.Timestamp = new AmqpTimestamp(new DateTimeOffset(request.RequestedAtUtc).ToUnixTimeSeconds());
+        properties.Type = request.EventType;
+        properties.Timestamp = new AmqpTimestamp(new DateTimeOffset(GetOccurredAtUtc(request)).ToUnixTimeSeconds());
 
         var body = Encoding.UTF8.GetBytes(payload);
 
@@ -117,6 +117,18 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
         };
 
         return factory.CreateConnection();
+    }
+
+    /// <summary>
+    /// Operacao para obter a data de ocorrencia compativel com mensagens legadas.
+    /// </summary>
+    /// <param name="request">Solicitacao de notificacao.</param>
+    /// <returns>Data de ocorrencia em UTC.</returns>
+    private static DateTime GetOccurredAtUtc(SendTransactionalNotificationRequested request)
+    {
+        return request.OccurredAtUtc == DateTime.UnixEpoch
+            ? request.RequestedAtUtc
+            : request.OccurredAtUtc;
     }
 
     /// <summary>

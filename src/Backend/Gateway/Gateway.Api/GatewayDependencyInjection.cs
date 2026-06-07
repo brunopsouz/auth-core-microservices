@@ -1,11 +1,13 @@
 using System.Net;
 using System.Text;
+using Gateway.Api.Authentication;
 using Gateway.Api.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 using Ocelot.DependencyInjection;
 using NetIPNetwork = System.Net.IPNetwork;
 
@@ -32,6 +34,8 @@ public static class GatewayDependencyInjection
         ArgumentNullException.ThrowIfNull(configuration);
 
         AddJwtOptions(services, configuration);
+        AddAuthCookieOptions(services, configuration);
+        AddCsrfOptions(services, configuration);
         AddForwardedHeaders(services, configuration);
         AddAuthentication(services, configuration);
 
@@ -55,6 +59,40 @@ public static class GatewayDependencyInjection
             .AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .ValidateDataAnnotations()
+            .ValidateOnStart();
+    }
+
+    /// <summary>
+    /// Operacao para adicionar as opcoes dos cookies de autenticacao.
+    /// </summary>
+    /// <param name="services">Colecao de servicos da aplicacao.</param>
+    /// <param name="configuration">Configuracao da aplicacao.</param>
+    private static void AddAuthCookieOptions(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddOptions<AuthCookieOptions>()
+            .Bind(configuration.GetSection(AuthCookieOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(options => !string.IsNullOrWhiteSpace(options.SessionCookieName), "O nome do cookie da sessao nao foi configurado.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.AccessTokenCookieName), "O nome do cookie do access token nao foi configurado.")
+            .ValidateOnStart();
+    }
+
+    /// <summary>
+    /// Operacao para adicionar as opcoes de protecao CSRF.
+    /// </summary>
+    /// <param name="services">Colecao de servicos da aplicacao.</param>
+    /// <param name="configuration">Configuracao da aplicacao.</param>
+    private static void AddCsrfOptions(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddOptions<CsrfOptions>()
+            .Bind(configuration.GetSection(CsrfOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(options => !string.IsNullOrWhiteSpace(options.CookieName), "O nome do cookie CSRF nao foi configurado.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.HeaderName), "O nome do header CSRF nao foi configurado.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.SigningKey), "A chave de assinatura do CSRF nao foi configurada.")
+            .Validate(options => options.AllowedOrigins.All(IsAllowedOriginConfigurationValid), "As origens CORS/CSRF precisam ser explicitas e validas.")
             .ValidateOnStart();
     }
 
@@ -94,6 +132,7 @@ public static class GatewayDependencyInjection
     private static void AddAuthentication(IServiceCollection services, IConfiguration configuration)
     {
         var jwtOptions = GetJwtOptions(configuration);
+        var authCookieOptions = GetAuthCookieOptions(configuration);
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -111,7 +150,45 @@ public static class GatewayDependencyInjection
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromSeconds(jwtOptions.ClockSkewSeconds)
                 };
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        if (context.Request.Headers.ContainsKey(HeaderNames.Authorization))
+                        {
+                            context.HttpContext.Items[GatewayAuthenticationItems.AccessTokenSource] = AccessTokenSource.AuthorizationHeader;
+                            return Task.CompletedTask;
+                        }
+
+                        if (context.Request.Cookies.TryGetValue(authCookieOptions.AccessTokenCookieName, out var accessToken)
+                            && !string.IsNullOrWhiteSpace(accessToken))
+                        {
+                            context.Token = accessToken.Trim();
+                            context.HttpContext.Items[GatewayAuthenticationItems.AccessTokenSource] = AccessTokenSource.Cookie;
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
             });
+    }
+
+    /// <summary>
+    /// Operacao para obter as configuracoes dos cookies de autenticacao.
+    /// </summary>
+    /// <param name="configuration">Configuracao da aplicacao.</param>
+    /// <returns>Configuracoes validas dos cookies de autenticacao.</returns>
+    private static AuthCookieOptions GetAuthCookieOptions(IConfiguration configuration)
+    {
+        var authCookieOptions = configuration
+            .GetSection(AuthCookieOptions.SectionName)
+            .Get<AuthCookieOptions>()
+            ?? new AuthCookieOptions();
+
+        if (string.IsNullOrWhiteSpace(authCookieOptions.AccessTokenCookieName))
+            throw new InvalidOperationException("O nome do cookie do access token nao foi configurado.");
+
+        return authCookieOptions;
     }
 
     /// <summary>
@@ -267,6 +344,23 @@ public static class GatewayDependencyInjection
             categories++;
 
         return categories;
+    }
+
+    /// <summary>
+    /// Operacao para indicar se a origem CORS/CSRF configurada e valida.
+    /// </summary>
+    /// <param name="origin">Origem configurada.</param>
+    /// <returns><c>true</c> quando a origem e explicita e valida; caso contrario, <c>false</c>.</returns>
+    private static bool IsAllowedOriginConfigurationValid(string origin)
+    {
+        if (string.IsNullOrWhiteSpace(origin))
+            return false;
+
+        if (string.Equals(origin.Trim(), "*", StringComparison.Ordinal))
+            return false;
+
+        return Uri.TryCreate(origin.Trim(), UriKind.Absolute, out var uri)
+            && !string.IsNullOrWhiteSpace(uri.GetLeftPart(UriPartial.Authority));
     }
 
 }
