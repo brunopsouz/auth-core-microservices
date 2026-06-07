@@ -192,7 +192,7 @@ public static class ApiDependencyInjection
                 options.KnownProxies.Add(ParseIpAddress(knownProxy));
 
             foreach (var knownNetwork in proxyForwardingOptions.KnownNetworks)
-                options.KnownNetworks.Add(ParseNetwork(knownNetwork));
+                options.KnownIPNetworks.Add(ParseNetwork(knownNetwork));
         });
     }
 
@@ -382,7 +382,7 @@ public static class ApiDependencyInjection
     /// </summary>
     /// <param name="network">Rede informada na configuracao.</param>
     /// <returns>Rede valida para confianca dos headers encaminhados.</returns>
-    private static Microsoft.AspNetCore.HttpOverrides.IPNetwork ParseNetwork(string network)
+    private static System.Net.IPNetwork ParseNetwork(string network)
     {
         var segments = (network ?? string.Empty)
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -394,7 +394,7 @@ public static class ApiDependencyInjection
             throw new InvalidOperationException($"A rede confiavel '{network}' nao esta em formato CIDR valido.");
         }
 
-        return new Microsoft.AspNetCore.HttpOverrides.IPNetwork(prefix, prefixLength);
+        return new System.Net.IPNetwork(prefix, prefixLength);
     }
 
     /// <summary>

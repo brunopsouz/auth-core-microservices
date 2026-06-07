@@ -10,6 +10,14 @@ builder.Services.AddGateway(builder.Configuration);
 
 var app = builder.Build();
 
+app.MapGet("/", () => Results.Ok(new
+{
+    service = "gateway",
+    health = "/health",
+    authCoreHealth = "/authcore/health",
+    notificationCoreHealth = "/notificationcore/health"
+}));
+
 app.UseForwardedHeaders();
 app.UseRouting();
 app.UseAuthentication();

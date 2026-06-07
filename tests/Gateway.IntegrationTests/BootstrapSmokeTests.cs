@@ -1,4 +1,5 @@
-﻿using System.Net;
+using System.Net;
+using System.Net.Http.Json;
 using Gateway.Api;
 using Gateway.Api.Options;
 using Microsoft.AspNetCore.Authentication;
@@ -93,6 +94,66 @@ public sealed class BootstrapSmokeTests
         await app.StopAsync();
     }
 
+    [Fact]
+    public async Task Root_WhenGatewayIsStarted_ShouldReturnServiceStatusPayload()
+    {
+        var builder = WebApplication.CreateBuilder();
+
+        builder.Configuration.AddConfiguration(CreateGatewayConfiguration());
+        builder.Services.AddGateway(builder.Configuration);
+
+        await using var app = builder.Build();
+
+        app.MapGet("/", () => Results.Ok(new
+        {
+            service = "gateway",
+            health = "/health",
+            authCoreHealth = "/authcore/health",
+            notificationCoreHealth = "/notificationcore/health"
+        }));
+        app.UseRouting();
+#pragma warning disable ASP0014
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapHealthChecks("/health", new HealthCheckOptions
+            {
+                AllowCachingResponses = false,
+                ResultStatusCodes =
+                {
+                    [HealthStatus.Healthy] = StatusCodes.Status200OK,
+                    [HealthStatus.Degraded] = StatusCodes.Status200OK,
+                    [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+                }
+            });
+        });
+#pragma warning restore ASP0014
+
+        await app.UseOcelot();
+        app.Urls.Add("http://127.0.0.1:0");
+
+        await app.StartAsync();
+
+        var address = app.Services
+            .GetRequiredService<IServer>()
+            .Features
+            .Get<IServerAddressesFeature>()!
+            .Addresses
+            .Single();
+
+        using var httpClient = new HttpClient();
+        using var response = await httpClient.GetAsync(address);
+        var payload = await response.Content.ReadFromJsonAsync<GatewayRootResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("gateway", payload.Service);
+        Assert.Equal("/health", payload.Health);
+        Assert.Equal("/authcore/health", payload.AuthCoreHealth);
+        Assert.Equal("/notificationcore/health", payload.NotificationCoreHealth);
+
+        await app.StopAsync();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -135,5 +196,16 @@ public sealed class BootstrapSmokeTests
                 ["GlobalConfiguration:BaseUrl"] = "http://localhost:8080"
             })
             .Build();
+    }
+
+    private sealed class GatewayRootResponse
+    {
+        public string Service { get; set; } = string.Empty;
+
+        public string Health { get; set; } = string.Empty;
+
+        public string AuthCoreHealth { get; set; } = string.Empty;
+
+        public string NotificationCoreHealth { get; set; } = string.Empty;
     }
 }

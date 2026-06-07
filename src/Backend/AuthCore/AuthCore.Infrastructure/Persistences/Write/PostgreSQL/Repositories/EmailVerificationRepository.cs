@@ -275,9 +275,7 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
     {
         return _databaseSession.CurrentTransaction is null
             ? ";"
-            : """
-                FOR UPDATE;
-                """;
+            : " FOR UPDATE;";
     }
 
     /// <summary>

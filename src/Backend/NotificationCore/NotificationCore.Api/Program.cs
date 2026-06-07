@@ -21,6 +21,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.MapGet("/", () => Results.Redirect(app.Environment.IsDevelopment() ? "/swagger" : "/health"));
+
 app.UseExceptionHandler();
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
