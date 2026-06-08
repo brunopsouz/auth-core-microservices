@@ -882,8 +882,8 @@ public sealed class AuthControllerIntegrationTests
         Assert.Equal(3, forwardedHeadersOptions.ForwardLimit);
         Assert.Contains(forwardedHeadersOptions.KnownProxies, proxy => proxy.ToString() == "10.0.0.10");
         Assert.Contains(
-            forwardedHeadersOptions.KnownNetworks,
-            network => network.Prefix.ToString() == "10.10.0.0" && network.PrefixLength == 24);
+            forwardedHeadersOptions.KnownIPNetworks,
+            network => network.BaseAddress.ToString() == "10.10.0.0" && network.PrefixLength == 24);
     }
 
     [Fact]

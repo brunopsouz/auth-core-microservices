@@ -6,7 +6,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/Backend/AuthCore/AuthCore.Api/bin/Debug/net8.0/AuthCore.Api.dll",
+            "program": "${workspaceFolder}/src/Backend/AuthCore/AuthCore.Api/bin/Debug/net10.0/AuthCore.Api.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src/Backend/AuthCore/AuthCore.Api",
             "stopAtEntry": false,
