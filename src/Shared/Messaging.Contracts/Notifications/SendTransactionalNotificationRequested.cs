@@ -1,4 +1,4 @@
-namespace BuildingBlocks.Messaging.Contracts.Notifications;
+namespace Shared.Messaging.Contracts.Notifications;
 
 /// <summary>
 /// Representa solicitação para envio de notificação transacional.

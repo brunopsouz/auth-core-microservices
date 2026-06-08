@@ -52,7 +52,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 - `Gateway.Api`: API Gateway com Ocelot, autenticação JWT, suporte a JWT via cookie `HttpOnly`, proteção CSRF para mutações por cookie e roteamento para os serviços internos.
 - `AuthCore.Api`: serviço de autenticação e usuários.
 - `NotificationCore.Api`: serviço de notificações transacionais, templates e envio de e-mail.
-- `BuildingBlocks.Messaging.Contracts`: contratos compartilhados de mensageria e utilitários de payload sensível.
+- `Shared.Messaging.Contracts`: contratos compartilhados de mensageria e utilitários de payload sensível.
 
 ## Tecnologias
 
@@ -91,7 +91,7 @@ flowchart TD
     NotificationApplication --> NotificationDomain[NotificationCore.Domain]
     NotificationInfrastructure --> NotificationDomain
 
-    AuthInfrastructure -. compile-time .-> Contracts[BuildingBlocks.Messaging.Contracts]
+    AuthInfrastructure -. compile-time .-> Contracts[Shared.Messaging.Contracts]
     NotificationApplication -. compile-time .-> Contracts
     NotificationInfrastructure -. compile-time .-> Contracts
 
@@ -118,7 +118,7 @@ Responsabilidades principais:
 - `NotificationCore.Application`: orquestração de consultas, busca e solicitações de envio de notificações.
 - `NotificationCore.Domain`: entidades, value objects, enums e regras de notificação.
 - `NotificationCore.Infrastructure`: persistência PostgreSQL, consumo RabbitMQ, Inbox, templates, renderização e envio SMTP.
-- `BuildingBlocks.Messaging.Contracts`: mensagens compartilhadas entre serviços.
+- `Shared.Messaging.Contracts`: mensagens compartilhadas entre serviços.
 - `tests`: testes unitários de domínio, aplicação e testes de integração por serviço.
 
 ## Requisitos
@@ -488,8 +488,8 @@ dotnet test tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj
 │   │       ├── NotificationCore.Application
 │   │       ├── NotificationCore.Domain
 │   │       └── NotificationCore.Infrastructure
-│   ├── BuildingBlocks
-│   │   └── BuildingBlocks.Messaging.Contracts
+│   ├── Shared
+│   │   └── Messaging.Contracts
 │   └── Frontend
 └── tests
     ├── AuthCore.Application.UnitTests

@@ -3,7 +3,7 @@ using System.Text.Json;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
-using BuildingBlocks.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Notifications;
 
 namespace AuthCore.Infrastructure.Services.Messaging;
 

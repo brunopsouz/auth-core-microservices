@@ -1,6 +1,6 @@
 using System.Text.Json;
-using BuildingBlocks.Messaging.Contracts.Notifications;
-using BuildingBlocks.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Security;
 using NotificationCore.Domain.Common.Exceptions;
 using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Domain.Notifications.Aggregates;

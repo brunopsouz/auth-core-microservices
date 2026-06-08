@@ -1,4 +1,4 @@
-using BuildingBlocks.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts.Security;
 using Microsoft.AspNetCore.Mvc;
 using NotificationCore.Api.Contracts.Requests;
 using NotificationCore.Api.Contracts.Responses;

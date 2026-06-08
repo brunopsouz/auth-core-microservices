@@ -1,5 +1,5 @@
 using System.Text.Json;
-using BuildingBlocks.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Notifications;
 using NotificationCore.Application.UseCases.Notifications.DispatchPendingNotification;
 using NotificationCore.Domain.Common.Exceptions;
 using NotificationCore.Domain.Common.Repositories;

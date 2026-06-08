@@ -39,9 +39,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Gateway", "Gateway", "{9381
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gateway.Api", "src\Backend\Gateway\Gateway.Api\Gateway.Api.csproj", "{0E2A3403-D22A-4A1F-ADB0-8FD967A793BB}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildingBlocks", "BuildingBlocks", "{5CBA36E9-77A5-4EB6-A8F9-47A5FD60F1A4}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Shared", "Shared", "{5CBA36E9-77A5-4EB6-A8F9-47A5FD60F1A4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildingBlocks.Messaging.Contracts", "src\BuildingBlocks\BuildingBlocks.Messaging.Contracts\BuildingBlocks.Messaging.Contracts.csproj", "{11211A1B-76A4-472B-9735-89585B841BF0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.Messaging.Contracts", "src\Shared\Messaging.Contracts\Messaging.Contracts.csproj", "{11211A1B-76A4-472B-9735-89585B841BF0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationCore.Domain.UnitTests", "tests\NotificationCore.Domain.UnitTests\NotificationCore.Domain.UnitTests.csproj", "{A5E63D1F-512F-49DD-A41A-E73179314908}"
 EndProject
@@ -55,9 +55,6 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{5DD89D14-7AE2-4AEF-8C94-FCE745CF799E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -128,6 +125,9 @@ Global
 		{87B90E46-2592-4EBD-B5B6-413052705B9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{87B90E46-2592-4EBD-B5B6-413052705B9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{87B90E46-2592-4EBD-B5B6-413052705B9B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{AE4301B3-8E2B-45D1-90C9-966975CACA16} = {FEED2014-A199-4116-97F4-A56A3642CD28}

@@ -18,7 +18,7 @@ A solução backend está organizada em serviços e projetos compartilhados:
 - `src/Backend/AuthCore`: serviço de autenticação e usuários
 - `src/Backend/NotificationCore`: serviço de notificações transacionais
 - `src/Backend/Gateway`: borda HTTP com Ocelot
-- `src/BuildingBlocks`: contratos e blocos compartilhados
+- `src/Shared`: contratos compartilhados
 - `tests`: projetos de validação automatizada por serviço
 
 No recorte do `AuthCore`, os projetos principais são:

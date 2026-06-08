@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
-using BuildingBlocks.Messaging.Contracts.Notifications;
-using BuildingBlocks.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Security;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Infrastructure.Configurations;

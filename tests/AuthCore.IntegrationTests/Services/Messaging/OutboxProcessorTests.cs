@@ -1,5 +1,5 @@
 using System.Text.Json;
-using BuildingBlocks.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Notifications;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Infrastructure.Configurations;

@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthCore.Domain", "AuthCore
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthCore.Infrastructure", "AuthCore.Infrastructure\AuthCore.Infrastructure.csproj", "{F61B5CA7-68B4-4E31-BE89-C1731CE08DCB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildingBlocks.Messaging.Contracts", "..\..\BuildingBlocks\BuildingBlocks.Messaging.Contracts\BuildingBlocks.Messaging.Contracts.csproj", "{A7630EFB-A300-45B9-B2D6-8B31A4A602D1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.Messaging.Contracts", "..\..\Shared\Messaging.Contracts\Messaging.Contracts.csproj", "{A7630EFB-A300-45B9-B2D6-8B31A4A602D1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

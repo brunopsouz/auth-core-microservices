@@ -1,5 +1,5 @@
 using System.Text;
-using BuildingBlocks.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Notifications;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

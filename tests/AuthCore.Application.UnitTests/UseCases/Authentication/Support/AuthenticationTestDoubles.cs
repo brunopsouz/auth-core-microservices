@@ -10,7 +10,7 @@ using AuthCore.Domain.Security.Tokens.Models;
 using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
-using BuildingBlocks.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Notifications;
 
 namespace AuthCore.Application.UnitTests.UseCases.Authentication.Support;
 

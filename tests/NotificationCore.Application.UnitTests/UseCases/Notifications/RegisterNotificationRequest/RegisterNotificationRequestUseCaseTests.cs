@@ -1,4 +1,4 @@
-using BuildingBlocks.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Notifications;
 using NotificationCore.Application.UseCases.Notifications.RegisterNotificationRequest;
 using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Domain.Notifications.Aggregates;

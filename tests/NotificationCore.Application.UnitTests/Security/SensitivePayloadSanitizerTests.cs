@@ -1,4 +1,4 @@
-using BuildingBlocks.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts.Security;
 
 namespace NotificationCore.Application.UnitTests.Security;
 

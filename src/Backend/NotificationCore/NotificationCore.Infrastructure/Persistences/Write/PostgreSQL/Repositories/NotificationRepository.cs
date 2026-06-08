@@ -1,4 +1,4 @@
-using BuildingBlocks.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts.Security;
 using NotificationCore.Domain.Notifications.Aggregates;
 using NotificationCore.Domain.Notifications.Entities;
 using NotificationCore.Domain.Notifications.Enums;

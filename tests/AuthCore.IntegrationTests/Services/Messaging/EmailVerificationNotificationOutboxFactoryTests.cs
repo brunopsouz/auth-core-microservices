@@ -1,7 +1,7 @@
 using System.Text.Json;
 using AuthCore.Domain.Passports;
 using AuthCore.Infrastructure.Services.Messaging;
-using BuildingBlocks.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Notifications;
 
 namespace AuthCore.IntegrationTests.Services.Messaging;
 

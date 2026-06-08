@@ -1,4 +1,4 @@
-using BuildingBlocks.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts.Security;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Diagnostics;
 using NotificationCore.Api.Contracts.Responses;

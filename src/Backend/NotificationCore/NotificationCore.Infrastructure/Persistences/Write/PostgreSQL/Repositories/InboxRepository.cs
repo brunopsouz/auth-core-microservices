@@ -1,4 +1,4 @@
-using BuildingBlocks.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts.Security;
 using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Infrastructure.Abstractions.Data;
 using Npgsql;

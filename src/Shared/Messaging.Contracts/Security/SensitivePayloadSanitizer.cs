@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace BuildingBlocks.Messaging.Contracts.Security;
+namespace Shared.Messaging.Contracts.Security;
 
 /// <summary>
 /// Representa sanitizador de payloads e textos com dados sensíveis.

@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="../../../BuildingBlocks/BuildingBlocks.Messaging.Contracts/BuildingBlocks.Messaging.Contracts.csproj" />
     <ProjectReference Include="../AuthCore.Domain/AuthCore.Domain.csproj" />
+    <ProjectReference Include="../../../Shared/Messaging.Contracts/Messaging.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

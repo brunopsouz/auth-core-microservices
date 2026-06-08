@@ -13,7 +13,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthCore.Domain", "AuthCore
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthCore.Infrastructure", "AuthCore\AuthCore.Infrastructure\AuthCore.Infrastructure.csproj", "{F82800E1-792E-42FE-B9B8-A9C9057BA84E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildingBlocks.Messaging.Contracts", "..\BuildingBlocks\BuildingBlocks.Messaging.Contracts\BuildingBlocks.Messaging.Contracts.csproj", "{B21F6548-7C6B-4FDA-B641-146DA5C64467}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.Messaging.Contracts", "..\Shared\Messaging.Contracts\Messaging.Contracts.csproj", "{B21F6548-7C6B-4FDA-B641-146DA5C64467}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NotificationCore", "NotificationCore", "{336A2F5A-FC48-0C72-3AEF-EDE4CA7A62E9}"
 EndProject

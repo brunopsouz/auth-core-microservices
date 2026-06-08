@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
-using BuildingBlocks.Messaging.Contracts.Notifications;
-using BuildingBlocks.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts.Security;
 using Microsoft.Extensions.Options;
 using NotificationCore.Application.UseCases.Notifications.RegisterNotificationRequest;
 using NotificationCore.Domain.Common.Exceptions;

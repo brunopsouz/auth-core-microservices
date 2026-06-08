@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationCore.Api", "Not
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationCore.Application", "NotificationCore.Application\NotificationCore.Application.csproj", "{B711ACFB-5E03-4BBE-9127-870715BCF7C3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildingBlocks.Messaging.Contracts", "..\..\BuildingBlocks\BuildingBlocks.Messaging.Contracts\BuildingBlocks.Messaging.Contracts.csproj", "{5936BBAF-51B2-42DC-8194-4F6848DFD4D2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.Messaging.Contracts", "..\..\Shared\Messaging.Contracts\Messaging.Contracts.csproj", "{5936BBAF-51B2-42DC-8194-4F6848DFD4D2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationCore.Domain", "NotificationCore.Domain\NotificationCore.Domain.csproj", "{65913EC2-3795-4FB4-A7BD-C8F1C8943B3D}"
 EndProject
