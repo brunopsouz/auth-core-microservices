@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Users;
 
 namespace AuthCore.Api.Authentication;
@@ -34,7 +35,7 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
             if (TryGetUserIdentifier(out var userIdentifier))
                 return userIdentifier;
 
-            throw new UnauthorizedAccessException("O identificador do usuario autenticado nao foi encontrado.");
+            throw new UnauthorizedException("O identificador do usuario autenticado nao foi encontrado.");
         }
     }
 
@@ -48,7 +49,7 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
             if (Guid.TryParse(claimValue, out var userId))
                 return userId;
 
-            throw new UnauthorizedAccessException("O identificador interno do usuario autenticado nao foi encontrado.");
+            throw new UnauthorizedException("O identificador interno do usuario autenticado nao foi encontrado.");
         }
     }
 
@@ -69,7 +70,7 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
                     return claimValue;
             }
 
-            throw new UnauthorizedAccessException("O e-mail do usuario autenticado nao foi encontrado.");
+            throw new UnauthorizedException("O e-mail do usuario autenticado nao foi encontrado.");
         }
     }
 
@@ -84,7 +85,7 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
             if (!string.IsNullOrWhiteSpace(sessionId))
                 return sessionId;
 
-            throw new UnauthorizedAccessException("O identificador da sessao autenticada nao foi encontrado.");
+            throw new UnauthorizedException("O identificador da sessao autenticada nao foi encontrado.");
         }
     }
 
@@ -112,7 +113,7 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
             if (Enum.TryParse<UserStatus>(claimValue, out var userStatus))
                 return userStatus;
 
-            throw new UnauthorizedAccessException("O status do usuario autenticado nao foi encontrado.");
+            throw new UnauthorizedException("O status do usuario autenticado nao foi encontrado.");
         }
     }
 
@@ -126,7 +127,7 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
             if (bool.TryParse(claimValue, out var userIsActive))
                 return userIsActive;
 
-            throw new UnauthorizedAccessException("O estado de atividade do usuario autenticado nao foi encontrado.");
+            throw new UnauthorizedException("O estado de atividade do usuario autenticado nao foi encontrado.");
         }
     }
 

@@ -76,7 +76,7 @@ public sealed class DispatchPendingNotificationUseCaseTests
         Assert.True(notification.ScheduledAtUtc > notification.RequestedAtUtc);
         Assert.Equal(DeliveryAttemptStatus.Failed, attempt.Status);
         Assert.Equal("421", attempt.ErrorCode);
-        Assert.Equal("Falha temporária no provedor de e-mail.", attempt.ErrorMessage);
+        Assert.Equal("Falha temporária no provedor de e-mail. Código: 421.", attempt.ErrorMessage);
         Assert.DoesNotContain("123456", attempt.ErrorMessage);
         Assert.Equal(2, notificationRepository.UpdatedNotifications.Count);
         Assert.Single(emailProvider.Messages);
@@ -107,10 +107,10 @@ public sealed class DispatchPendingNotificationUseCaseTests
         Assert.Equal(0, result.RetryScheduled);
         Assert.Equal(1, result.DeadLettered);
         Assert.Equal(NotificationStatus.DeadLettered, notification.Status);
-        Assert.Equal("Falha permanente no provedor de e-mail.", notification.LastError);
+        Assert.Equal("Falha permanente no provedor de e-mail. Código: 550.", notification.LastError);
         Assert.Equal(DeliveryAttemptStatus.Failed, attempt.Status);
         Assert.Equal("550", attempt.ErrorCode);
-        Assert.Equal("Falha permanente no provedor de e-mail.", attempt.ErrorMessage);
+        Assert.Equal("Falha permanente no provedor de e-mail. Código: 550.", attempt.ErrorMessage);
         Assert.Equal(2, notificationRepository.UpdatedNotifications.Count);
         Assert.Single(emailProvider.Messages);
     }
@@ -143,7 +143,7 @@ public sealed class DispatchPendingNotificationUseCaseTests
         Assert.Equal(0, result.DeadLettered);
         Assert.Equal(NotificationStatus.RetryScheduled, notification.Status);
         Assert.Equal("EMAIL_PROVIDER_EXCEPTION", attempt.ErrorCode);
-        Assert.Equal("Falha temporária no provedor de e-mail.", attempt.ErrorMessage);
+        Assert.Equal("Falha temporária no provedor de e-mail. Código: EMAIL_PROVIDER_EXCEPTION.", attempt.ErrorMessage);
         Assert.DoesNotContain("123456", attempt.ErrorMessage);
         Assert.Single(emailProvider.Messages);
         Assert.Equal(2, notificationRepository.UpdatedNotifications.Count);

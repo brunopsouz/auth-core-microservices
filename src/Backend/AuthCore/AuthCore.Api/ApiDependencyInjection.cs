@@ -14,7 +14,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace AuthCore.Api;
 
@@ -347,17 +347,10 @@ public static class ApiDependencyInjection
                 Description = "Informe o token JWT no formato Bearer."
             });
 
-            options.AddSecurityRequirement(new OpenApiSecurityRequirement
+            options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
             {
                 {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = JwtAuthenticationScheme
-                        }
-                    },
+                    new OpenApiSecuritySchemeReference(JwtAuthenticationScheme, null, null),
                     []
                 }
             });

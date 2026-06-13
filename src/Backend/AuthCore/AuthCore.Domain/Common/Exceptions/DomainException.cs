@@ -1,31 +1,49 @@
+using System.Net;
+
 namespace AuthCore.Domain.Common.Exceptions;
 
-public class DomainException : Exception
+/// <summary>
+/// Representa exceção de regra de negócio do domínio.
+/// </summary>
+public class DomainException : AuthCoreException
 {
-    /// <summary> 
-    /// Inicializa uma nova instância da classe <see cref="DomainException"/> com a mensagem de erro especificada.
-    /// </summary> 
+    /// <summary>
+    /// Operação para criar instância da classe.
+    /// </summary>
     /// <param name="message">Mensagem que descreve o erro.</param>
-    public DomainException(string message) : base(message) { }
+    public DomainException(string message) : base(message)
+    {
+    }
 
     /// <summary>
-    /// Inicializa uma nova instância da classe <see cref="DomainException"/> 
-    /// com a mensagem de erro especificada e uma referência à exceção interna que causou esta exceção.
+    /// Operação para criar instância da classe.
     /// </summary>
     /// <param name="message">Mensagem que descreve o erro.</param>
-    /// <param name="inner">Exceção que é a causa da exceção atual.</param>
-    public DomainException(string message, Exception inner) : base(message, inner) { }
-    
+    /// <param name="inner">Exceção que originou o erro.</param>
+    public DomainException(string message, Exception inner) : base(message, inner)
+    {
+    }
+
+    /// <inheritdoc />
+    public override IList<string> GetErrorMessages()
+    {
+        return [Message];
+    }
+
+    /// <inheritdoc />
+    public override HttpStatusCode GetStatusCode()
+    {
+        return HttpStatusCode.BadRequest;
+    }
+
     /// <summary>
-    /// Método estático para validações de pré-condição.
+    /// Operação para validar pré-condição de domínio.
     /// </summary>
-    /// <param name="hasError">Boleano para identificar se existe erro.</param>
+    /// <param name="hasError">Indica se existe erro.</param>
     /// <param name="errorMessage">Mensagem que descreve o erro.</param>
     public static void When(bool hasError, string errorMessage)
     {
-        if(hasError)
-        {   
+        if (hasError)
             throw new DomainException(errorMessage);
-        }
     }
-};
+}

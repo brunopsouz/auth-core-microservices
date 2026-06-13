@@ -244,9 +244,9 @@ internal sealed class LoginSessionUseCase : ILoginSessionUseCase
     /// Operacao para criar a falha generica de autenticacao.
     /// </summary>
     /// <returns>Excecao de acesso nao autorizado.</returns>
-    private static UnauthorizedAccessException CreateInvalidCredentialsException()
+    private static UnauthorizedException CreateInvalidCredentialsException()
     {
-        return new UnauthorizedAccessException(INVALID_CREDENTIALS_MESSAGE);
+        return new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
     /// <summary>

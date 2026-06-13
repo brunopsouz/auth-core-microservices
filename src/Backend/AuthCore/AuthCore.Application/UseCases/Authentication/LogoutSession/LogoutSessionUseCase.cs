@@ -1,3 +1,4 @@
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Security.Tokens.Services;
 
@@ -41,6 +42,9 @@ internal sealed class LogoutSessionUseCase : ILogoutSessionUseCase
     public async Task Execute(LogoutSessionCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
+
+        if (string.IsNullOrWhiteSpace(command.RefreshToken))
+            throw new ValidationException("O refresh token é obrigatório.");
 
         var tokenHash = _refreshTokenService.ComputeHash(command.RefreshToken);
         var refreshToken = await _refreshTokenRepository.GetByHashAsync(tokenHash);

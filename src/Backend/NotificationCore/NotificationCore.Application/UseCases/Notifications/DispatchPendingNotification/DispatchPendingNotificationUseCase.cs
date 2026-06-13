@@ -368,13 +368,17 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
 
         if (providerResult.IsTemporaryFailure)
         {
+            var errorMessage = BuildProviderFailureMessage(
+                EMAIL_PROVIDER_TEMPORARY_FAILURE_MESSAGE,
+                providerResult.ErrorCode);
+
             notification.RegisterTemporaryFailureDeliveryAttempt(
                 provider,
                 attemptStartedAtUtc,
                 attemptFinishedAtUtc,
                 attemptFinishedAtUtc.Add(retryDelay),
                 NormalizeProviderErrorCode(providerResult.ErrorCode),
-                EMAIL_PROVIDER_TEMPORARY_FAILURE_MESSAGE);
+                errorMessage);
 
             if (notification.Status == NotificationStatus.RetryScheduled)
                 counters.RetryScheduled++;
@@ -384,12 +388,16 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
             return;
         }
 
+        var permanentFailureMessage = BuildProviderFailureMessage(
+            EMAIL_PROVIDER_PERMANENT_FAILURE_MESSAGE,
+            providerResult.ErrorCode);
+
         notification.RegisterPermanentFailureDeliveryAttempt(
             provider,
             attemptStartedAtUtc,
             attemptFinishedAtUtc,
             NormalizeProviderErrorCode(providerResult.ErrorCode),
-            EMAIL_PROVIDER_PERMANENT_FAILURE_MESSAGE);
+            permanentFailureMessage);
         counters.DeadLettered++;
     }
 
@@ -479,6 +487,32 @@ internal sealed class DispatchPendingNotificationUseCase : IDispatchPendingNotif
         return string.IsNullOrWhiteSpace(errorCode)
             ? "EMAIL_PROVIDER_FAILURE"
             : errorCode.Trim();
+    }
+
+    /// <summary>
+    /// Operação para compor mensagem sanitizada com código do provedor.
+    /// </summary>
+    /// <param name="baseMessage">Mensagem base sanitizada.</param>
+    /// <param name="errorCode">Código sanitizado do provedor.</param>
+    /// <returns>Mensagem final para persistência.</returns>
+    private static string BuildProviderFailureMessage(string baseMessage, string errorCode)
+    {
+        var normalizedBaseMessage = NormalizeProviderFailureMessage(baseMessage);
+        var normalizedErrorCode = NormalizeProviderErrorCode(errorCode);
+
+        return $"{normalizedBaseMessage}. Código: {normalizedErrorCode}.";
+    }
+
+    /// <summary>
+    /// Operação para normalizar mensagem base do provedor.
+    /// </summary>
+    /// <param name="message">Mensagem informada.</param>
+    /// <returns>Mensagem normalizada sem pontuação duplicada no sufixo.</returns>
+    private static string NormalizeProviderFailureMessage(string message)
+    {
+        return string.IsNullOrWhiteSpace(message)
+            ? "Falha no provedor de e-mail"
+            : message.Trim().TrimEnd('.');
     }
 
     /// <summary>

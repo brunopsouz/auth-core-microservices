@@ -1,8 +1,8 @@
-using Shared.Messaging.Contracts.Security;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Diagnostics;
 using NotificationCore.Api.Contracts.Responses;
 using NotificationCore.Domain.Common.Exceptions;
+using Shared.Messaging.Contracts.Security;
 
 namespace NotificationCore.Api.Exceptions;
 
@@ -46,35 +46,55 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
         ArgumentNullException.ThrowIfNull(httpContext);
         ArgumentNullException.ThrowIfNull(exception);
 
-        var (statusCode, errors) = MapException(exception);
+        if (exception is NotificationCoreException notificationCoreException)
+            await HandleProjectExceptionAsync(httpContext, notificationCoreException, cancellationToken);
+        else
+            await HandleUnknownExceptionAsync(httpContext, cancellationToken);
 
-        LogException(exception, statusCode);
-
-        httpContext.Response.StatusCode = statusCode;
-        httpContext.Response.ContentType = MediaTypeNames.Application.Json;
-
-        await httpContext.Response.WriteAsJsonAsync(new ResponseErrorJson
-        {
-            Errors = errors
-        }, cancellationToken);
+        LogException(exception, httpContext.Response.StatusCode);
 
         return true;
     }
 
+    /// <summary>
+    /// Operação para tratar exceção conhecida do projeto.
+    /// </summary>
+    /// <param name="httpContext">Contexto HTTP da requisição.</param>
+    /// <param name="notificationCoreException">Exceção conhecida do projeto.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    private static async Task HandleProjectExceptionAsync(
+        HttpContext httpContext,
+        NotificationCoreException notificationCoreException,
+        CancellationToken cancellationToken)
+    {
+        httpContext.Response.StatusCode = (int)notificationCoreException.GetStatusCode();
+        httpContext.Response.ContentType = MediaTypeNames.Application.Json;
+
+        await httpContext.Response.WriteAsJsonAsync(new ResponseErrorJson
+        {
+            Errors = notificationCoreException
+                .GetErrorMessages()
+                .Select(SensitivePayloadSanitizer.SanitizeText)
+                .ToList()
+        }, cancellationToken);
+    }
 
     /// <summary>
-    /// Operação para mapear a exceção para o status code e mensagens de erro da resposta.
+    /// Operação para tratar exceção desconhecida.
     /// </summary>
-    /// <param name="exception">Exceção capturada no pipeline.</param>
-    /// <returns>Status code e mensagens de erro da resposta.</returns>
-    private static (int StatusCode, IList<string> Errors) MapException(Exception exception)
+    /// <param name="httpContext">Contexto HTTP da requisição.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    private static async Task HandleUnknownExceptionAsync(
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
     {
-        return exception switch
+        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        httpContext.Response.ContentType = MediaTypeNames.Application.Json;
+
+        await httpContext.Response.WriteAsJsonAsync(new ResponseErrorJson
         {
-            UnauthorizedAccessException unauthorizedAccessException => (StatusCodes.Status401Unauthorized, GetErrors(unauthorizedAccessException)),
-            DomainException domainException => (StatusCodes.Status400BadRequest, GetErrors(domainException)),
-            _ => (StatusCodes.Status500InternalServerError, [UNKNOWN_ERROR_MESSAGE])
-        };
+            Errors = [UNKNOWN_ERROR_MESSAGE]
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -101,15 +121,4 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
             SensitivePayloadSanitizer.SanitizeText(exception.Message),
             SensitivePayloadSanitizer.SanitizeText(exception.ToString()));
     }
-
-    /// <summary>
-    /// Operação para obter a lista de mensagens de erro da exceção.
-    /// </summary>
-    /// <param name="exception">Exceção tratada pela API.</param>
-    /// <returns>Lista com as mensagens de erro da exceção.</returns>
-    private static IList<string> GetErrors(Exception exception)
-    {
-        return [SensitivePayloadSanitizer.SanitizeText(exception.Message)];
-    }
-
 }

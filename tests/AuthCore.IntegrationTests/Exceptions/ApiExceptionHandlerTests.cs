@@ -50,13 +50,13 @@ public sealed class ApiExceptionHandlerTests
     }
 
     [Fact]
-    public async Task TryHandleAsync_WhenExceptionIsUnauthorizedAccessException_ShouldReturnUnauthorized()
+    public async Task TryHandleAsync_WhenExceptionIsUnauthorizedException_ShouldReturnUnauthorized()
     {
         var httpContext = CreateHttpContext();
 
         var wasHandled = await _exceptionHandler.TryHandleAsync(
             httpContext,
-            new UnauthorizedAccessException("Usuário não autenticado."),
+            new UnauthorizedException("Usuário não autenticado."),
             CancellationToken.None);
 
         var response = await ReadResponseAsync(httpContext);

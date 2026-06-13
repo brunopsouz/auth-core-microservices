@@ -45,7 +45,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 - Health checks por serviço.
 - Publicação assíncrona de solicitações de notificação pelo AuthCore.
 - Consumo, registro, renderização e despacho de notificações transacionais pelo NotificationCore.
-- SMTP local para testes de envio de e-mail em desenvolvimento.
+- SMTP configurável para envio de e-mail em desenvolvimento.
 
 ## Serviços
 
@@ -243,9 +243,6 @@ Serviços padrão em desenvolvimento:
 | Redis | `localhost` | `6379` |
 | RabbitMQ | `localhost` | `5672` |
 | RabbitMQ Management | `localhost` | `15672` |
-| SMTP local | `localhost` | `1025` |
-| SMTP4Dev UI | `localhost` | `1080` |
-
 Credenciais, senhas e chave de assinatura JWT devem ficar no `.env.development` local ou no mecanismo de segredos do ambiente de deploy. O `docker-compose.yml` apenas referencia essas variáveis.
 
 ## Autenticação
@@ -383,11 +380,7 @@ curl -X POST http://localhost:8080/api/auth/register \
   }'
 ```
 
-Em desenvolvimento, a solicitação de verificação de e-mail é publicada pelo AuthCore e processada pelo NotificationCore quando a aplicação completa está em execução. As mensagens enviadas por SMTP local podem ser consultadas na UI do SMTP4Dev:
-
-```text
-http://localhost:1080
-```
+Em desenvolvimento, a solicitação de verificação de e-mail é publicada pelo AuthCore e processada pelo NotificationCore quando a aplicação completa está em execução. O destino do envio depende do provedor SMTP configurado no ambiente, como Brevo.
 
 ### Exemplo: verificar e-mail
 

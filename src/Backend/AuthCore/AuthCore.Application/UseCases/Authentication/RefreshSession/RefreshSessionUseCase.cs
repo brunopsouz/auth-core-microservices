@@ -1,4 +1,5 @@
 using AuthCore.Application.UseCases.Authentication.Models;
+using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
@@ -159,9 +160,9 @@ internal sealed class RefreshSessionUseCase : IRefreshSessionUseCase
     /// Operação para criar a falha genérica de renovação do modo token.
     /// </summary>
     /// <returns>Exceção de acesso não autorizado.</returns>
-    private static UnauthorizedAccessException CreateInvalidSessionException()
+    private static UnauthorizedException CreateInvalidSessionException()
     {
-        return new UnauthorizedAccessException(INVALID_SESSION_MESSAGE);
+        return new UnauthorizedException(INVALID_SESSION_MESSAGE);
     }
 
 }

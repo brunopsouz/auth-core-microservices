@@ -295,12 +295,12 @@ public sealed class AuthControllerIntegrationTests
     }
 
     [Fact]
-    public async Task TokenLogout_WhenUseCaseThrowsUnauthorizedAccessException_ShouldPropagateException()
+    public async Task TokenLogout_WhenUseCaseThrowsUnauthorizedException_ShouldPropagateException()
     {
-        var useCase = new ThrowingLogoutSessionUseCase(new UnauthorizedAccessException("A sessão informada é inválida ou expirou."));
+        var useCase = new ThrowingLogoutSessionUseCase(new UnauthorizedException("A sessão informada é inválida ou expirou."));
         var controller = CreateTokenController();
 
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => controller.Logout(useCase, new RequestTokenLogoutJson
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(() => controller.Logout(useCase, new RequestTokenLogoutJson
         {
             RefreshToken = "invalid-refresh-token"
         }));

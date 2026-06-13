@@ -115,7 +115,7 @@ public sealed class LoginUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenPasswordIsInvalid_ShouldRegisterFailureAndThrowUnauthorizedAccessException()
+    public async Task Execute_WhenPasswordIsInvalid_ShouldRegisterFailureAndThrowUnauthorizedException()
     {
         var userRepository = new FakeUserReadRepository();
         var passwordRepository = new FakePasswordRepository();
@@ -138,7 +138,7 @@ public sealed class LoginUseCaseTests
         userRepository.Store(user);
         passwordRepository.Store(password);
 
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => useCase.Execute(new global::AuthCore.Application.UseCases.Authentication.Login.LoginCommand
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(() => useCase.Execute(new global::AuthCore.Application.UseCases.Authentication.Login.LoginCommand
         {
             Email = user.Email.Value,
             Password = "WrongPassword#2026"

@@ -161,8 +161,8 @@ internal sealed class RefreshBrowserSessionUseCase : IRefreshBrowserSessionUseCa
     /// Operacao para criar a falha generica de renovacao da sessao por cookie.
     /// </summary>
     /// <returns>Excecao de acesso nao autorizado.</returns>
-    private static UnauthorizedAccessException CreateInvalidSessionException()
+    private static UnauthorizedException CreateInvalidSessionException()
     {
-        return new UnauthorizedAccessException(INVALID_SESSION_MESSAGE);
+        return new UnauthorizedException(INVALID_SESSION_MESSAGE);
     }
 }

@@ -1,4 +1,5 @@
 using global::AuthCore.Application.UnitTests.UseCases.Authentication.Support;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.UseCases.Authentication.LogoutSession;
 using AuthCore.Domain.Passports;
 
@@ -78,6 +79,25 @@ public sealed class LogoutSessionUseCaseTests
             RefreshToken = "missing-refresh-token"
         });
 
+        Assert.Empty(refreshTokenRepository.UpdatedRefreshTokens);
+        Assert.Empty(refreshTokenRepository.RevokeFamilyCalls);
+    }
+
+    [Fact]
+    public async Task Execute_WhenRefreshTokenIsEmpty_ShouldThrowValidationException()
+    {
+        var refreshTokenRepository = new FakeRefreshTokenRepository();
+        var refreshTokenService = new FakeRefreshTokenService();
+        var useCase = new LogoutSessionUseCase(
+            refreshTokenRepository,
+            refreshTokenService);
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => useCase.Execute(new LogoutSessionCommand
+        {
+            RefreshToken = string.Empty
+        }));
+
+        Assert.Equal("O refresh token é obrigatório.", exception.Message);
         Assert.Empty(refreshTokenRepository.UpdatedRefreshTokens);
         Assert.Empty(refreshTokenRepository.RevokeFamilyCalls);
     }

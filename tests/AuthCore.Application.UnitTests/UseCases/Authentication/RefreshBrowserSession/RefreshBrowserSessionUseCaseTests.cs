@@ -1,5 +1,6 @@
 using global::AuthCore.Application.UnitTests.UseCases.Authentication.Support;
 using AuthCore.Application.UseCases.Authentication.RefreshBrowserSession;
+using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Passports;
 
 namespace AuthCore.Application.UnitTests.UseCases.Authentication.RefreshBrowserSession;
@@ -59,7 +60,7 @@ public sealed class RefreshBrowserSessionUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenSessionIsRevoked_ShouldThrowUnauthorizedAccessException()
+    public async Task Execute_WhenSessionIsRevoked_ShouldThrowUnauthorizedException()
     {
         var durableSessionRepository = new FakeDurableSessionRepository();
         var sessionIdentifierHasher = new FakeSessionIdentifierHasher();
@@ -83,7 +84,7 @@ public sealed class RefreshBrowserSessionUseCaseTests
         userRepository.Store(user);
         durableSessionRepository.Store(session);
 
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => useCase.Execute(new RefreshBrowserSessionCommand
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(() => useCase.Execute(new RefreshBrowserSessionCommand
         {
             SessionId = session.SessionId
         }));
@@ -94,7 +95,7 @@ public sealed class RefreshBrowserSessionUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenSecurityStampDiverges_ShouldThrowUnauthorizedAccessException()
+    public async Task Execute_WhenSecurityStampDiverges_ShouldThrowUnauthorizedException()
     {
         var durableSessionRepository = new FakeDurableSessionRepository();
         var sessionIdentifierHasher = new FakeSessionIdentifierHasher();
@@ -115,7 +116,7 @@ public sealed class RefreshBrowserSessionUseCaseTests
         userRepository.Store(user);
         durableSessionRepository.Store(session);
 
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => useCase.Execute(new RefreshBrowserSessionCommand
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(() => useCase.Execute(new RefreshBrowserSessionCommand
         {
             SessionId = session.SessionId
         }));

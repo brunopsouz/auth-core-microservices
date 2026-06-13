@@ -9,6 +9,7 @@ using AuthCore.Application.UseCases.Authentication.LogoutAllSessions;
 using AuthCore.Application.UseCases.Authentication.LogoutCurrentSession;
 using AuthCore.Application.UseCases.Authentication.RefreshBrowserSession;
 using AuthCore.Application.UseCases.Authentication.RevokeUserSession;
+using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -441,7 +442,7 @@ public sealed class SessionAuthController : ControllerBase
             return sessionId.Trim();
         }
 
-        throw new UnauthorizedAccessException("O identificador da sessao autenticada nao foi encontrado.");
+        throw new UnauthorizedException("O identificador da sessao autenticada nao foi encontrado.");
     }
 
     /// <summary>

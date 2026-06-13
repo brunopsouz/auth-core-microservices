@@ -1,9 +1,11 @@
+using System.Net;
+
 namespace NotificationCore.Domain.Common.Exceptions;
 
 /// <summary>
 /// Representa erro de regra de negócio do domínio.
 /// </summary>
-public class DomainException : Exception
+public class DomainException : NotificationCoreException
 {
     /// <summary>
     /// Operação para criar instância da classe.
@@ -20,6 +22,18 @@ public class DomainException : Exception
     /// <param name="inner">Exceção que originou o erro.</param>
     public DomainException(string message, Exception inner) : base(message, inner)
     {
+    }
+
+    /// <inheritdoc />
+    public override IList<string> GetErrorMessages()
+    {
+        return [Message];
+    }
+
+    /// <inheritdoc />
+    public override HttpStatusCode GetStatusCode()
+    {
+        return HttpStatusCode.BadRequest;
     }
 
     /// <summary>

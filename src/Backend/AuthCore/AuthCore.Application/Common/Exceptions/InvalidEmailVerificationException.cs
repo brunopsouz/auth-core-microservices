@@ -1,9 +1,12 @@
+using System.Net;
+using AuthCore.Domain.Common.Exceptions;
+
 namespace AuthCore.Application.Common.Exceptions;
 
 /// <summary>
 /// Representa exceção de aplicação para verificação de e-mail inválida.
 /// </summary>
-public sealed class InvalidEmailVerificationException : Exception
+public sealed class InvalidEmailVerificationException : AuthCoreException
 {
     /// <summary>
     /// Mensagem pública padronizada para falha de verificação de e-mail.
@@ -15,5 +18,17 @@ public sealed class InvalidEmailVerificationException : Exception
     /// </summary>
     public InvalidEmailVerificationException() : base(InvalidVerificationMessage)
     {
+    }
+
+    /// <inheritdoc />
+    public override IList<string> GetErrorMessages()
+    {
+        return [Message];
+    }
+
+    /// <inheritdoc />
+    public override HttpStatusCode GetStatusCode()
+    {
+        return HttpStatusCode.BadRequest;
     }
 }

@@ -41,7 +41,7 @@ internal sealed class AuthenticatedUserAccessValidator : IAuthenticatedUserAcces
         var authenticatedUser = await _userReadRepository.GetByUserIdentifierAsync(userIdentifier);
 
         if (authenticatedUser is null)
-            throw new UnauthorizedAccessException("O usuário autenticado não está disponível.");
+            throw new UnauthorizedException("O usuário autenticado não está disponível.");
 
         if (!authenticatedUser.IsActive)
             throw new ForbiddenException("O usuário não pode autenticar no momento.");
@@ -77,7 +77,7 @@ internal sealed class AuthenticatedUserAccessValidator : IAuthenticatedUserAcces
                 return userIdentifier;
         }
 
-        throw new UnauthorizedAccessException("O identificador do usuário autenticado não foi encontrado.");
+        throw new UnauthorizedException("O identificador do usuário autenticado não foi encontrado.");
     }
 
 }

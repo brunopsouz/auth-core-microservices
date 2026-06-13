@@ -1,9 +1,12 @@
+using System.Net;
+using AuthCore.Domain.Common.Exceptions;
+
 namespace AuthCore.Application.Common.Exceptions;
 
 /// <summary>
 /// Representa exceção de aplicação para falha de validação.
 /// </summary>
-public sealed class ValidationException : Exception
+public sealed class ValidationException : AuthCoreException
 {
     /// <summary>
     /// Obtém os erros de validação.
@@ -28,5 +31,17 @@ public sealed class ValidationException : Exception
         ArgumentNullException.ThrowIfNull(errors);
 
         Errors = errors.ToArray();
+    }
+
+    /// <inheritdoc />
+    public override IList<string> GetErrorMessages()
+    {
+        return Errors.ToList();
+    }
+
+    /// <inheritdoc />
+    public override HttpStatusCode GetStatusCode()
+    {
+        return HttpStatusCode.BadRequest;
     }
 }

@@ -216,9 +216,9 @@ internal sealed class LoginUseCase : ILoginUseCase
     /// Operação para criar a falha genérica de autenticação.
     /// </summary>
     /// <returns>Exceção de acesso não autorizado.</returns>
-    private static UnauthorizedAccessException CreateInvalidCredentialsException()
+    private static UnauthorizedException CreateInvalidCredentialsException()
     {
-        return new UnauthorizedAccessException(INVALID_CREDENTIALS_MESSAGE);
+        return new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
     /// <summary>

@@ -95,7 +95,7 @@ public sealed class LoginSessionUseCaseTests
         userRepository.Store(user);
         passwordRepository.Store(password);
 
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => useCase.Execute(new global::AuthCore.Application.UseCases.Authentication.LoginSession.LoginSessionCommand
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(() => useCase.Execute(new global::AuthCore.Application.UseCases.Authentication.LoginSession.LoginSessionCommand
         {
             Email = user.Email.Value,
             Password = "WrongPassword#2026"

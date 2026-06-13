@@ -1,5 +1,6 @@
 using global::AuthCore.Application.UnitTests.UseCases.Authentication.Support;
 using AuthCore.Application.UseCases.Authentication.RefreshSession;
+using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Passports;
 
 namespace AuthCore.Application.UnitTests.UseCases.Authentication.RefreshSession;
@@ -64,7 +65,7 @@ public sealed class RefreshSessionUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenRefreshTokenWasAlreadyConsumed_ShouldRevokeFamilyAndThrowUnauthorizedAccessException()
+    public async Task Execute_WhenRefreshTokenWasAlreadyConsumed_ShouldRevokeFamilyAndThrowUnauthorizedException()
     {
         var userRepository = new FakeUserReadRepository();
         var refreshTokenRepository = new FakeRefreshTokenRepository();
@@ -88,7 +89,7 @@ public sealed class RefreshSessionUseCaseTests
         userRepository.Store(user);
         refreshTokenRepository.Store(consumedRefreshToken);
 
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => useCase.Execute(new global::AuthCore.Application.UseCases.Authentication.RefreshSession.RefreshSessionCommand
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(() => useCase.Execute(new global::AuthCore.Application.UseCases.Authentication.RefreshSession.RefreshSessionCommand
         {
             RefreshToken = rawRefreshToken
         }));
@@ -106,7 +107,7 @@ public sealed class RefreshSessionUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WhenUserCanNoLongerSignIn_ShouldThrowUnauthorizedAccessExceptionWithoutPersistingChanges()
+    public async Task Execute_WhenUserCanNoLongerSignIn_ShouldThrowUnauthorizedExceptionWithoutPersistingChanges()
     {
         var userRepository = new FakeUserReadRepository();
         var refreshTokenRepository = new FakeRefreshTokenRepository();
@@ -129,7 +130,7 @@ public sealed class RefreshSessionUseCaseTests
         userRepository.Store(user);
         refreshTokenRepository.Store(currentRefreshToken);
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => useCase.Execute(new global::AuthCore.Application.UseCases.Authentication.RefreshSession.RefreshSessionCommand
+        await Assert.ThrowsAsync<UnauthorizedException>(() => useCase.Execute(new global::AuthCore.Application.UseCases.Authentication.RefreshSession.RefreshSessionCommand
         {
             RefreshToken = rawRefreshToken
         }));

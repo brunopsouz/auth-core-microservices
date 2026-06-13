@@ -76,7 +76,7 @@ services:
       RABBITMQ__QUEUE: ${RABBITMQ_QUEUE}
       RABBITMQ__DEADLETTERQUEUE: ${RABBITMQ_DEAD_LETTER_QUEUE}
       SMTP__HOST: ${SMTP_HOST}
-      SMTP__PORT: ${SMTP_CONTAINER_PORT}
+      SMTP__PORT: ${SMTP_PORT}
       SMTP__USERNAME: ${SMTP_USERNAME}
       SMTP__PASSWORD: ${SMTP_PASSWORD}
       SMTP__USETLS: ${SMTP_USE_TLS}
@@ -93,8 +93,6 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      smtp:
-        condition: service_started
     networks:
       - notificationcore-local
     restart: unless-stopped
@@ -202,15 +200,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    networks:
-      - notificationcore-local
-    restart: unless-stopped
-
-  smtp:
-    image: rnwood/smtp4dev:3.15.0
-    ports:
-      - "${SMTP_PORT}:${SMTP_CONTAINER_PORT}"
-      - "${SMTP_WEB_PORT}:80"
     networks:
       - notificationcore-local
     restart: unless-stopped
