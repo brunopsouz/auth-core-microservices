@@ -798,6 +798,16 @@ dotnet build AuthCore.sln
 
 ## Task 1.5 - Definir estratégia de criação de User por login externo
 
+Status: concluida em 2026-06-14.
+
+Decisão registrada:
+
+- Não criar `RegisterFromExternalLogin` nesta task sem decisão confirmada para dados obrigatórios ausentes.
+- Criação automática via Google só é segura quando `email_verified=true` e todos os dados obrigatórios do `User` atual estiverem disponíveis: `FirstName`, `LastName`, `Email` e `Contact`.
+- Com os escopos mínimos do Google (`openid`, `profile`, `email`), `Contact` não é fornecido e `LastName` pode faltar; nesses casos, o fluxo deve seguir para onboarding ou retornar erro controlado.
+- Não usar placeholders para `Contact`, `LastName` ou qualquer outro campo obrigatório.
+- Não adicionar `UserStatus.PendingOnboarding` sem task específica para domínio, persistência, autenticação e autorização.
+
 ### Objetivo
 
 Preparar o domínio para criação ou onboarding sem inventar requisito fora da Spec.
@@ -838,6 +848,8 @@ A Spec recomenda criação automática com `email_verified=true`, mas o modelo a
 - Testes cobrem factory se ela for criada.
 
 ### Testes esperados
+
+Condicionais à criação futura da factory:
 
 - `RegisterFromExternalLogin_WhenEmailIsNotVerified_ShouldThrowDomainException`
 - `RegisterFromExternalLogin_WhenRequiredDataIsMissing_ShouldFollowConfirmedDecision`
