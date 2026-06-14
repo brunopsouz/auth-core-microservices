@@ -742,6 +742,8 @@ dotnet test tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj
 
 ## Task 1.4 - Definir contratos de repositório de ExternalLogin
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Expor operações necessárias para Application sem depender de infraestrutura.
