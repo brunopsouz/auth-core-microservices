@@ -1095,6 +1095,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 
 ## Task 3.1 - Criar validação de returnUrl
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Bloquear open redirect no início e conclusão do login externo.
