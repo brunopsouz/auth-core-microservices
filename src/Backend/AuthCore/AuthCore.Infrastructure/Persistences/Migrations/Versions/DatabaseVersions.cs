@@ -54,4 +54,9 @@ internal static class DatabaseVersions
     /// Versao de criacao da tabela de sessoes duraveis.
     /// </summary>
     public const long TABLE_AUTH_SESSIONS = 10;
+
+    /// <summary>
+    /// Versao de criacao da tabela de logins externos.
+    /// </summary>
+    public const long TABLE_EXTERNAL_LOGINS = 11;
 }

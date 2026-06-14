@@ -866,6 +866,8 @@ dotnet test tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj
 
 ## Task 2.1 - Criar migration external_logins
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Criar estrutura persistente para vínculos externos.
