@@ -983,6 +983,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 
 ## Task 2.3 - Implementar leitura de ExternalLogin
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Permitir que a Application resolva vínculo existente e conflitos.

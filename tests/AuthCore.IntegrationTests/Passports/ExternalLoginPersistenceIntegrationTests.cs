@@ -1,6 +1,7 @@
 using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 using AuthCore.Infrastructure.Abstractions.Data;
+using AuthCore.Infrastructure.Persistences.Read.PostgreSQL.Repositories;
 using AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -103,6 +104,124 @@ public sealed class ExternalLoginPersistenceIntegrationTests : IClassFixture<Pos
         Assert.Equal("google-sub-update", persistedExternalLogin.ProviderUserId);
         Assert.Equal(usedAtUtc, persistedExternalLogin.LastUsedAtUtc);
         Assert.True(persistedExternalLogin.UpdateAt >= persistedExternalLogin.CreatedAt);
+    }
+
+    /// <summary>
+    /// Verifica se a leitura por provedor e identificador externo materializa o login externo.
+    /// </summary>
+    [Fact]
+    public async Task GetByProviderUserIdAsync_WhenExternalLoginExists_ShouldReturnExternalLogin()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var databaseSession = scope.ServiceProvider.GetRequiredService<IDatabaseSession>();
+        var externalLoginRepository = new ExternalLoginRepository(databaseSession);
+        var externalLoginReadRepository = new ExternalLoginReadRepository(databaseSession);
+        var user = CreateVerifiedUser("external.read.provider@example.com");
+        var linkedAtUtc = new DateTime(2026, 6, 14, 12, 0, 0, DateTimeKind.Utc);
+        var externalLogin = ExternalLogin.LinkGoogle(
+            user.Id,
+            "google-sub-read-provider",
+            "external.read.provider@example.com",
+            emailVerified: true,
+            linkedAtUtc);
+
+        await userRepository.AddAsync(user);
+        await externalLoginRepository.AddAsync(externalLogin);
+
+        var persistedExternalLogin = await externalLoginReadRepository.GetByProviderUserIdAsync(
+            ExternalLoginProvider.Google,
+            "google-sub-read-provider");
+
+        Assert.NotNull(persistedExternalLogin);
+        Assert.Equal(externalLogin.Id, persistedExternalLogin!.Id);
+        Assert.Equal(user.Id, persistedExternalLogin.UserId);
+        Assert.Equal(ExternalLoginProvider.Google, persistedExternalLogin.Provider);
+        Assert.Equal("google-sub-read-provider", persistedExternalLogin.ProviderUserId);
+        Assert.Equal("external.read.provider@example.com", persistedExternalLogin.Email);
+        Assert.True(persistedExternalLogin.EmailVerified);
+        Assert.Equal(linkedAtUtc, persistedExternalLogin.LinkedAtUtc);
+        Assert.Equal(linkedAtUtc, persistedExternalLogin.LastUsedAtUtc);
+    }
+
+    /// <summary>
+    /// Verifica se a leitura por provedor e identificador externo retorna nulo quando não existe vínculo.
+    /// </summary>
+    [Fact]
+    public async Task GetByProviderUserIdAsync_WhenExternalLoginDoesNotExist_ShouldReturnNull()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var databaseSession = scope.ServiceProvider.GetRequiredService<IDatabaseSession>();
+        var externalLoginReadRepository = new ExternalLoginReadRepository(databaseSession);
+
+        var persistedExternalLogin = await externalLoginReadRepository.GetByProviderUserIdAsync(
+            ExternalLoginProvider.Google,
+            "google-sub-missing");
+
+        Assert.Null(persistedExternalLogin);
+    }
+
+    /// <summary>
+    /// Verifica se a leitura por usuário e provedor materializa o login externo.
+    /// </summary>
+    [Fact]
+    public async Task GetByUserIdAndProviderAsync_WhenExternalLoginExists_ShouldReturnExternalLogin()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var databaseSession = scope.ServiceProvider.GetRequiredService<IDatabaseSession>();
+        var externalLoginRepository = new ExternalLoginRepository(databaseSession);
+        var externalLoginReadRepository = new ExternalLoginReadRepository(databaseSession);
+        var user = CreateVerifiedUser("external.read.user@example.com");
+        var linkedAtUtc = new DateTime(2026, 6, 14, 13, 0, 0, DateTimeKind.Utc);
+        var externalLogin = ExternalLogin.LinkGoogle(
+            user.Id,
+            "google-sub-read-user",
+            "external.read.user@example.com",
+            emailVerified: true,
+            linkedAtUtc);
+
+        await userRepository.AddAsync(user);
+        await externalLoginRepository.AddAsync(externalLogin);
+
+        var persistedExternalLogin = await externalLoginReadRepository.GetByUserIdAndProviderAsync(
+            user.Id,
+            ExternalLoginProvider.Google);
+
+        Assert.NotNull(persistedExternalLogin);
+        Assert.Equal(externalLogin.Id, persistedExternalLogin!.Id);
+        Assert.Equal(user.Id, persistedExternalLogin.UserId);
+        Assert.Equal(ExternalLoginProvider.Google, persistedExternalLogin.Provider);
+        Assert.Equal("google-sub-read-user", persistedExternalLogin.ProviderUserId);
+    }
+
+    /// <summary>
+    /// Verifica se a leitura por usuário e provedor retorna nulo quando não existe vínculo.
+    /// </summary>
+    [Fact]
+    public async Task GetByUserIdAndProviderAsync_WhenExternalLoginDoesNotExist_ShouldReturnNull()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var databaseSession = scope.ServiceProvider.GetRequiredService<IDatabaseSession>();
+        var externalLoginReadRepository = new ExternalLoginReadRepository(databaseSession);
+
+        var persistedExternalLogin = await externalLoginReadRepository.GetByUserIdAndProviderAsync(
+            Guid.NewGuid(),
+            ExternalLoginProvider.Google);
+
+        Assert.Null(persistedExternalLogin);
     }
 
     /// <summary>
