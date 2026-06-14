@@ -926,6 +926,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 
 ## Task 2.2 - Implementar escrita de ExternalLogin
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Persistir criação e atualização do vínculo externo.
