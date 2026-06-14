@@ -6,6 +6,7 @@ using AuthCore.Api.Controllers;
 using AuthCore.Application;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Security.Tokens.Services;
+using AuthCore.Domain.Users.Repositories;
 using AuthCore.Infrastructure;
 using AuthCore.Infrastructure.Abstractions.Data;
 using AuthCore.Infrastructure.Configurations;
@@ -46,6 +47,8 @@ public sealed class BootstrapSmokeTests
         var unitOfWork = scope.ServiceProvider.GetService<IUnitOfWork>();
         var accessTokenGenerator = scope.ServiceProvider.GetService<IAccessTokenGenerator>();
         var refreshTokenService = scope.ServiceProvider.GetService<IRefreshTokenService>();
+        var externalLoginRepository = scope.ServiceProvider.GetService<IExternalLoginRepository>();
+        var externalLoginReadRepository = scope.ServiceProvider.GetService<IExternalLoginReadRepository>();
         var authenticationSchemeProvider = scope.ServiceProvider.GetService<IAuthenticationSchemeProvider>();
         var healthCheckService = scope.ServiceProvider.GetService<HealthCheckService>();
         var outboxProcessor = scope.ServiceProvider.GetService<IOutboxProcessor>();
@@ -58,6 +61,8 @@ public sealed class BootstrapSmokeTests
         Assert.NotNull(unitOfWork);
         Assert.NotNull(accessTokenGenerator);
         Assert.NotNull(refreshTokenService);
+        Assert.NotNull(externalLoginRepository);
+        Assert.NotNull(externalLoginReadRepository);
         Assert.NotNull(authenticationSchemeProvider);
         Assert.NotNull(healthCheckService);
         Assert.NotNull(outboxProcessor);

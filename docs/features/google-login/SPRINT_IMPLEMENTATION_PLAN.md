@@ -1039,6 +1039,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 
 ## Task 2.4 - Registrar repositórios no DI
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Disponibilizar contratos de `ExternalLogin` para Application.

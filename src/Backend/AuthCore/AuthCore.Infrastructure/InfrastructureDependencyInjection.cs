@@ -112,8 +112,12 @@ public static class InfrastructureDependencyInjection
     {
         services.AddScoped<UserRepository>();
         services.AddScoped<UserReadRepository>();
+        services.AddScoped<ExternalLoginRepository>();
+        services.AddScoped<ExternalLoginReadRepository>();
         services.AddScoped<IUserRepository>(serviceProvider => serviceProvider.GetRequiredService<UserRepository>());
         services.AddScoped<IUserReadRepository>(serviceProvider => serviceProvider.GetRequiredService<UserReadRepository>());
+        services.AddScoped<IExternalLoginRepository>(serviceProvider => serviceProvider.GetRequiredService<ExternalLoginRepository>());
+        services.AddScoped<IExternalLoginReadRepository>(serviceProvider => serviceProvider.GetRequiredService<ExternalLoginReadRepository>());
         services.AddScoped<IPasswordRepository, PasswordRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IDurableSessionRepository, DurableSessionRepository>();
