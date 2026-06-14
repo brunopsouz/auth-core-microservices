@@ -1,4 +1,5 @@
 using NotificationCore.Domain.Notifications.Enums;
+using NotificationCore.Domain.Notifications.Templates;
 using NotificationCore.Infrastructure.Abstractions.Data;
 using NotificationCore.Infrastructure.Notifications.Templates;
 using Npgsql;
@@ -8,7 +9,7 @@ namespace NotificationCore.Infrastructure.Persistences.Read.PostgreSQL.Repositor
 /// <summary>
 /// Representa repositório PostgreSQL de leitura de templates de notificação.
 /// </summary>
-internal sealed class NotificationTemplateRepository : INotificationTemplateRepository
+internal sealed class NotificationTemplateRepository : INotificationTemplateRepository, INotificationTemplateReadRepository
 {
     /// <summary>
     /// Campo que armazena database session.
@@ -54,6 +55,26 @@ internal sealed class NotificationTemplateRepository : INotificationTemplateRepo
             templates.Add(ReadTemplate(reader));
 
         return templates;
+    }
+
+    /// <summary>
+    /// Operacao para listar templates ativos para leitura da aplicacao.
+    /// </summary>
+    /// <returns>Templates ativos.</returns>
+    async Task<IReadOnlyCollection<NotificationTemplateSummary>> INotificationTemplateReadRepository.ListActiveAsync()
+    {
+        var templates = await ListActiveAsync();
+
+        return templates
+            .Select(template => new NotificationTemplateSummary
+            {
+                TemplateKey = template.TemplateKey,
+                Channel = template.Channel.ToString(),
+                Subject = template.Subject,
+                HtmlBody = template.HtmlBody,
+                TextBody = template.TextBody
+            })
+            .ToList();
     }
 
     /// <summary>

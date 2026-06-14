@@ -33,13 +33,19 @@ public sealed class ValidationException : AuthCoreException
         Errors = errors.ToArray();
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para obter as mensagens de erro.
+    /// </summary>
+    /// <returns>Mensagens de erro da excecao.</returns>
     public override IList<string> GetErrorMessages()
     {
         return Errors.ToList();
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para obter o status code HTTP.
+    /// </summary>
+    /// <returns>Status code HTTP da excecao.</returns>
     public override HttpStatusCode GetStatusCode()
     {
         return HttpStatusCode.BadRequest;

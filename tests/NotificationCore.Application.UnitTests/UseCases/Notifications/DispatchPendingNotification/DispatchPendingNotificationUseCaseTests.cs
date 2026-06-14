@@ -358,7 +358,7 @@ public sealed class DispatchPendingNotificationUseCaseTests
         return JsonSerializer.Serialize(request);
     }
 
-    private sealed class FakeNotificationRepository : INotificationRepository
+    private sealed class FakeNotificationRepository : INotificationDispatchRepository, INotificationWriterRepository
     {
         /// <summary>
         /// Campo que armazena notifications.

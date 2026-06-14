@@ -16,13 +16,19 @@ public sealed class ConflictException : AuthCoreException
     {
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para obter as mensagens de erro.
+    /// </summary>
+    /// <returns>Mensagens de erro da excecao.</returns>
     public override IList<string> GetErrorMessages()
     {
         return [Message];
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para obter o status code HTTP.
+    /// </summary>
+    /// <returns>Status code HTTP da excecao.</returns>
     public override HttpStatusCode GetStatusCode()
     {
         return HttpStatusCode.Conflict;

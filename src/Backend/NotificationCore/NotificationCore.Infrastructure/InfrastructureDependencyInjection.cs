@@ -6,6 +6,7 @@ using NotificationCore.Domain.Common.Repositories;
 using NotificationCore.Domain.Notifications.Providers;
 using NotificationCore.Domain.Notifications.Repositories;
 using NotificationCore.Domain.Notifications.Rendering;
+using NotificationCore.Domain.Notifications.Templates;
 using NotificationCore.Infrastructure.Abstractions.Data;
 using NotificationCore.Infrastructure.Configurations;
 using NotificationCore.Infrastructure.Messaging.RabbitMq;
@@ -85,8 +86,14 @@ public static class InfrastructureDependencyInjection
     private static void AddRepositories(IServiceCollection services)
     {
         services.AddScoped<IInboxRepository, InboxRepository>();
-        services.AddScoped<INotificationRepository, NotificationRepository>();
-        services.AddScoped<INotificationTemplateRepository, NotificationTemplateRepository>();
+        services.AddScoped<NotificationRepository>();
+        services.AddScoped<INotificationWriterRepository>(serviceProvider => serviceProvider.GetRequiredService<NotificationRepository>());
+        services.AddScoped<INotificationReadRepository>(serviceProvider => serviceProvider.GetRequiredService<NotificationRepository>());
+        services.AddScoped<INotificationSearchRepository>(serviceProvider => serviceProvider.GetRequiredService<NotificationRepository>());
+        services.AddScoped<INotificationDispatchRepository>(serviceProvider => serviceProvider.GetRequiredService<NotificationRepository>());
+        services.AddScoped<NotificationTemplateRepository>();
+        services.AddScoped<INotificationTemplateRepository>(serviceProvider => serviceProvider.GetRequiredService<NotificationTemplateRepository>());
+        services.AddScoped<INotificationTemplateReadRepository>(serviceProvider => serviceProvider.GetRequiredService<NotificationTemplateRepository>());
     }
 
     /// <summary>

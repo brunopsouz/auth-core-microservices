@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using NotificationCore.Api.Contracts.Responses;
-using NotificationCore.Infrastructure.Notifications.Templates;
+using NotificationCore.Application.UseCases.Notifications.ListActiveNotificationTemplates;
 
 namespace NotificationCore.Api.Controllers;
 
@@ -14,15 +14,14 @@ public sealed class TemplatesController : ControllerBase
     /// <summary>
     /// Operação para listar templates ativos.
     /// </summary>
-    /// <param name="serviceProvider">Provider de serviços da aplicação.</param>
+    /// <param name="useCase">Caso de uso responsavel pela listagem.</param>
     /// <returns>Resposta com templates ativos.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyCollection<ResponseNotificationTemplateJson>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<ResponseNotificationTemplateJson>>> ListActive(
-        [FromServices] IServiceProvider serviceProvider)
+        [FromServices] IListActiveNotificationTemplatesUseCase useCase)
     {
-        var templateRepository = serviceProvider.GetRequiredService<INotificationTemplateRepository>();
-        var templates = await templateRepository.ListActiveAsync();
+        var templates = await useCase.Execute();
 
         return Ok(templates
             .Select(MapTemplate)
@@ -35,7 +34,7 @@ public sealed class TemplatesController : ControllerBase
     /// </summary>
     /// <param name="template">Template da infraestrutura.</param>
     /// <returns>Resposta HTTP do template.</returns>
-    private static ResponseNotificationTemplateJson MapTemplate(NotificationTemplate template)
+    private static ResponseNotificationTemplateJson MapTemplate(ListActiveNotificationTemplateResult template)
     {
         return new ResponseNotificationTemplateJson
         {

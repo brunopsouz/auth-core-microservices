@@ -12,7 +12,13 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// </summary>
 internal sealed class EmailVerificationNotificationOutboxFactory : IEmailVerificationNotificationOutboxFactory
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para criar mensagem de outbox de verificacao de e-mail.
+    /// </summary>
+    /// <param name="verification">Verificacao de e-mail emitida.</param>
+    /// <param name="confirmationCode">Codigo de confirmacao em texto claro.</param>
+    /// <param name="requestedAtUtc">Data da solicitacao em UTC.</param>
+    /// <returns>Mensagem de outbox criada.</returns>
     public OutboxMessage Create(
         EmailVerification verification,
         string confirmationCode,

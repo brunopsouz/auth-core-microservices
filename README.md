@@ -17,6 +17,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 - [Serviços](#serviços)
 - [Tecnologias](#tecnologias)
 - [Arquitetura](#arquitetura)
+- [Padrões de engenharia](#padrões-de-engenharia)
 - [Requisitos](#requisitos)
 - [Instalação](#instalação)
 - [Uso](#uso)
@@ -73,7 +74,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 
 ## Arquitetura
 
-A solução organiza serviços backend com separação de responsabilidades e camadas internas por contexto de negócio:
+A solução organiza serviços backend com separação de responsabilidades e camadas internas por contexto de negócio. A evolução do código segue Clean Architecture, DDD tático e princípios SOLID para manter baixo acoplamento, alta testabilidade e responsabilidades claras.
 
 ```mermaid
 flowchart TD
@@ -120,6 +121,20 @@ Responsabilidades principais:
 - `NotificationCore.Infrastructure`: persistência PostgreSQL, consumo RabbitMQ, Inbox, templates, renderização e envio SMTP.
 - `Shared.Messaging.Contracts`: mensagens compartilhadas entre serviços.
 - `tests`: testes unitários de domínio, aplicação e testes de integração por serviço.
+
+## Padrões de engenharia
+
+O projeto adota SOLID como padrão transversal de design e revisão técnica:
+
+- SRP: classes, controllers, use cases e repositórios devem ter um motivo principal para mudar.
+- OCP: variações reais de comportamento devem ser tratadas por abstrações, policies, strategies, factories ou providers, sem concentrar branches em classes centrais.
+- LSP: implementações devem cumprir integralmente os contratos que expõem, sem métodos artificiais ou `NotSupportedException`.
+- ISP: interfaces devem ser pequenas e orientadas ao consumidor.
+- DIP: `Application` e `Domain` dependem de abstrações; detalhes técnicos ficam em `Infrastructure`.
+
+Como regra de visibilidade, abstrações consumidas entre camadas podem ser públicas, enquanto implementações concretas devem ser `internal` por padrão, exceto contratos de entrada, tipos de domínio e exigências técnicas de frameworks.
+
+O guia completo fica em `docs/agents/solid-guidelines.md`. Ele complementa os padrões de arquitetura, estilo C#, contratos HTTP, persistência e testes em `docs/agents/`.
 
 ## Requisitos
 

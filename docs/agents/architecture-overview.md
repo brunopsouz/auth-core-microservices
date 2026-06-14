@@ -52,6 +52,7 @@ Na prática, a solução combina:
 
 - **Clean Architecture**, ao manter o domínio e a aplicação isolados de detalhes técnicos
 - **DDD tático**, ao modelar agregados, value objects, invariantes e contratos de repositório
+- **SOLID**, ao separar responsabilidades, orientar interfaces por consumidor e depender de abstrações nas camadas de alto nível
 - **vertical slices na aplicação**, ao organizar casos de uso por módulo e responsabilidade
 - **separação de leitura e escrita**, especialmente na infraestrutura PostgreSQL
 
@@ -66,6 +67,8 @@ O fluxo de dependência implementado hoje é o seguinte:
 - os projetos de teste dependem da camada que exercitam
 
 Uma regra importante da solução é que **`AuthCore.Application` não depende diretamente de `AuthCore.Infrastructure`**. A aplicação trabalha apenas com contratos do domínio, enquanto a infraestrutura fornece implementações concretas por injeção de dependência.
+
+O padrão de visibilidade acompanha essa regra: a abstração que cruza camadas pode ser `public`, mas a implementação concreta deve ser `internal` por padrão. Assim, a superfície pública representa contratos de consumo, não detalhes técnicos ou classes concretas.
 
 Mesmo quando `AuthCore.Api` referencia `AuthCore.Infrastructure` para compor o processo, essa referência deve ser tratada como uma borda de bootstrap. A infraestrutura deve manter seus detalhes técnicos encapsulados com tipos `internal` por padrão. As exceções públicas esperadas são a classe de registro de dependências, como `InfrastructureDependencyInjection`, e tipos que precisam ser públicos por exigência técnica de frameworks de discovery ou reflexão.
 
@@ -184,6 +187,8 @@ A camada `AuthCore.Infrastructure` implementa detalhes técnicos sem absorver re
 Mesmo quando a infraestrutura materializa agregados de domínio, ela faz isso respeitando o modelo central, normalmente por meio de factories como `Restore(...)`.
 
 Por encapsulamento, classes concretas, options, repositórios, factories técnicas, workers de infraestrutura e modelos auxiliares da camada devem permanecer `internal`. A camada não deve expor seus detalhes como API pública do assembly sem necessidade técnica real.
+
+Quando houver uma interface ou contrato técnico consumido por outro assembly, esse contrato pode ser `public`; a classe concreta que o implementa permanece `internal` e deve ser resolvida pela composição de DI.
 
 As migrations versionadas do `FluentMigrator` são uma exceção técnica: elas podem permanecer `public` quando o scanner padrão do framework precisar descobri-las por reflexão. Essa exposição não deve ser tratada como contrato de consumo da aplicação; é apenas uma exigência operacional do mecanismo de migrations. O mesmo critério vale para outros frameworks que exijam tipos públicos para discovery, desde que a exceção seja pontual e justificada.
 
@@ -379,6 +384,7 @@ Também é recomendado evitar estes desvios comuns:
 - levar regra de negócio para controllers, services utilitários ou infraestrutura
 - introduzir dependência direta de `Application` para `Infrastructure`
 - tornar públicos detalhes técnicos da `Infrastructure` sem necessidade técnica clara
+- criar interfaces grandes demais, service locators ou classes centrais que concentrem variações de comportamento
 
 ## Leitura Final
 

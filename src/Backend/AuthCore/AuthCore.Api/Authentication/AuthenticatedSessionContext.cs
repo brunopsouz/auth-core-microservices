@@ -27,7 +27,9 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
     }
 
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Identificador publico do usuario autenticado.
+    /// </summary>
     public Guid UserIdentifier
     {
         get
@@ -39,7 +41,9 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Identificador interno do usuario autenticado.
+    /// </summary>
     public Guid InternalUserId
     {
         get
@@ -53,7 +57,9 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// E-mail do usuario autenticado.
+    /// </summary>
     public string Email
     {
         get
@@ -74,7 +80,9 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Identificador opaco da sessao autenticada.
+    /// </summary>
     public string SessionId
     {
         get
@@ -89,7 +97,9 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Identificador publico da sessao autenticada.
+    /// </summary>
     public string PublicSessionId
     {
         get
@@ -103,7 +113,9 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Status funcional do usuario autenticado.
+    /// </summary>
     public UserStatus UserStatus
     {
         get
@@ -117,7 +129,9 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Indicacao de atividade do usuario autenticado.
+    /// </summary>
     public bool IsActive
     {
         get
@@ -132,7 +146,11 @@ public sealed class AuthenticatedSessionContext : IAuthenticatedSessionContext
     }
 
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para tentar obter o identificador publico do usuario autenticado.
+    /// </summary>
+    /// <param name="userIdentifier">Identificador publico do usuario autenticado.</param>
+    /// <returns>Verdadeiro quando o identificador foi encontrado.</returns>
     public bool TryGetUserIdentifier(out Guid userIdentifier)
     {
         var claimValues = new[]

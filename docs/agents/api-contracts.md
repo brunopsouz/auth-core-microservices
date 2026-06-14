@@ -14,6 +14,8 @@ Use este documento ao criar ou revisar:
 
 O objetivo é manter a API fina, previsível e alinhada ao padrão dominante do repositório.
 
+Controllers e contratos HTTP também devem respeitar os princípios SOLID definidos em `docs/agents/solid-guidelines.md`, principalmente SRP e DIP.
+
 ## Fonte de verdade
 
 Ao modelar contratos HTTP, siga esta ordem de referência:
@@ -45,8 +47,12 @@ Responsabilidades que não devem ir para controller:
 - validações centrais de domínio
 - persistência
 - composição complexa de infraestrutura
+- service locator para resolver dependências que deveriam estar explícitas na action ou no construtor
+- uso direto de tipos concretos da infraestrutura como fluxo de aplicação
 
 Mesmo que a API referencie `Infrastructure` no projeto para permitir o bootstrap, controllers não devem expor tipos concretos da infraestrutura em contratos HTTP, responses, requests ou superfície pública das actions. Detalhes técnicos da infraestrutura devem permanecer encapsulados. Tipos públicos por exigência técnica de frameworks, como migrations descobertas por reflexão, não devem ser tratados como contratos disponíveis para a API.
+
+Controllers devem depender das abstrações públicas de casos de uso, como `I...UseCase`. As implementações concretas desses casos de uso devem permanecer `internal` e ser resolvidas apenas pela composição de injeção de dependência.
 
 O padrão atual está bem representado em:
 
@@ -287,6 +293,8 @@ Antes de concluir uma mudança em contrato HTTP, confirme:
 7. nomes de rota, action e DTO estão consistentes com o caso de uso
 8. a mudança preserva compatibilidade com contratos já expostos ou trata claramente a evolução
 9. nenhum tipo concreto de `Infrastructure` foi exposto na assinatura pública do endpoint ou no contrato JSON
+10. o controller não acessa infraestrutura diretamente quando existe ou deve existir um caso de uso
+11. as dependências do endpoint estão explícitas e alinhadas ao checklist SOLID
 
 ## Arquivos de referência
 

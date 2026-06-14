@@ -63,7 +63,7 @@ public sealed class SearchNotificationsUseCaseTests
         Assert.Equal("Status de notificação inválido.", exception.Message);
     }
 
-    private sealed class FakeNotificationRepository : INotificationRepository
+    private sealed class FakeNotificationRepository : INotificationSearchRepository
     {
         public string? CorrelationId { get; private set; }
 

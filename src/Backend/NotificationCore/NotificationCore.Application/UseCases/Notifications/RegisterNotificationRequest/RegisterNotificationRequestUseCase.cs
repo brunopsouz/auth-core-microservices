@@ -24,7 +24,11 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
     /// <summary>
     /// Campo que armazena notification repository.
     /// </summary>
-    private readonly INotificationRepository _notificationRepository;
+    private readonly INotificationReadRepository _notificationReadRepository;
+    /// <summary>
+    /// Campo que armazena notification writer repository.
+    /// </summary>
+    private readonly INotificationWriterRepository _notificationWriterRepository;
     /// <summary>
     /// Campo que armazena unit of work.
     /// </summary>
@@ -35,15 +39,18 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
     /// Operacao para criar instancia da classe.
     /// </summary>
     /// <param name="inboxRepository">Repositorio de inbox.</param>
-    /// <param name="notificationRepository">Repositorio de notificacoes.</param>
+    /// <param name="notificationReadRepository">Repositorio de leitura de notificacoes.</param>
+    /// <param name="notificationWriterRepository">Repositorio de escrita de notificacoes.</param>
     /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
     public RegisterNotificationRequestUseCase(
         IInboxRepository inboxRepository,
-        INotificationRepository notificationRepository,
+        INotificationReadRepository notificationReadRepository,
+        INotificationWriterRepository notificationWriterRepository,
         IUnitOfWork unitOfWork)
     {
         _inboxRepository = inboxRepository;
-        _notificationRepository = notificationRepository;
+        _notificationReadRepository = notificationReadRepository;
+        _notificationWriterRepository = notificationWriterRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -78,7 +85,7 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
                 if (!inboxResult.WasAlreadyProcessed)
                     throw new InvalidOperationException("Mensagem de inbox ja esta em processamento por outro consumidor.");
 
-                var existingNotification = await _notificationRepository.GetByIdempotencyKeyAsync(command.Request.IdempotencyKey);
+                var existingNotification = await _notificationReadRepository.GetByIdempotencyKeyAsync(command.Request.IdempotencyKey);
 
                 await _unitOfWork.CommitAsync();
 
@@ -99,11 +106,11 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
                 priority,
                 command.Request.RequestedAtUtc);
 
-            var wasNotificationAdded = await _notificationRepository.TryAddAsync(notification);
+            var wasNotificationAdded = await _notificationWriterRepository.TryAddAsync(notification);
 
             if (!wasNotificationAdded)
             {
-                var existingNotification = await _notificationRepository.GetByIdempotencyKeyAsync(command.Request.IdempotencyKey);
+                var existingNotification = await _notificationReadRepository.GetByIdempotencyKeyAsync(command.Request.IdempotencyKey);
 
                 await MarkAsProcessedAsync(command.Request.MessageId);
                 await _unitOfWork.CommitAsync();

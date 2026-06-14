@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 using NotificationCore.Api.Contracts.Responses;
 using NotificationCore.Api.Controllers;
-using NotificationCore.Domain.Notifications.Enums;
-using NotificationCore.Infrastructure.Notifications.Templates;
+using NotificationCore.Application.UseCases.Notifications.ListActiveNotificationTemplates;
 
 namespace NotificationCore.IntegrationTests.Api;
 
@@ -12,55 +10,45 @@ public sealed class TemplatesControllerTests
     [Fact]
     public async Task ListActive_WhenTemplatesExist_ShouldMapResponse()
     {
-        var repository = new StubNotificationTemplateRepository
+        var useCase = new StubListActiveNotificationTemplatesUseCase
         {
             Templates =
             [
-                new NotificationTemplate
+                new ListActiveNotificationTemplateResult
                 {
                     TemplateKey = "auth.email-confirmation",
-                    Channel = NotificationChannel.Email,
+                    Channel = "Email",
                     Subject = "Confirme seu e-mail",
-                    HtmlBody = "<p>Seu código é {{confirmationCode}}</p>",
-                    TextBody = "Seu código é {{confirmationCode}}"
+                    HtmlBody = "<p>Seu codigo e {{confirmationCode}}</p>",
+                    TextBody = "Seu codigo e {{confirmationCode}}"
                 }
             ]
         };
         var controller = new TemplatesController();
-        using var serviceProvider = new ServiceCollection()
-            .AddSingleton<INotificationTemplateRepository>(repository)
-            .BuildServiceProvider();
 
-        var actionResult = await controller.ListActive(serviceProvider);
+        var actionResult = await controller.ListActive(useCase);
 
         var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
         var response = Assert.IsAssignableFrom<IReadOnlyCollection<ResponseNotificationTemplateJson>>(okResult.Value);
         var template = Assert.Single(response);
 
-        Assert.True(repository.WasListed);
+        Assert.True(useCase.WasListed);
         Assert.Equal("auth.email-confirmation", template.TemplateKey);
         Assert.Equal("Email", template.Channel);
         Assert.Equal("Confirme seu e-mail", template.Subject);
     }
 
-    private sealed class StubNotificationTemplateRepository : INotificationTemplateRepository
+    private sealed class StubListActiveNotificationTemplatesUseCase : IListActiveNotificationTemplatesUseCase
     {
-        public IReadOnlyCollection<NotificationTemplate> Templates { get; init; } = [];
+        public IReadOnlyCollection<ListActiveNotificationTemplateResult> Templates { get; init; } = [];
 
         public bool WasListed { get; private set; }
 
-        public Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync()
+        public Task<IReadOnlyCollection<ListActiveNotificationTemplateResult>> Execute()
         {
             WasListed = true;
 
             return Task.FromResult(Templates);
-        }
-
-        public Task<NotificationTemplate?> GetActiveAsync(string templateKey, NotificationChannel channel)
-        {
-            return Task.FromResult(Templates.FirstOrDefault(template =>
-                template.TemplateKey == templateKey &&
-                template.Channel == channel));
         }
     }
 }

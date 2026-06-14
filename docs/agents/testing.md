@@ -6,6 +6,8 @@ Este documento oficializa a estratégia de testes do projeto `auth_core` com bas
 
 Ele existe para orientar criação, revisão e evolução de testes de forma pragmática, preservando o foco do projeto em comportamento de negócio, previsibilidade arquitetural e validação incremental por camada.
 
+Os testes também servem como sinal de aderência aos princípios SOLID descritos em `docs/agents/solid-guidelines.md`: se uma regra não pode ser testada sem infraestrutura real, avalie possível violação de SRP ou DIP.
+
 As regras abaixo seguem quatro premissas:
 
 - testar comportamento observável antes de testar detalhe interno
@@ -66,6 +68,7 @@ Os testes da aplicação devem validar a orquestração dos casos de uso, especi
 - integração entre domínio e dependências externas por contrato
 - montagem de resultados de aplicação
 - decisões de fluxo condicionadas por leitura de dados
+- consumo de contratos pequenos e coerentes com a responsabilidade exercida
 
 O padrão atual privilegia dublês manuais simples, como:
 
@@ -143,6 +146,7 @@ Regra prática por tipo de mudança:
 - mudança em orquestração de caso de uso: atualizar `AuthCore.Application.UnitTests`
 - mudança em controller, bootstrap, autenticação ou infraestrutura: complementar com `AuthCore.IntegrationTests`
 - mudança puramente estrutural sem efeito observável: avaliar se teste novo realmente agrega valor antes de criar
+- refatoração SOLID que altera fronteiras de interface ou DI: atualizar testes de composição e dublês de aplicação para refletir os novos contratos
 
 ## O Que Evitar
 

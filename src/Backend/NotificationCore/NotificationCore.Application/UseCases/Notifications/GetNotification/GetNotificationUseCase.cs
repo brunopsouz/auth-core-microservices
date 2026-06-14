@@ -12,14 +12,14 @@ internal sealed class GetNotificationUseCase : IGetNotificationUseCase
     /// <summary>
     /// Campo que armazena notification repository.
     /// </summary>
-    private readonly INotificationRepository _notificationRepository;
+    private readonly INotificationReadRepository _notificationRepository;
 
 
     /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
     /// <param name="notificationRepository">Repositório de notificações.</param>
-    public GetNotificationUseCase(INotificationRepository notificationRepository)
+    public GetNotificationUseCase(INotificationReadRepository notificationRepository)
     {
         ArgumentNullException.ThrowIfNull(notificationRepository);
 

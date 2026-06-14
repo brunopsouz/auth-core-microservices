@@ -27,7 +27,12 @@ public sealed class ActiveSessionAuthorizationHandler : AuthorizationHandler<Act
     }
 
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para validar o requisito de sessao ativa.
+    /// </summary>
+    /// <param name="context">Contexto da autorizacao em execucao.</param>
+    /// <param name="requirement">Requisito de sessao ativa.</param>
+    /// <returns>Tarefa concluida apos validar o requisito.</returns>
     protected override Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
         ActiveSessionRequirement requirement)

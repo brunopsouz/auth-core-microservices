@@ -32,7 +32,15 @@ internal sealed class InboxRepository : IInboxRepository
     }
 
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para tentar iniciar o processamento idempotente da mensagem.
+    /// </summary>
+    /// <param name="messageId">Identificador idempotente da mensagem.</param>
+    /// <param name="messageType">Tipo logico da mensagem.</param>
+    /// <param name="consumerName">Nome do consumidor.</param>
+    /// <param name="payload">Conteudo serializado da mensagem.</param>
+    /// <param name="receivedAtUtc">Data de recebimento em UTC.</param>
+    /// <returns>Resultado da tentativa de inicio.</returns>
     public async Task<InboxProcessingStartResult> TryStartProcessingAsync(
         Guid messageId,
         string messageType,
@@ -93,7 +101,11 @@ internal sealed class InboxRepository : IInboxRepository
             receivedAtUtc);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para obter o payload original pela chave de idempotencia da notificacao.
+    /// </summary>
+    /// <param name="idempotencyKey">Chave de idempotencia da notificacao.</param>
+    /// <returns>Payload encontrado ou nulo.</returns>
     public async Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(string idempotencyKey)
     {
         const string sql = """
@@ -113,7 +125,14 @@ internal sealed class InboxRepository : IInboxRepository
         return payload as string;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para marcar mensagem como processada.
+    /// </summary>
+    /// <param name="messageId">Identificador idempotente da mensagem.</param>
+    /// <param name="messageType">Tipo logico da mensagem.</param>
+    /// <param name="consumerName">Nome do consumidor.</param>
+    /// <param name="processedAtUtc">Data de processamento em UTC.</param>
+    /// <returns>Tarefa concluida apos atualizar a mensagem.</returns>
     public async Task MarkAsProcessedAsync(
         Guid messageId,
         string messageType,
@@ -141,7 +160,16 @@ internal sealed class InboxRepository : IInboxRepository
         await command.ExecuteNonQueryAsync();
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para marcar mensagem como falha.
+    /// </summary>
+    /// <param name="messageId">Identificador idempotente da mensagem.</param>
+    /// <param name="messageType">Tipo logico da mensagem.</param>
+    /// <param name="consumerName">Nome do consumidor.</param>
+    /// <param name="payload">Conteudo serializado da mensagem.</param>
+    /// <param name="receivedAtUtc">Data de recebimento em UTC.</param>
+    /// <param name="error">Erro sanitizado da tentativa.</param>
+    /// <returns>Tarefa concluida apos registrar a falha.</returns>
     public async Task MarkAsFailedAsync(
         Guid messageId,
         string messageType,

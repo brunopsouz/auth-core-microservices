@@ -18,6 +18,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         var useCase = new RegisterNotificationRequestUseCase(
             inboxRepository,
             notificationRepository,
+            notificationRepository,
             unitOfWork);
         var command = new RegisterNotificationRequestCommand
         {
@@ -52,6 +53,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         var useCase = new RegisterNotificationRequestUseCase(
             inboxRepository,
             notificationRepository,
+            notificationRepository,
             unitOfWork);
 
         inboxRepository.ProcessedMessageIds.Add(request.MessageId);
@@ -81,6 +83,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         var unitOfWork = new SpyUnitOfWork();
         var useCase = new RegisterNotificationRequestUseCase(
             inboxRepository,
+            notificationRepository,
             notificationRepository,
             unitOfWork);
         var existingNotification = CreateNotification(request.IdempotencyKey);
@@ -115,6 +118,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         var useCase = new RegisterNotificationRequestUseCase(
             inboxRepository,
             notificationRepository,
+            notificationRepository,
             unitOfWork);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -142,6 +146,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         var useCase = new RegisterNotificationRequestUseCase(
             inboxRepository,
             notificationRepository,
+            notificationRepository,
             unitOfWork);
 
         await useCase.Execute(new RegisterNotificationRequestCommand { Request = request });
@@ -162,6 +167,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         var unitOfWork = new SpyUnitOfWork();
         var useCase = new RegisterNotificationRequestUseCase(
             inboxRepository,
+            notificationRepository,
             notificationRepository,
             unitOfWork);
 
@@ -283,7 +289,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
         string ConsumerName,
         string Payload);
 
-    private sealed class FakeNotificationRepository : INotificationRepository
+    private sealed class FakeNotificationRepository : INotificationReadRepository, INotificationWriterRepository
     {
         private readonly Dictionary<string, Notification> _notificationsByIdempotencyKey = [];
 

@@ -41,7 +41,13 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
     }
 
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Operacao para publicar solicitacao de notificacao.
+    /// </summary>
+    /// <param name="request">Solicitacao de notificacao.</param>
+    /// <param name="payload">Payload serializado da mensagem.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operacao.</param>
+    /// <returns>Tarefa concluida apos a publicacao.</returns>
     public Task PublishAsync(
         SendTransactionalNotificationRequested request,
         string payload,

@@ -28,6 +28,21 @@ src/Backend
 
 Cada servico possui sua propria solucao (`*.Service.sln`) com projetos de producao. A solucao `Backend.sln` funciona como agregadora de producao do backend. A solucao da raiz do repositorio funciona apenas como agregadora global do monorepo.
 
+## Padroes de engenharia
+
+Os servicos backend seguem Clean Architecture, DDD tatico e principios SOLID.
+
+Na pratica:
+
+- controllers permanecem finos e nao acessam infraestrutura diretamente quando existe fluxo de aplicacao;
+- use cases orquestram o fluxo e dependem de contratos pequenos, orientados ao consumidor;
+- dominio concentra regras de negocio, invariantes e value objects;
+- infraestrutura implementa detalhes tecnicos por meio de Npgsql, Redis, RabbitMQ, SMTP, migrations e providers concretos;
+- interfaces devem ser criadas por necessidade real de consumidor, teste, infraestrutura ou variacao de comportamento.
+- abstracoes consumidas entre camadas podem ser publicas, mas implementacoes concretas devem ser `internal` por padrao.
+
+O guia completo de SOLID fica em `../../docs/agents/solid-guidelines.md` e complementa os documentos de padrao em `../../docs/agents/`.
+
 ## Servicos
 
 | Servico | Responsabilidade | Solucao |
@@ -232,4 +247,4 @@ Os servicos devem preservar a separacao de responsabilidades:
 - `Domain` concentra regras de negocio e invariantes.
 - `Infrastructure` implementa persistencia, mensageria, cache, migracoes e integracoes tecnicas.
 
-Evite dependencias diretas entre servicos. A integracao entre servicos deve ser feita por contratos explicitos, mensageria ou chamadas HTTP atraves de uma borda bem definida.
+Evite dependencias diretas entre servicos. A integracao entre servicos deve ser feita por contratos explicitos, mensageria ou chamadas HTTP atraves de uma borda bem definida. Ao evoluir um servico, aplique o checklist SOLID de `../../docs/agents/solid-guidelines.md` para evitar responsabilidades misturadas, interfaces infladas e dependencia direta de detalhes tecnicos em codigo de alto nivel.

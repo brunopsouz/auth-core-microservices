@@ -15,14 +15,14 @@ internal sealed class SearchNotificationsUseCase : ISearchNotificationsUseCase
     /// <summary>
     /// Campo que armazena notification repository.
     /// </summary>
-    private readonly INotificationRepository _notificationRepository;
+    private readonly INotificationSearchRepository _notificationRepository;
 
 
     /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
     /// <param name="notificationRepository">Repositório de notificações.</param>
-    public SearchNotificationsUseCase(INotificationRepository notificationRepository)
+    public SearchNotificationsUseCase(INotificationSearchRepository notificationRepository)
     {
         ArgumentNullException.ThrowIfNull(notificationRepository);
 

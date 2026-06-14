@@ -17,6 +17,7 @@ As regras aqui descritas seguem três premissas:
 O padrão de C# do projeto é guiado por alguns princípios recorrentes no código atual:
 
 - modelagem orientada a domínio, com comportamento explícito e responsabilidades bem delimitadas
+- aplicação dos princípios SOLID descritos em `docs/agents/solid-guidelines.md`
 - clareza estrutural acima de atalhos “espertos” ou abstrações excessivamente implícitas
 - consistência entre interface e implementação
 - documentação XML pública como parte do contrato e da legibilidade do código
@@ -118,6 +119,7 @@ Na camada `AuthCore.Application`, o padrão dominante é:
 
 - organização por caso de uso em formato vertical slice
 - dentro de cada use case, interface `I...UseCase`, implementação `...UseCase`, `Command` ou `Query` e `Result` quando necessário
+- interface `I...UseCase` pública quando consumida por outra camada, com implementação concreta `internal` por padrão
 - dependências recebidas pelo construtor
 - validação de argumentos com `ArgumentNullException.ThrowIfNull(...)` quando aplicável
 - orquestração de repositórios e transação sem reimplementar regra central de negócio
@@ -151,6 +153,8 @@ Na camada `AuthCore.Infrastructure`, o padrão dominante é:
 - integração com o restante da solução via contratos do domínio e abstrações técnicas próprias
 
 A infraestrutura implementa detalhes, mas não redefine o modelo do domínio.
+
+Quando uma abstração de infraestrutura precisa ser consumida por outra camada, a abstração pode ser pública. A implementação concreta continua `internal` por padrão e deve ser acessada apenas pelo contêiner de injeção de dependência.
 
 As classes públicas esperadas em `Infrastructure` devem ser exceções pontuais. A principal exceção é a classe responsável por registrar dependências no contêiner de injeção de dependência, como `InfrastructureDependencyInjection`. Também são aceitáveis tipos que precisam ser públicos por exigência técnica de frameworks de discovery ou reflexão, como migrations versionadas do `FluentMigrator` quando usadas pelo scanner padrão.
 
@@ -232,11 +236,13 @@ Antes de concluir uma alteração C# neste projeto, revise:
 
 - o arquivo usa `namespace` file-scoped
 - a classe, interface ou tipo segue a convenção dominante do módulo
+- abstrações consumidas entre camadas podem ser públicas, mas implementações concretas permanecem `internal` por padrão
 - tipos de `Infrastructure` permanecem `internal` por padrão, exceto a classe pública de registro de DI e exceções técnicas de discovery/reflection
 - a ordem de membros está alinhada ao padrão predominante
 - o arquivo não introduz `#region` ou `#endregion`
 - a documentação XML está em português e segue o padrão textual do projeto
 - a responsabilidade permaneceu na camada correta
+- o checklist SOLID de `docs/agents/solid-guidelines.md` foi considerado para SRP, OCP, LSP, ISP e DIP
 - o código novo foi alinhado ao padrão dominante atual, e não ao legado residual
 
 ## Relação com Outras Referências

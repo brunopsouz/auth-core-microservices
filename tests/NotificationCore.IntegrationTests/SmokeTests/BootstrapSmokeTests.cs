@@ -56,7 +56,10 @@ public sealed class BootstrapSmokeTests
             scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
             scope.ServiceProvider.GetRequiredService<IDatabaseSession>());
         Assert.IsType<InboxRepository>(scope.ServiceProvider.GetRequiredService<IInboxRepository>());
-        Assert.IsType<NotificationRepository>(scope.ServiceProvider.GetRequiredService<INotificationRepository>());
+        Assert.IsType<NotificationRepository>(scope.ServiceProvider.GetRequiredService<INotificationWriterRepository>());
+        Assert.IsType<NotificationRepository>(scope.ServiceProvider.GetRequiredService<INotificationReadRepository>());
+        Assert.IsType<NotificationRepository>(scope.ServiceProvider.GetRequiredService<INotificationSearchRepository>());
+        Assert.IsType<NotificationRepository>(scope.ServiceProvider.GetRequiredService<INotificationDispatchRepository>());
         Assert.IsType<NotificationTemplateRepository>(scope.ServiceProvider.GetRequiredService<INotificationTemplateRepository>());
         Assert.IsType<SimpleTemplateRenderer>(scope.ServiceProvider.GetRequiredService<ITemplateRenderer>());
         Assert.IsType<MailKitSmtpClientFactory>(scope.ServiceProvider.GetRequiredService<ISmtpClientFactory>());
