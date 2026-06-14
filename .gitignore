@@ -436,3 +436,5 @@ docs/specs
 AGENTS.md
 *.agents
 .codex
+
+docs/refactor/
