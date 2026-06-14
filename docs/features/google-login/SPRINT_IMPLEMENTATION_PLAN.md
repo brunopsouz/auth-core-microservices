@@ -1159,6 +1159,8 @@ dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.
 
 ## Task 3.2 - Criar command e result do login externo
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Definir contrato entre API e Application para conclusão do login Google.
