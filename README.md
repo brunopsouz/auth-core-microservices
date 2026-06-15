@@ -295,6 +295,17 @@ Authorization: Bearer <access-token>
 
 Quando `Authorization: Bearer` está presente, ele tem prioridade sobre qualquer cookie `at` enviado junto na requisição. Esse fluxo não exige CSRF.
 
+### Login com Google
+
+O suporte a login com Google esta em implementacao. A base interna ja possui dominio, persistencia e casos de uso de Application para:
+
+- representar vinculo externo por `provider + providerUserId`;
+- concluir login Google a partir de dados externos ja validados pela borda;
+- vincular Google a usuario autenticado;
+- desvincular Google sem deixar o usuario sem metodo de autenticacao utilizavel.
+
+Os endpoints HTTP de challenge/callback, a configuracao OAuth/OIDC do Google e o roteamento pelo Gateway ainda nao estao disponiveis. Ate essa etapa ser concluida, o login Google nao deve ser anunciado como fluxo funcional para clientes.
+
 ### Teste manual do fluxo Browser/PWA
 
 1. Suba a aplicação completa com Docker Compose.

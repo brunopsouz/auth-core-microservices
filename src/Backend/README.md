@@ -75,6 +75,10 @@ Quando `Authorization: Bearer` esta presente, ele tem prioridade sobre o cookie 
 
 As rotas `/api/auth/...` permanecem sob responsabilidade do AuthCore, inclusive login, refresh, logout, sessao por cookie e validacao CSRF propria dessas operacoes.
 
+### Login com Google
+
+O suporte a login com Google esta em implementacao no AuthCore. Ate o momento, existem dominio, persistencia e casos de uso de Application para concluir, vincular e desvincular logins Google a partir de dados externos ja validados. Ainda nao existem endpoints HTTP de challenge/callback, configuracao OAuth/OIDC ou rotas publicadas pelo Gateway para esse fluxo.
+
 ## Solucoes
 
 | Solucao | Uso recomendado |
