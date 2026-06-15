@@ -115,6 +115,27 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>
+    /// Operacao para excluir um login externo.
+    /// </summary>
+    /// <param name="externalLogin">Login externo a ser excluido.</param>
+    public async Task DeleteAsync(ExternalLogin externalLogin)
+    {
+        ArgumentNullException.ThrowIfNull(externalLogin);
+
+        const string sql = """
+            DELETE FROM external_logins
+            WHERE id = @Id;
+            """;
+
+        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var command = CreateCommand(connection, sql);
+
+        command.Parameters.AddWithValue("Id", externalLogin.Id);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
 
     /// <summary>
     /// Operação para criar comando SQL respeitando a transação atual.

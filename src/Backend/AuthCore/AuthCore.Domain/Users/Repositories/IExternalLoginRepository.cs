@@ -18,4 +18,10 @@ public interface IExternalLoginRepository
     /// </summary>
     /// <param name="externalLogin">Login externo a ser atualizado.</param>
     Task UpdateAsync(ExternalLogin externalLogin);
+
+    /// <summary>
+    /// Operação para excluir um login externo.
+    /// </summary>
+    /// <param name="externalLogin">Login externo a ser excluído.</param>
+    Task DeleteAsync(ExternalLogin externalLogin);
 }

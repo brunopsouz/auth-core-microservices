@@ -1214,6 +1214,8 @@ dotnet build AuthCore.sln
 
 ## Task 3.3 - Criar CompleteGoogleLoginUseCase
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Concluir login Google e devolver autenticação interna do AuthCore.
@@ -1285,6 +1287,8 @@ dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.
 
 ## Task 3.4 - Criar fluxo de vínculo Google a usuário autenticado
 
+Status: concluida em 2026-06-14.
+
 ### Objetivo
 
 Permitir vincular uma conta Google a usuário já autenticado, se confirmado no escopo.
@@ -1343,6 +1347,8 @@ dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.
 ```
 
 ## Task 3.5 - Criar fluxo de desvincular Google
+
+Status: concluida em 2026-06-14.
 
 ### Objetivo
 

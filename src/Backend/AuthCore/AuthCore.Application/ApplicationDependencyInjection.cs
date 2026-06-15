@@ -1,4 +1,5 @@
 using AuthCore.Application.UseCases.Authentication.Login;
+using AuthCore.Application.UseCases.Authentication.ExternalLogin;
 using AuthCore.Application.UseCases.Authentication.LoginSession;
 using AuthCore.Application.UseCases.Authentication.LogoutAllSessions;
 using AuthCore.Application.UseCases.Authentication.LogoutCurrentSession;
@@ -15,6 +16,7 @@ using AuthCore.Application.UseCases.Users.GetUserProfile;
 using AuthCore.Application.UseCases.Users.RegisterUser;
 using AuthCore.Application.UseCases.Users.UpdateUser;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AuthCore.Application;
 
@@ -33,6 +35,11 @@ public static class ApplicationDependencyInjection
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddScoped<ILoginUseCase, LoginUseCase>();
+        services.TryAddScoped<IExternalAuthenticationOptionsProvider, DefaultExternalAuthenticationOptionsProvider>();
+        services.TryAddScoped<IExternalReturnUrlValidator, ExternalReturnUrlValidator>();
+        services.AddScoped<ICompleteGoogleLoginUseCase, CompleteGoogleLoginUseCase>();
+        services.AddScoped<ILinkGoogleLoginUseCase, LinkGoogleLoginUseCase>();
+        services.AddScoped<IUnlinkGoogleLoginUseCase, UnlinkGoogleLoginUseCase>();
         services.AddScoped<ILoginSessionUseCase, LoginSessionUseCase>();
         services.AddScoped<ILogoutCurrentSessionUseCase, LogoutCurrentSessionUseCase>();
         services.AddScoped<ILogoutSessionUseCase, LogoutSessionUseCase>();

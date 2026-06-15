@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using AuthCore.Application.UseCases.Authentication.ExternalLogin;
 using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
@@ -11,6 +12,7 @@ using AuthCore.Domain.Security.Tokens.Services;
 using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 using Shared.Messaging.Contracts.Notifications;
+using DomainExternalLogin = AuthCore.Domain.Users.ExternalLogin;
 
 namespace AuthCore.Application.UnitTests.UseCases.Authentication.Support;
 
@@ -149,6 +151,94 @@ internal sealed class FakeUserRepository : IUserRepository
     public void Store(User user)
     {
         _usersById[user.Id] = user;
+    }
+}
+
+internal sealed class FakeExternalLoginReadRepository : IExternalLoginReadRepository
+{
+    private readonly Dictionary<(ExternalLoginProvider Provider, string ProviderUserId), DomainExternalLogin> _loginsByProviderUserId = [];
+    private readonly Dictionary<(Guid UserId, ExternalLoginProvider Provider), DomainExternalLogin> _loginsByUserIdAndProvider = [];
+
+    public Task<DomainExternalLogin?> GetByProviderUserIdAsync(
+        ExternalLoginProvider provider,
+        string providerUserId)
+    {
+        _loginsByProviderUserId.TryGetValue((provider, providerUserId.Trim()), out var externalLogin);
+        return Task.FromResult(externalLogin);
+    }
+
+    public Task<DomainExternalLogin?> GetByUserIdAndProviderAsync(
+        Guid userId,
+        ExternalLoginProvider provider)
+    {
+        _loginsByUserIdAndProvider.TryGetValue((userId, provider), out var externalLogin);
+        return Task.FromResult(externalLogin);
+    }
+
+    public void Store(DomainExternalLogin externalLogin)
+    {
+        _loginsByProviderUserId[(externalLogin.Provider, externalLogin.ProviderUserId)] = externalLogin;
+        _loginsByUserIdAndProvider[(externalLogin.UserId, externalLogin.Provider)] = externalLogin;
+    }
+}
+
+internal sealed class FakeExternalLoginRepository : IExternalLoginRepository
+{
+    public List<DomainExternalLogin> AddedExternalLogins { get; } = [];
+
+    public List<DomainExternalLogin> UpdatedExternalLogins { get; } = [];
+
+    public List<DomainExternalLogin> DeletedExternalLogins { get; } = [];
+
+    public Task AddAsync(DomainExternalLogin externalLogin)
+    {
+        AddedExternalLogins.Add(externalLogin);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(DomainExternalLogin externalLogin)
+    {
+        UpdatedExternalLogins.Add(externalLogin);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(DomainExternalLogin externalLogin)
+    {
+        DeletedExternalLogins.Add(externalLogin);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class ThrowingExternalLoginRepository : IExternalLoginRepository
+{
+    public Exception ExceptionToThrow { get; set; } = new InvalidOperationException("external-login-repository-failure");
+
+    public Task AddAsync(DomainExternalLogin externalLogin)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task UpdateAsync(DomainExternalLogin externalLogin)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task DeleteAsync(DomainExternalLogin externalLogin)
+    {
+        throw ExceptionToThrow;
+    }
+}
+
+internal sealed class FakeExternalReturnUrlValidator : IExternalReturnUrlValidator
+{
+    public string Result { get; set; } = "https://app.authcore.dev/home";
+
+    public string? LastReturnUrl { get; private set; }
+
+    public string Validate(string? returnUrl)
+    {
+        LastReturnUrl = returnUrl;
+        return Result;
     }
 }
 
@@ -757,6 +847,26 @@ internal static class AuthenticationFixtures
             UserStatus.PendingEmailVerification,
             Guid.NewGuid(),
             null);
+    }
+
+    public static User CreateBlockedUser(Guid? id = null)
+    {
+        var now = new DateTime(2026, 4, 13, 12, 0, 0, DateTimeKind.Utc);
+
+        return User.Restore(
+            id ?? Guid.NewGuid(),
+            now.AddDays(-30),
+            now.AddDays(-1),
+            true,
+            "Bruno",
+            "Silva",
+            "Bruno Silva",
+            $"bruno.{Guid.NewGuid():N}@authcore.dev",
+            "11999999999",
+            Role.User,
+            UserStatus.Blocked,
+            Guid.NewGuid(),
+            now.AddDays(-10));
     }
 
     public static Password CreatePassword(
