@@ -114,7 +114,14 @@ internal sealed class RedisSessionStore : ISessionStore
     /// <param name="session">Sessao autenticada a ser persistida.</param>
     public async Task SaveAsync(Session session)
     {
-        if (!await TrySaveAsync(session))
+        await SaveAsync(session, CancellationToken.None);
+    }
+
+    public async Task SaveAsync(Session session, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!await TrySaveAsync(session).WaitAsync(cancellationToken))
             throw new InvalidOperationException("A sessao nao pode ser persistida porque foi revogada ou possui versao obsoleta.");
     }
 

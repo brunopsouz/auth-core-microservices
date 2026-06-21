@@ -14,6 +14,15 @@ public interface ISessionStore
     Task SaveAsync(Session session);
 
     /// <summary>
+    /// Operacao para persistir uma sessao permitindo cancelamento da espera.
+    /// </summary>
+    Task SaveAsync(Session session, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return SaveAsync(session);
+    }
+
+    /// <summary>
     /// Operacao para persistir uma sessao quando nao houver revogacao e a versao for mais recente.
     /// </summary>
     /// <param name="session">Sessao autenticada a ser persistida.</param>

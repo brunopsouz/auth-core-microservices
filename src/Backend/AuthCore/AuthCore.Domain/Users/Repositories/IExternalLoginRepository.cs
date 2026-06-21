@@ -14,10 +14,28 @@ public interface IExternalLoginRepository
     Task AddAsync(ExternalLogin externalLogin);
 
     /// <summary>
+    /// Operacao para adicionar um login externo permitindo cancelamento.
+    /// </summary>
+    Task AddAsync(ExternalLogin externalLogin, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return AddAsync(externalLogin);
+    }
+
+    /// <summary>
     /// Operação para atualizar um login externo.
     /// </summary>
     /// <param name="externalLogin">Login externo a ser atualizado.</param>
     Task UpdateAsync(ExternalLogin externalLogin);
+
+    /// <summary>
+    /// Operacao para atualizar um login externo permitindo cancelamento.
+    /// </summary>
+    Task UpdateAsync(ExternalLogin externalLogin, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return UpdateAsync(externalLogin);
+    }
 
     /// <summary>
     /// Operação para excluir um login externo.

@@ -882,6 +882,8 @@ internal sealed class FakeSessionService : ISessionService
 
 internal sealed class SpyUnitOfWork : IUnitOfWork
 {
+    public Exception? CommitException { get; init; }
+
     public int BegunTransactions { get; private set; }
 
     public int CommittedTransactions { get; private set; }
@@ -897,6 +899,10 @@ internal sealed class SpyUnitOfWork : IUnitOfWork
     public Task CommitAsync(CancellationToken cancellationToken = default)
     {
         CommittedTransactions++;
+
+        if (CommitException is not null)
+            throw CommitException;
+
         return Task.CompletedTask;
     }
 

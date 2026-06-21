@@ -36,6 +36,14 @@ internal sealed class ExternalLoginReadRepository : IExternalLoginReadRepository
         ExternalLoginProvider provider,
         string providerUserId)
     {
+        return await GetByProviderUserIdAsync(provider, providerUserId, CancellationToken.None);
+    }
+
+    public async Task<ExternalLogin?> GetByProviderUserIdAsync(
+        ExternalLoginProvider provider,
+        string providerUserId,
+        CancellationToken cancellationToken)
+    {
         const string sql = """
             SELECT
                 id,
@@ -55,16 +63,17 @@ internal sealed class ExternalLoginReadRepository : IExternalLoginReadRepository
             LIMIT 1;
             """;
 
-        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        await using var connectionLease =
+            await _databaseSession.AcquireConnectionAsync(cancellationToken);
 
         var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("Provider", (short)provider);
         command.Parameters.AddWithValue("ProviderUserId", providerUserId.Trim());
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-        return await ReadExternalLoginAsync(reader);
+        return await ReadExternalLoginAsync(reader, cancellationToken);
     }
 
     /// <summary>
@@ -76,6 +85,14 @@ internal sealed class ExternalLoginReadRepository : IExternalLoginReadRepository
     public async Task<ExternalLogin?> GetByUserIdAndProviderAsync(
         Guid userId,
         ExternalLoginProvider provider)
+    {
+        return await GetByUserIdAndProviderAsync(userId, provider, CancellationToken.None);
+    }
+
+    public async Task<ExternalLogin?> GetByUserIdAndProviderAsync(
+        Guid userId,
+        ExternalLoginProvider provider,
+        CancellationToken cancellationToken)
     {
         const string sql = """
             SELECT
@@ -96,16 +113,17 @@ internal sealed class ExternalLoginReadRepository : IExternalLoginReadRepository
             LIMIT 1;
             """;
 
-        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        await using var connectionLease =
+            await _databaseSession.AcquireConnectionAsync(cancellationToken);
 
         var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserId", userId);
         command.Parameters.AddWithValue("Provider", (short)provider);
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-        return await ReadExternalLoginAsync(reader);
+        return await ReadExternalLoginAsync(reader, cancellationToken);
     }
 
 
@@ -125,9 +143,11 @@ internal sealed class ExternalLoginReadRepository : IExternalLoginReadRepository
     /// </summary>
     /// <param name="reader">Leitor com os dados do login externo.</param>
     /// <returns>Login externo materializado ou nulo.</returns>
-    private static async Task<ExternalLogin?> ReadExternalLoginAsync(NpgsqlDataReader reader)
+    private static async Task<ExternalLogin?> ReadExternalLoginAsync(
+        NpgsqlDataReader reader,
+        CancellationToken cancellationToken)
     {
-        if (!await reader.ReadAsync())
+        if (!await reader.ReadAsync(cancellationToken))
             return null;
 
         return ExternalLogin.Restore(

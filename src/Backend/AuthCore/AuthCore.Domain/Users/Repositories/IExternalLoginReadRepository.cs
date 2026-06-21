@@ -18,6 +18,18 @@ public interface IExternalLoginReadRepository
         string providerUserId);
 
     /// <summary>
+    /// Operacao para obter um login externo permitindo cancelamento.
+    /// </summary>
+    Task<ExternalLogin?> GetByProviderUserIdAsync(
+        ExternalLoginProvider provider,
+        string providerUserId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return GetByProviderUserIdAsync(provider, providerUserId);
+    }
+
+    /// <summary>
     /// Operação para obter um login externo pelo usuário e provedor.
     /// </summary>
     /// <param name="userId">Identificador interno do usuário.</param>
@@ -26,4 +38,16 @@ public interface IExternalLoginReadRepository
     Task<ExternalLogin?> GetByUserIdAndProviderAsync(
         Guid userId,
         ExternalLoginProvider provider);
+
+    /// <summary>
+    /// Operacao para obter um login externo do usuario permitindo cancelamento.
+    /// </summary>
+    Task<ExternalLogin?> GetByUserIdAndProviderAsync(
+        Guid userId,
+        ExternalLoginProvider provider,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return GetByUserIdAndProviderAsync(userId, provider);
+    }
 }

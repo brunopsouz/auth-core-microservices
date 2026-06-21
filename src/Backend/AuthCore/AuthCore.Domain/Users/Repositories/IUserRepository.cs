@@ -20,6 +20,15 @@ public interface IUserRepository
     Task UpdateAsync(User user);
 
     /// <summary>
+    /// Operacao para atualizar um usuario permitindo cancelamento.
+    /// </summary>
+    Task UpdateAsync(User user, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return UpdateAsync(user);
+    }
+
+    /// <summary>
     /// Operação para remover um usuário.
     /// </summary>
     /// <param name="user">Usuário a ser removido.</param>

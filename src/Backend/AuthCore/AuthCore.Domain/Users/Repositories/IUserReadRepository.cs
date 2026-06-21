@@ -15,6 +15,15 @@ public interface IUserReadRepository
     Task<User?> GetByIdAsync(Guid userId);
 
     /// <summary>
+    /// Operacao para obter um usuario pelo identificador permitindo cancelamento.
+    /// </summary>
+    Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return GetByIdAsync(userId);
+    }
+
+    /// <summary>
     /// Operação para obter um usuário pelo identificador público.
     /// </summary>
     /// <param name="userIdentifier">Identificador público do usuário.</param>
@@ -27,4 +36,13 @@ public interface IUserReadRepository
     /// <param name="email">E-mail do usuário.</param>
     /// <returns>Usuário encontrado ou nulo.</returns>
     Task<User?> GetByEmailAsync(string email);
+
+    /// <summary>
+    /// Operacao para obter um usuario pelo e-mail permitindo cancelamento.
+    /// </summary>
+    Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return GetByEmailAsync(email);
+    }
 }

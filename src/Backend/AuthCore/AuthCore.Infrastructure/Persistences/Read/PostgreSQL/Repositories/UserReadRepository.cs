@@ -33,6 +33,11 @@ internal sealed class UserReadRepository : IUserReadRepository
     /// <returns>Usuário encontrado ou nulo.</returns>
     public async Task<User?> GetByIdAsync(Guid userId)
     {
+        return await GetByIdAsync(userId, CancellationToken.None);
+    }
+
+    public async Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken)
+    {
         const string sql = """
             SELECT
                 "Id",
@@ -54,15 +59,16 @@ internal sealed class UserReadRepository : IUserReadRepository
             LIMIT 1;
             """;
 
-        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        await using var connectionLease =
+            await _databaseSession.AcquireConnectionAsync(cancellationToken);
 
         var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserId", userId);
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-        return await ReadUserAsync(reader);
+        return await ReadUserAsync(reader, cancellationToken);
     }
 
     /// <summary>
@@ -111,6 +117,11 @@ internal sealed class UserReadRepository : IUserReadRepository
     /// <returns>Usuário encontrado ou nulo.</returns>
     public async Task<User?> GetByEmailAsync(string email)
     {
+        return await GetByEmailAsync(email, CancellationToken.None);
+    }
+
+    public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken)
+    {
         const string sql = """
             SELECT
                 "Id",
@@ -132,15 +143,16 @@ internal sealed class UserReadRepository : IUserReadRepository
             LIMIT 1;
             """;
 
-        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        await using var connectionLease =
+            await _databaseSession.AcquireConnectionAsync(cancellationToken);
 
         var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("Email", email.Trim().ToLowerInvariant());
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-        return await ReadUserAsync(reader);
+        return await ReadUserAsync(reader, cancellationToken);
     }
 
 
@@ -160,9 +172,11 @@ internal sealed class UserReadRepository : IUserReadRepository
     /// </summary>
     /// <param name="reader">Leitor com os dados do usuário.</param>
     /// <returns>Usuário materializado ou nulo.</returns>
-    private static async Task<User?> ReadUserAsync(NpgsqlDataReader reader)
+    private static async Task<User?> ReadUserAsync(
+        NpgsqlDataReader reader,
+        CancellationToken cancellationToken = default)
     {
-        if (!await reader.ReadAsync())
+        if (!await reader.ReadAsync(cancellationToken))
             return null;
 
         return User.Restore(

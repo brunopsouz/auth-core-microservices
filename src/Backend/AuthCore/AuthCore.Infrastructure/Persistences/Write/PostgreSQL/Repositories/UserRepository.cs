@@ -99,6 +99,11 @@ internal sealed class UserRepository : IUserRepository
     /// <param name="user">Usuário a ser atualizado.</param>
     public async Task UpdateAsync(User user)
     {
+        await UpdateAsync(user, CancellationToken.None);
+    }
+
+    public async Task UpdateAsync(User user, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(user);
 
         const string sql = """
@@ -118,7 +123,7 @@ internal sealed class UserRepository : IUserRepository
             WHERE "Id" = @Id;
             """;
 
-        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
         var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
@@ -135,7 +140,7 @@ internal sealed class UserRepository : IUserRepository
         command.Parameters.AddWithValue("EmailVerifiedAt", user.EmailVerifiedAt ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("SecurityStamp", user.SecurityStamp.Value);
 
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>

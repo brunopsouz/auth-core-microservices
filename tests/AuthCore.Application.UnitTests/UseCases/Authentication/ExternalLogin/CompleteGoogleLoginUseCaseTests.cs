@@ -195,6 +195,49 @@ public sealed class CompleteGoogleLoginUseCaseTests
         Assert.Equal(0, context.UnitOfWork.BegunTransactions);
     }
 
+    [Fact]
+    public async Task Execute_WhenCancellationIsRequested_ShouldStopBeforePersistence()
+    {
+        var context = CreateContext();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => context.UseCase.Execute(
+            CreateCommand(
+                providerUserId: "google-sub-cancelled",
+                email: "cancelled@authcore.dev"),
+            cancellationTokenSource.Token));
+
+        Assert.Empty(context.ExternalLoginRepository!.AddedExternalLogins);
+        Assert.Empty(context.DurableSessionRepository.AddedSessions);
+        Assert.Empty(context.SessionStore.SavedSessions);
+        Assert.Equal(0, context.UnitOfWork.BegunTransactions);
+    }
+
+    [Fact]
+    public async Task Execute_WhenCommitIsCancelled_ShouldRollbackAndSkipCache()
+    {
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var unitOfWork = new SpyUnitOfWork
+        {
+            CommitException = new OperationCanceledException(cancellationTokenSource.Token)
+        };
+        var context = CreateContext(unitOfWork: unitOfWork);
+        var user = AuthenticationFixtures.CreateVerifiedUser();
+        context.UserReadRepository.Store(user);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => context.UseCase.Execute(
+            CreateCommand(
+                providerUserId: "google-sub-commit-cancelled",
+                email: user.Email.Value),
+            cancellationTokenSource.Token));
+
+        Assert.Equal(1, context.UnitOfWork.BegunTransactions);
+        Assert.Equal(1, context.UnitOfWork.CommittedTransactions);
+        Assert.Equal(1, context.UnitOfWork.RolledBackTransactions);
+        Assert.Empty(context.SessionStore.SavedSessions);
+    }
+
     private static CompleteGoogleLoginCommand CreateCommand(
         string providerUserId,
         string email,
@@ -213,7 +256,9 @@ public sealed class CompleteGoogleLoginUseCaseTests
         };
     }
 
-    private static TestContext CreateContext(IExternalLoginRepository? externalLoginRepository = null)
+    private static TestContext CreateContext(
+        IExternalLoginRepository? externalLoginRepository = null,
+        SpyUnitOfWork? unitOfWork = null)
     {
         var externalLoginReadRepository = new FakeExternalLoginReadRepository();
         var resolvedExternalLoginRepository = externalLoginRepository ?? new FakeExternalLoginRepository();
@@ -227,7 +272,7 @@ public sealed class CompleteGoogleLoginUseCaseTests
         };
         var accessTokenGenerator = new FakeAccessTokenGenerator();
         var returnUrlValidator = new FakeExternalReturnUrlValidator();
-        var unitOfWork = new SpyUnitOfWork();
+        var resolvedUnitOfWork = unitOfWork ?? new SpyUnitOfWork();
 
         var useCase = new CompleteGoogleLoginUseCase(
             externalLoginReadRepository,
@@ -239,7 +284,7 @@ public sealed class CompleteGoogleLoginUseCaseTests
             sessionService,
             accessTokenGenerator,
             returnUrlValidator,
-            unitOfWork);
+            resolvedUnitOfWork);
 
         return new TestContext(
             useCase,
@@ -251,7 +296,7 @@ public sealed class CompleteGoogleLoginUseCaseTests
             sessionStore,
             accessTokenGenerator,
             returnUrlValidator,
-            unitOfWork);
+            resolvedUnitOfWork);
     }
 
     private sealed class TestContext

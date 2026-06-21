@@ -120,10 +120,14 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
     /// Operacao para concluir login com Google.
     /// </summary>
     /// <param name="command">Comando com dados externos do Google.</param>
+    /// <param name="cancellationToken">Token de cancelamento da operacao.</param>
     /// <returns>Resultado da conclusao do login com Google.</returns>
-    public async Task<CompleteGoogleLoginResult> Execute(CompleteGoogleLoginCommand command)
+    public async Task<CompleteGoogleLoginResult> Execute(
+        CompleteGoogleLoginCommand command,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var redirectUrl = _returnUrlValidator.Validate(command.ReturnUrl);
         var providerUserId = NormalizeRequired(command.ProviderUserId);
@@ -140,12 +144,19 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
 
         var externalLogin = await _externalLoginReadRepository.GetByProviderUserIdAsync(
             ExternalLoginProvider.Google,
-            providerUserId);
+            providerUserId,
+            cancellationToken);
 
         if (externalLogin is not null)
-            return await AuthenticateLinkedUserAsync(externalLogin, redirectUrl, command);
+        {
+            return await AuthenticateLinkedUserAsync(
+                externalLogin,
+                redirectUrl,
+                command,
+                cancellationToken);
+        }
 
-        var user = await _userReadRepository.GetByEmailAsync(email);
+        var user = await _userReadRepository.GetByEmailAsync(email, cancellationToken);
 
         if (user is null)
         {
@@ -161,7 +172,8 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
             providerUserId,
             email,
             redirectUrl,
-            command);
+            command,
+            cancellationToken);
     }
 
     /// <summary>
@@ -174,9 +186,12 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
     private async Task<CompleteGoogleLoginResult> AuthenticateLinkedUserAsync(
         DomainExternalLogin externalLogin,
         string redirectUrl,
-        CompleteGoogleLoginCommand command)
+        CompleteGoogleLoginCommand command,
+        CancellationToken cancellationToken)
     {
-        var user = await _userReadRepository.GetByIdAsync(externalLogin.UserId)
+        var user = await _userReadRepository.GetByIdAsync(
+            externalLogin.UserId,
+            cancellationToken)
             ?? throw new NotFoundException("Usuario vinculado ao login externo nao foi encontrado.");
 
         EnsureCanSignIn(user);
@@ -187,6 +202,7 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
             user,
             redirectUrl,
             command,
+            cancellationToken,
             updateExternalLogin: externalLogin);
     }
 
@@ -204,13 +220,15 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
         string providerUserId,
         string email,
         string redirectUrl,
-        CompleteGoogleLoginCommand command)
+        CompleteGoogleLoginCommand command,
+        CancellationToken cancellationToken)
     {
         EnsureCanLinkExternalLogin(user);
 
         var existingGoogleLogin = await _externalLoginReadRepository.GetByUserIdAndProviderAsync(
             user.Id,
-            ExternalLoginProvider.Google);
+            ExternalLoginProvider.Google,
+            cancellationToken);
 
         if (existingGoogleLogin is not null)
             throw new ConflictException("O usuario ja possui login Google vinculado.");
@@ -236,6 +254,7 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
             user,
             redirectUrl,
             command,
+            cancellationToken,
             addExternalLogin: externalLogin,
             updateUser: updatedUser);
     }
@@ -254,6 +273,7 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
         User user,
         string redirectUrl,
         CompleteGoogleLoginCommand command,
+        CancellationToken cancellationToken,
         DomainExternalLogin? addExternalLogin = null,
         DomainExternalLogin? updateExternalLogin = null,
         User? updateUser = null)
@@ -266,29 +286,32 @@ internal sealed class CompleteGoogleLoginUseCase : ICompleteGoogleLoginUseCase
             command.UserAgent);
         var accessToken = _accessTokenGenerator.Generate(user, session);
 
-        await _unitOfWork.BeginTransactionAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
             if (updateUser is not null)
-                await _userRepository.UpdateAsync(updateUser);
+                await _userRepository.UpdateAsync(updateUser, cancellationToken);
 
             if (addExternalLogin is not null)
-                await _externalLoginRepository.AddAsync(addExternalLogin);
+                await _externalLoginRepository.AddAsync(addExternalLogin, cancellationToken);
 
             if (updateExternalLogin is not null)
-                await _externalLoginRepository.UpdateAsync(updateExternalLogin);
+                await _externalLoginRepository.UpdateAsync(updateExternalLogin, cancellationToken);
 
-            await _durableSessionRepository.AddAsync(session);
-            await _unitOfWork.CommitAsync();
+            await _durableSessionRepository.AddAsync(session, cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
         }
         catch
         {
-            await _unitOfWork.RollbackAsync();
+            await _unitOfWork.RollbackAsync(CancellationToken.None);
             throw;
         }
 
-        await _sessionStore.SaveAsync(session);
+        // A transacao duravel ja foi confirmada; a projecao em cache deve ser concluida
+        // mesmo se a requisicao HTTP for cancelada neste ponto.
+        await _sessionStore.SaveAsync(session, CancellationToken.None);
 
         return new CompleteGoogleLoginResult
         {

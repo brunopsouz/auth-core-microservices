@@ -14,6 +14,15 @@ public interface IDurableSessionRepository
     Task AddAsync(Session session);
 
     /// <summary>
+    /// Operacao para adicionar uma sessao duravel permitindo cancelamento.
+    /// </summary>
+    Task AddAsync(Session session, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return AddAsync(session);
+    }
+
+    /// <summary>
     /// Operacao para atualizar uma sessao duravel.
     /// </summary>
     /// <param name="session">Sessao a ser atualizada.</param>

@@ -43,6 +43,11 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
     /// <param name="session">Sessão a ser persistida.</param>
     public async Task AddAsync(Session session)
     {
+        await AddAsync(session, CancellationToken.None);
+    }
+
+    public async Task AddAsync(Session session, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(session);
 
         const string sql = """
@@ -84,7 +89,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
             );
             """;
 
-        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
         var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
@@ -106,7 +111,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
             ? (short)session.RevocationReason.Value
             : (object)DBNull.Value);
 
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>

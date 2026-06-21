@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Claims;
 using AuthCore.Api;
+using AuthCore.Api.Authentication;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Api.Controllers;
 using AuthCore.Api.Observability;
@@ -35,9 +36,9 @@ public sealed class ExternalAuthControllerIntegrationTests
         {
             Result = "http://localhost:5173/dashboard"
         };
-        var controller = CreateController();
+        var controller = CreateController(returnUrlValidator: validator);
 
-        var result = controller.Google(validator, "http://localhost:5173/dashboard");
+        var result = controller.Google("http://localhost:5173/dashboard");
 
         var challengeResult = Assert.IsType<ChallengeResult>(result);
 
@@ -52,11 +53,10 @@ public sealed class ExternalAuthControllerIntegrationTests
     public void Google_WhenReturnUrlIsInvalid_ShouldThrowValidationException()
     {
         var validator = new ThrowingExternalReturnUrlValidator();
-        var controller = CreateController();
+        var controller = CreateController(returnUrlValidator: validator);
 
-        var exception = Assert.Throws<ValidationException>(() => controller.Google(
-            validator,
-            "https://evil.example/callback"));
+        var exception = Assert.Throws<ValidationException>(() =>
+            controller.Google("https://evil.example/callback"));
 
         Assert.Equal("A URL de retorno informada nao e permitida.", exception.Message);
     }
@@ -120,15 +120,31 @@ public sealed class ExternalAuthControllerIntegrationTests
     {
         var authenticationService = new StubAuthenticationService(AuthenticateResult.Fail("invalid_state"));
         var useCase = new SpyCompleteGoogleLoginUseCase();
-        var controller = CreateController(authenticationService);
+        var controller = CreateController(authenticationService, useCase: useCase);
 
-        var result = await controller.GoogleComplete(useCase, CreateAuthCookieOptions());
+        var result = await controller.GoogleComplete(CancellationToken.None);
 
         var redirectResult = Assert.IsType<RedirectResult>(result);
 
         Assert.Equal("/auth/error?reason=external_callback_failed", redirectResult.Url);
         Assert.Equal("AuthCore.External", authenticationService.LastAuthenticateScheme);
         Assert.Equal("AuthCore.External", authenticationService.LastSignOutScheme);
+        Assert.Null(useCase.LastCommand);
+    }
+
+    [Fact]
+    public async Task Callback_WhenRequestIsCancelled_ShouldStopBeforeAuthentication()
+    {
+        var authenticationService = new StubAuthenticationService(AuthenticateResult.NoResult());
+        var useCase = new SpyCompleteGoogleLoginUseCase();
+        var controller = CreateController(authenticationService, useCase: useCase);
+        using var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            controller.GoogleComplete(cancellationTokenSource.Token));
+
+        Assert.Null(authenticationService.LastAuthenticateScheme);
         Assert.Null(useCase.LastCommand);
     }
 
@@ -152,9 +168,9 @@ public sealed class ExternalAuthControllerIntegrationTests
         var principal = CreatePrincipal(new Claim(ClaimTypes.Email, "bruno@authcore.dev"));
         var authenticationService = new StubAuthenticationService(CreateSuccessAuthentication(principal));
         var useCase = new SpyCompleteGoogleLoginUseCase();
-        var controller = CreateController(authenticationService);
+        var controller = CreateController(authenticationService, useCase: useCase);
 
-        var result = await controller.GoogleComplete(useCase, CreateAuthCookieOptions());
+        var result = await controller.GoogleComplete(CancellationToken.None);
 
         var redirectResult = Assert.IsType<RedirectResult>(result);
 
@@ -184,9 +200,10 @@ public sealed class ExternalAuthControllerIntegrationTests
                 RedirectUrl = "http://localhost:5173/dashboard"
             }
         };
-        var controller = CreateController(authenticationService);
+        var controller = CreateController(authenticationService, useCase: useCase);
+        using var cancellationTokenSource = new CancellationTokenSource();
 
-        var result = await controller.GoogleComplete(useCase, CreateAuthCookieOptions());
+        var result = await controller.GoogleComplete(cancellationTokenSource.Token);
 
         var redirectResult = Assert.IsType<RedirectResult>(result);
 
@@ -199,6 +216,7 @@ public sealed class ExternalAuthControllerIntegrationTests
         Assert.Equal("http://localhost:5173/dashboard", useCase.LastCommand.ReturnUrl);
         Assert.Equal("127.0.0.1", useCase.LastCommand.IpAddress);
         Assert.Equal("AuthCore.IntegrationTests", useCase.LastCommand.UserAgent);
+        Assert.Equal(cancellationTokenSource.Token, useCase.LastCancellationToken);
         Assert.Equal("AuthCore.External", authenticationService.LastSignOutScheme);
     }
 
@@ -239,9 +257,9 @@ public sealed class ExternalAuthControllerIntegrationTests
                 }
             }
         };
-        var controller = CreateController(authenticationService);
+        var controller = CreateController(authenticationService, useCase: useCase);
 
-        var result = await controller.GoogleComplete(useCase, CreateAuthCookieOptions());
+        var result = await controller.GoogleComplete(CancellationToken.None);
         var setCookieHeader = controller.Response.Headers.SetCookie.ToString();
 
         var redirectResult = Assert.IsType<RedirectResult>(result);
@@ -258,7 +276,7 @@ public sealed class ExternalAuthControllerIntegrationTests
     [Fact]
     public async Task Callback_WhenLoginSucceeds_ShouldWriteSanitizedLog()
     {
-        var logger = new SpyLogger<ExternalAuthController>();
+        var logger = new SpyLogger<GoogleExternalAuthenticationFlow>();
         var principal = CreatePrincipal(
             new Claim("sub", "google-sub-123"),
             new Claim("email", "bruno@authcore.dev"),
@@ -280,9 +298,12 @@ public sealed class ExternalAuthControllerIntegrationTests
                 }
             }
         };
-        var controller = CreateController(authenticationService, logger);
+        var controller = CreateController(
+            authenticationService,
+            logger,
+            useCase: useCase);
 
-        await controller.GoogleComplete(useCase, CreateAuthCookieOptions());
+        await controller.GoogleComplete(CancellationToken.None);
 
         var logMessage = Assert.Single(logger.Messages, message => message.Contains("GoogleLoginSucceeded", StringComparison.Ordinal));
 
@@ -322,25 +343,36 @@ public sealed class ExternalAuthControllerIntegrationTests
 
     private static ExternalAuthController CreateController(
         IAuthenticationService? authenticationService = null,
-        ILogger<ExternalAuthController>? logger = null)
+        ILogger<GoogleExternalAuthenticationFlow>? logger = null,
+        IExternalReturnUrlValidator? returnUrlValidator = null,
+        ICompleteGoogleLoginUseCase? useCase = null,
+        TimeProvider? timeProvider = null)
     {
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Headers.UserAgent = "AuthCore.IntegrationTests";
         httpContext.Connection.RemoteIpAddress = IPAddress.Parse("127.0.0.1");
         httpContext.RequestServices = new ServiceCollection()
             .AddSingleton(authenticationService ?? new StubAuthenticationService(AuthenticateResult.NoResult()))
-            .AddSingleton(Options.Create(new CsrfOptions
-            {
-                CookieName = "XSRF-TOKEN",
-                HeaderName = "X-CSRF-TOKEN",
-                SigningKey = "tests-csrf-signing-key-2026"
-            }))
             .BuildServiceProvider();
 
-        return new ExternalAuthController(
-            new StubCsrfTokenService(),
+        var flow = new GoogleExternalAuthenticationFlow(
+            new AuthenticationCookieWriter(
+                new StubCsrfTokenService(),
+                CreateAuthCookieOptions(),
+                Options.Create(new CsrfOptions
+                {
+                    CookieName = "XSRF-TOKEN",
+                    HeaderName = "X-CSRF-TOKEN",
+                    SigningKey = "tests-csrf-signing-key-2026"
+                })),
+            useCase ?? new SpyCompleteGoogleLoginUseCase(),
+            returnUrlValidator ?? new StubExternalReturnUrlValidator(),
+            new GoogleExternalLoginCommandFactory(),
             new ExternalAuthenticationMetrics(),
-            logger ?? new SpyLogger<ExternalAuthController>())
+            timeProvider ?? TimeProvider.System,
+            logger ?? new SpyLogger<GoogleExternalAuthenticationFlow>());
+
+        return new ExternalAuthController(flow)
         {
             ControllerContext = new ControllerContext
             {
@@ -522,14 +554,19 @@ public sealed class ExternalAuthControllerIntegrationTests
     {
         public CompleteGoogleLoginCommand? LastCommand { get; private set; }
 
+        public CancellationToken LastCancellationToken { get; private set; }
+
         public CompleteGoogleLoginResult Result { get; init; } = new()
         {
             RedirectUrl = "http://localhost:5173"
         };
 
-        public Task<CompleteGoogleLoginResult> Execute(CompleteGoogleLoginCommand command)
+        public Task<CompleteGoogleLoginResult> Execute(
+            CompleteGoogleLoginCommand command,
+            CancellationToken cancellationToken = default)
         {
             LastCommand = command;
+            LastCancellationToken = cancellationToken;
             return Task.FromResult(Result);
         }
     }

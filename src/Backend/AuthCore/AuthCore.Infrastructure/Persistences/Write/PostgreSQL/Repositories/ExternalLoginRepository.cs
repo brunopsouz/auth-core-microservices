@@ -32,6 +32,13 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
     /// <param name="externalLogin">Login externo a ser persistido.</param>
     public async Task AddAsync(ExternalLogin externalLogin)
     {
+        await AddAsync(externalLogin, CancellationToken.None);
+    }
+
+    public async Task AddAsync(
+        ExternalLogin externalLogin,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(externalLogin);
 
         const string sql = """
@@ -65,7 +72,7 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
             );
             """;
 
-        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
         var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
@@ -81,7 +88,7 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
         command.Parameters.AddWithValue("LinkedAtUtc", externalLogin.LinkedAtUtc);
         command.Parameters.AddWithValue("LastUsedAtUtc", externalLogin.LastUsedAtUtc ?? (object)DBNull.Value);
 
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>
@@ -89,6 +96,13 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
     /// </summary>
     /// <param name="externalLogin">Login externo a ser atualizado.</param>
     public async Task UpdateAsync(ExternalLogin externalLogin)
+    {
+        await UpdateAsync(externalLogin, CancellationToken.None);
+    }
+
+    public async Task UpdateAsync(
+        ExternalLogin externalLogin,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(externalLogin);
 
@@ -103,7 +117,7 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
             WHERE id = @Id;
             """;
 
-        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
         var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
@@ -114,7 +128,7 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
         command.Parameters.AddWithValue("EmailVerified", externalLogin.EmailVerified);
         command.Parameters.AddWithValue("LastUsedAtUtc", externalLogin.LastUsedAtUtc ?? (object)DBNull.Value);
 
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>
