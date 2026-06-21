@@ -35,6 +35,11 @@ public sealed class Session
     public SessionStatus Status { get; private set; }
 
     /// <summary>
+    /// Versao monotônica do estado da sessao.
+    /// </summary>
+    public long Version { get; private set; }
+
+    /// <summary>
     /// Carimbo de seguranca do usuario no momento da emissao da sessao.
     /// </summary>
     public SecurityStamp SecurityStamp { get; private set; } = null!;
@@ -89,6 +94,7 @@ public sealed class Session
     /// <param name="publicSessionId">Identificador publico da sessao.</param>
     /// <param name="userId">Identificador interno do usuario.</param>
     /// <param name="status">Status persistido da sessao.</param>
+    /// <param name="version">Versao monotônica persistida.</param>
     /// <param name="securityStamp">Carimbo de seguranca da sessao.</param>
     /// <param name="createdAtUtc">Data de criacao da sessao em UTC.</param>
     /// <param name="expiresAtUtc">Data de expiracao da sessao em UTC.</param>
@@ -102,6 +108,7 @@ public sealed class Session
         string publicSessionId,
         Guid userId,
         SessionStatus status,
+        long version,
         SecurityStamp securityStamp,
         DateTime createdAtUtc,
         DateTime expiresAtUtc,
@@ -115,6 +122,7 @@ public sealed class Session
         PublicSessionId = NormalizePublicSessionId(publicSessionId);
         UserId = userId;
         Status = status;
+        Version = version;
         SecurityStamp = securityStamp;
         CreatedAtUtc = createdAtUtc;
         ExpiresAtUtc = expiresAtUtc;
@@ -151,6 +159,7 @@ public sealed class Session
             CreatePublicSessionId(),
             userId,
             SessionStatus.Active,
+            version: 1,
             securityStamp,
             nowUtc,
             expiresAtUtc,
@@ -216,7 +225,8 @@ public sealed class Session
             ipAddress,
             userAgent,
             revokedAtUtc,
-            revokedAtUtc.HasValue ? SessionRevocationReason.UserLogout : null);
+            revokedAtUtc.HasValue ? SessionRevocationReason.UserLogout : null,
+            version: 1);
     }
 
     /// <summary>
@@ -226,6 +236,7 @@ public sealed class Session
     /// <param name="publicSessionId">Identificador publico da sessao.</param>
     /// <param name="userId">Identificador interno do usuario.</param>
     /// <param name="status">Status persistido da sessao.</param>
+    /// <param name="version">Versao monotônica persistida.</param>
     /// <param name="securityStamp">Carimbo de seguranca persistido.</param>
     /// <param name="createdAtUtc">Data de criacao da sessao em UTC.</param>
     /// <param name="expiresAtUtc">Data de expiracao da sessao em UTC.</param>
@@ -247,13 +258,15 @@ public sealed class Session
         string? ipAddress,
         string? userAgent,
         DateTime? revokedAtUtc,
-        SessionRevocationReason? revocationReason)
+        SessionRevocationReason? revocationReason,
+        long version = 1)
     {
         return new Session(
             SessionIdentifier.Create(sessionId),
             publicSessionId,
             userId,
             status,
+            version,
             SecurityStamp.Restore(securityStamp),
             createdAtUtc,
             expiresAtUtc,
@@ -311,6 +324,7 @@ public sealed class Session
             PublicSessionId,
             UserId,
             Status,
+            Version,
             SecurityStamp,
             CreatedAtUtc,
             expiresAtUtc,
@@ -340,6 +354,7 @@ public sealed class Session
             PublicSessionId,
             UserId,
             SessionStatus.Revoked,
+            checked(Version + 1),
             SecurityStamp,
             CreatedAtUtc,
             ExpiresAtUtc,
@@ -360,6 +375,28 @@ public sealed class Session
         return Revoke(SessionRevocationReason.UserLogout, revokedAtUtc);
     }
 
+    /// <summary>
+    /// Operacao para avancar a versao monotônica da sessao.
+    /// </summary>
+    /// <returns>Nova instancia com a versao incrementada.</returns>
+    public Session AdvanceVersion()
+    {
+        return new Session(
+            Identifier,
+            PublicSessionId,
+            UserId,
+            Status,
+            checked(Version + 1),
+            SecurityStamp,
+            CreatedAtUtc,
+            ExpiresAtUtc,
+            LastSeenAtUtc,
+            IpAddress,
+            UserAgent,
+            RevokedAtUtc,
+            RevocationReason);
+    }
+
 
     /// <summary>
     /// Operacao para validar a consistencia da sessao.
@@ -370,6 +407,7 @@ public sealed class Session
         DomainException.When(string.IsNullOrWhiteSpace(PublicSessionId), "O identificador publico da sessao e obrigatorio.");
         DomainException.When(UserId == Guid.Empty, "O identificador do usuario da sessao e obrigatorio.");
         DomainException.When(!Enum.IsDefined(typeof(SessionStatus), Status), "Status da sessao invalido.");
+        DomainException.When(Version <= 0, "A versao da sessao deve ser positiva.");
         DomainException.When(SecurityStamp is null, "O carimbo de seguranca da sessao e obrigatorio.");
         DomainException.When(CreatedAtUtc == default, "A data de criacao da sessao e obrigatoria.");
         DomainException.When(ExpiresAtUtc == default, "A data de expiracao da sessao e obrigatoria.");

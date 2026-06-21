@@ -239,7 +239,8 @@ public sealed class RegisterNotificationRequestUseCaseTests
             string messageType,
             string consumerName,
             string payload,
-            DateTime receivedAtUtc)
+            DateTime receivedAtUtc,
+            CancellationToken cancellationToken = default)
         {
             if (ProcessedMessageIds.Contains(messageId))
                 return Task.FromResult(InboxProcessingStartResult.Skipped(wasAlreadyProcessed: true, retryCount: 0));
@@ -252,7 +253,9 @@ public sealed class RegisterNotificationRequestUseCaseTests
             return Task.FromResult(InboxProcessingStartResult.Started(retryCount: 0));
         }
 
-        public Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(string idempotencyKey)
+        public Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(
+            string idempotencyKey,
+            CancellationToken cancellationToken = default)
         {
             return Task.FromResult<string?>(null);
         }
@@ -261,7 +264,8 @@ public sealed class RegisterNotificationRequestUseCaseTests
             Guid messageId,
             string messageType,
             string consumerName,
-            DateTime processedAtUtc)
+            DateTime processedAtUtc,
+            CancellationToken cancellationToken = default)
         {
             ProcessedMessageIds.Add(messageId);
             ProcessedMessages.Add(new InboxCall(messageId, messageType, consumerName, string.Empty));
@@ -275,7 +279,8 @@ public sealed class RegisterNotificationRequestUseCaseTests
             string consumerName,
             string payload,
             DateTime receivedAtUtc,
-            string error)
+            string error,
+            CancellationToken cancellationToken = default)
         {
             FailedMessages.Add(new InboxCall(messageId, messageType, consumerName, payload));
 
@@ -308,7 +313,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
             return Task.CompletedTask;
         }
 
-        public Task<bool> TryAddAsync(Notification notification)
+        public Task<bool> TryAddAsync(Notification notification, CancellationToken cancellationToken = default)
         {
             if (ThrowOnAdd)
                 throw new InvalidOperationException("Falha ao persistir notificacao.");
@@ -322,13 +327,17 @@ public sealed class RegisterNotificationRequestUseCaseTests
             return Task.FromResult(true);
         }
 
-        public Task<Notification?> GetByIdAsync(Guid notificationId)
+        public Task<Notification?> GetByIdAsync(
+            Guid notificationId,
+            CancellationToken cancellationToken = default)
         {
             return Task.FromResult(
                 _notificationsByIdempotencyKey.Values.SingleOrDefault(notification => notification.Id == notificationId));
         }
 
-        public Task<Notification?> GetByIdempotencyKeyAsync(string idempotencyKey)
+        public Task<Notification?> GetByIdempotencyKeyAsync(
+            string idempotencyKey,
+            CancellationToken cancellationToken = default)
         {
             _notificationsByIdempotencyKey.TryGetValue(idempotencyKey, out var notification);
 
@@ -354,7 +363,7 @@ public sealed class RegisterNotificationRequestUseCaseTests
             return Task.FromResult<IReadOnlyCollection<Notification>>([]);
         }
 
-        public Task UpdateAsync(Notification notification)
+        public Task UpdateAsync(Notification notification, CancellationToken cancellationToken = default)
         {
             _notificationsByIdempotencyKey[notification.IdempotencyKey.Value] = notification;
 

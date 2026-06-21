@@ -9,29 +9,93 @@ using StackExchange.Redis;
 namespace AuthCore.Infrastructure.Services.Caching;
 
 /// <summary>
-/// Representa store Redis de sessões autenticadas.
+/// Representa store Redis de sessoes autenticadas.
 /// </summary>
 internal sealed class RedisSessionStore : ISessionStore
 {
-    /// <summary>
-    /// Campo que armazena database.
-    /// </summary>
+    private const string SAVE_SESSION_SCRIPT = """
+        if redis.call('EXISTS', KEYS[2]) == 1 then
+            return 0
+        end
+
+        local current = redis.call('GET', KEYS[1])
+
+        if current then
+            local currentSession = cjson.decode(current)
+
+            if tonumber(currentSession.version or 1) > tonumber(ARGV[2]) then
+                return 0
+            end
+
+            if tonumber(currentSession.version or 1) == tonumber(ARGV[2]) then
+                return 1
+            end
+        end
+
+        redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[3])
+        redis.call('SADD', KEYS[3], ARGV[4])
+        return 1
+        """;
+
+    private const string REVOKE_SESSION_SCRIPT = """
+        local requestedVersion = tonumber(ARGV[1])
+        local requestedTtl = tonumber(ARGV[2])
+        local existingVersion = tonumber(redis.call('GET', KEYS[1]) or '0')
+        local existingTtl = redis.call('PTTL', KEYS[1])
+        local tombstoneVersion = math.max(existingVersion, requestedVersion)
+        local tombstoneTtl = math.max(existingTtl, requestedTtl)
+
+        redis.call('SET', KEYS[1], tostring(tombstoneVersion), 'PX', tombstoneTtl)
+
+        local sessionIds = redis.call('SMEMBERS', KEYS[2])
+
+        for _, sessionId in ipairs(sessionIds) do
+            local sessionKey = ARGV[4] .. sessionId
+            local payload = redis.call('GET', sessionKey)
+
+            if payload then
+                local cachedSession = cjson.decode(payload)
+
+                if cachedSession.publicSessionId == ARGV[3] then
+                    redis.call('DEL', sessionKey)
+                    redis.call('SREM', KEYS[2], sessionId)
+                end
+            else
+                redis.call('SREM', KEYS[2], sessionId)
+            end
+        end
+
+        return 1
+        """;
+
+    private const string REMOVE_SESSION_BY_VERSION_SCRIPT = """
+        local payload = redis.call('GET', KEYS[1])
+
+        if not payload then
+            return 0
+        end
+
+        local cachedSession = cjson.decode(payload)
+
+        if tonumber(cachedSession.version or 1) > tonumber(ARGV[1]) then
+            return 0
+        end
+
+        redis.call('DEL', KEYS[1])
+        redis.call('SREM', KEYS[2], ARGV[2])
+        return 1
+        """;
+
     private readonly IDatabase _database;
-    /// <summary>
-    /// Campo que armazena redis options.
-    /// </summary>
     private readonly RedisOptions _redisOptions;
-    /// <summary>
-    /// Campo que armazena serializer options.
-    /// </summary>
     private readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
 
 
     /// <summary>
-    /// Operação para criar instância da classe.
+    /// Operacao para criar instancia da classe.
     /// </summary>
-    /// <param name="connectionMultiplexer">Conexão compartilhada com o Redis.</param>
-    /// <param name="redisOptions">Configurações do Redis.</param>
+    /// <param name="connectionMultiplexer">Conexao compartilhada com o Redis.</param>
+    /// <param name="redisOptions">Configuracoes do Redis.</param>
     public RedisSessionStore(
         IConnectionMultiplexer connectionMultiplexer,
         IOptions<RedisOptions> redisOptions)
@@ -45,44 +109,48 @@ internal sealed class RedisSessionStore : ISessionStore
 
 
     /// <summary>
-    /// Operação para persistir uma sessão autenticada.
+    /// Operacao para persistir uma nova sessao autenticada.
     /// </summary>
-    /// <param name="session">Sessão autenticada a ser persistida.</param>
+    /// <param name="session">Sessao autenticada a ser persistida.</param>
     public async Task SaveAsync(Session session)
     {
-        ArgumentNullException.ThrowIfNull(session);
-
-        var sessionKey = GetSessionKey(session.SessionId);
-        var userSessionsKey = GetUserSessionsKey(session.UserId);
-        var payload = JsonSerializer.Serialize(new SessionCacheModel
-        {
-            SessionId = session.SessionId,
-            PublicSessionId = session.PublicSessionId,
-            UserId = session.UserId,
-            Status = session.Status,
-            SecurityStamp = session.SecurityStamp.Value,
-            CreatedAtUtc = session.CreatedAtUtc,
-            ExpiresAtUtc = session.ExpiresAtUtc,
-            LastSeenAtUtc = session.LastSeenAtUtc,
-            IpAddress = session.IpAddress,
-            UserAgent = session.UserAgent,
-            RevokedAtUtc = session.RevokedAtUtc,
-            RevocationReason = session.RevocationReason
-        }, _serializerOptions);
-        var ttl = session.ExpiresAtUtc - DateTime.UtcNow;
-
-        if (ttl <= TimeSpan.Zero)
-            ttl = TimeSpan.FromSeconds(1);
-
-        await _database.StringSetAsync(sessionKey, payload, ttl);
-        await _database.SetAddAsync(userSessionsKey, session.SessionId);
+        if (!await TrySaveAsync(session))
+            throw new InvalidOperationException("A sessao nao pode ser persistida porque foi revogada ou possui versao obsoleta.");
     }
 
     /// <summary>
-    /// Operação para obter uma sessão pelo identificador.
+    /// Operacao para persistir uma sessao quando nao houver revogacao e a versao for mais recente.
     /// </summary>
-    /// <param name="sessionId">Identificador público da sessão.</param>
-    /// <returns>Sessão encontrada ou nula.</returns>
+    /// <param name="session">Sessao autenticada a ser persistida.</param>
+    /// <returns>Verdadeiro quando a sessao foi persistida.</returns>
+    public async Task<bool> TrySaveAsync(Session session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        var ttl = GetTtl(session.ExpiresAtUtc);
+        var payload = Serialize(session);
+        var result = await _database.ScriptEvaluateAsync(
+            SAVE_SESSION_SCRIPT,
+            [
+                GetSessionKey(session.SessionId),
+                GetRevokedSessionKey(session.PublicSessionId),
+                GetUserSessionsKey(session.UserId)
+            ],
+            [
+                payload,
+                session.Version,
+                (long)ttl.TotalMilliseconds,
+                session.SessionId
+            ]);
+
+        return (long)result == 1;
+    }
+
+    /// <summary>
+    /// Operacao para obter uma sessao pelo identificador secreto.
+    /// </summary>
+    /// <param name="sessionId">Identificador secreto da sessao.</param>
+    /// <returns>Sessao encontrada ou nula.</returns>
     public async Task<Session?> GetByIdAsync(string sessionId)
     {
         var sessionValue = await _database.StringGetAsync(GetSessionKey(sessionId));
@@ -90,37 +158,25 @@ internal sealed class RedisSessionStore : ISessionStore
         if (!sessionValue.HasValue)
             return null;
 
-        var sessionModel = JsonSerializer.Deserialize<SessionCacheModel>(sessionValue.ToString(), _serializerOptions);
+        var sessionModel = Deserialize(sessionValue);
 
         if (sessionModel is null)
             return null;
 
-        return Session.Restore(
-            sessionModel.SessionId,
-            string.IsNullOrWhiteSpace(sessionModel.PublicSessionId)
-                ? sessionModel.SessionId
-                : sessionModel.PublicSessionId,
-            sessionModel.UserId,
-            sessionModel.Status == default
-                ? SessionStatus.Active
-                : sessionModel.Status,
-            string.IsNullOrWhiteSpace(sessionModel.SecurityStamp)
-                ? SecurityStamp.Create().Value
-                : sessionModel.SecurityStamp,
-            sessionModel.CreatedAtUtc,
-            sessionModel.ExpiresAtUtc,
-            sessionModel.LastSeenAtUtc,
-            sessionModel.IpAddress,
-            sessionModel.UserAgent,
-            sessionModel.RevokedAtUtc,
-            sessionModel.RevocationReason);
+        if (await _database.KeyExistsAsync(GetRevokedSessionKey(sessionModel.PublicSessionId)))
+        {
+            await RemoveAsync(sessionId);
+            return null;
+        }
+
+        return Restore(sessionModel);
     }
 
     /// <summary>
-    /// Operação para listar as sessões ativas de um usuário.
+    /// Operacao para listar as sessoes ativas de um usuario.
     /// </summary>
-    /// <param name="userId">Identificador interno do usuário.</param>
-    /// <returns>Sessões ativas encontradas.</returns>
+    /// <param name="userId">Identificador interno do usuario.</param>
+    /// <returns>Sessoes ativas encontradas.</returns>
     public async Task<IReadOnlyCollection<Session>> ListByUserIdAsync(Guid userId)
     {
         var userSessionsKey = GetUserSessionsKey(userId);
@@ -147,59 +203,157 @@ internal sealed class RedisSessionStore : ISessionStore
     }
 
     /// <summary>
-    /// Operação para revogar uma sessão específica.
+    /// Operacao para registrar a revogacao de uma sessao.
     /// </summary>
-    /// <param name="sessionId">Identificador público da sessão.</param>
-    public async Task RevokeAsync(string sessionId)
+    /// <param name="session">Sessao revogada com a versao persistida.</param>
+    public async Task RevokeAsync(Session session)
     {
-        var session = await GetByIdAsync(sessionId);
+        ArgumentNullException.ThrowIfNull(session);
 
-        if (session is null)
+        if (session.Status != SessionStatus.Revoked)
+            throw new ArgumentException("A sessao informada deve estar revogada.", nameof(session));
+
+        var ttl = GetTtl(session.ExpiresAtUtc);
+        await _database.ScriptEvaluateAsync(
+            REVOKE_SESSION_SCRIPT,
+            [
+                GetRevokedSessionKey(session.PublicSessionId),
+                GetUserSessionsKey(session.UserId)
+            ],
+            [
+                session.Version,
+                (long)ttl.TotalMilliseconds,
+                session.PublicSessionId,
+                GetSessionKeyPrefix()
+            ]);
+    }
+
+    /// <summary>
+    /// Operacao para remover uma sessao ativa pelo identificador secreto.
+    /// </summary>
+    /// <param name="sessionId">Identificador secreto da sessao.</param>
+    public async Task RemoveAsync(string sessionId)
+    {
+        var sessionKey = GetSessionKey(sessionId);
+        var sessionValue = await _database.StringGetAsync(sessionKey);
+
+        if (sessionValue.HasValue)
+        {
+            var sessionModel = Deserialize(sessionValue);
+
+            if (sessionModel is not null)
+                await _database.SetRemoveAsync(GetUserSessionsKey(sessionModel.UserId), sessionId);
+        }
+
+        await _database.KeyDeleteAsync(sessionKey);
+    }
+
+    /// <summary>
+    /// Operacao para remover uma sessao apenas quando a versao em cache nao for mais recente.
+    /// </summary>
+    /// <param name="sessionId">Identificador secreto da sessao.</param>
+    /// <param name="maximumVersion">Maior versao que pode ser removida.</param>
+    public async Task RemoveWhenVersionIsNotNewerAsync(string sessionId, long maximumVersion)
+    {
+        var sessionValue = await _database.StringGetAsync(GetSessionKey(sessionId));
+
+        if (!sessionValue.HasValue)
             return;
 
-        await _database.KeyDeleteAsync(GetSessionKey(sessionId));
-        await _database.SetRemoveAsync(GetUserSessionsKey(session.UserId), session.SessionId);
+        var sessionModel = Deserialize(sessionValue);
+
+        if (sessionModel is null)
+        {
+            await _database.KeyDeleteAsync(GetSessionKey(sessionId));
+            return;
+        }
+
+        await _database.ScriptEvaluateAsync(
+            REMOVE_SESSION_BY_VERSION_SCRIPT,
+            [
+                GetSessionKey(sessionId),
+                GetUserSessionsKey(sessionModel.UserId)
+            ],
+            [
+                maximumVersion,
+                sessionId
+            ]);
     }
 
-    /// <summary>
-    /// Operação para revogar todas as sessões de um usuário.
-    /// </summary>
-    /// <param name="userId">Identificador interno do usuário.</param>
-    public async Task RevokeAllAsync(Guid userId)
+
+    private string Serialize(Session session)
     {
-        var userSessionsKey = GetUserSessionsKey(userId);
-        var sessionIds = await _database.SetMembersAsync(userSessionsKey);
-
-        foreach (var sessionId in sessionIds)
-            await _database.KeyDeleteAsync(GetSessionKey(sessionId.ToString()));
-
-        await _database.KeyDeleteAsync(userSessionsKey);
+        return JsonSerializer.Serialize(new SessionCacheModel
+        {
+            SessionId = session.SessionId,
+            PublicSessionId = session.PublicSessionId,
+            UserId = session.UserId,
+            Status = session.Status,
+            Version = session.Version,
+            SecurityStamp = session.SecurityStamp.Value,
+            CreatedAtUtc = session.CreatedAtUtc,
+            ExpiresAtUtc = session.ExpiresAtUtc,
+            LastSeenAtUtc = session.LastSeenAtUtc,
+            IpAddress = session.IpAddress,
+            UserAgent = session.UserAgent,
+            RevokedAtUtc = session.RevokedAtUtc,
+            RevocationReason = session.RevocationReason
+        }, _serializerOptions);
     }
 
+    private SessionCacheModel? Deserialize(RedisValue sessionValue)
+    {
+        return JsonSerializer.Deserialize<SessionCacheModel>(sessionValue.ToString(), _serializerOptions);
+    }
 
-    /// <summary>
-    /// Operação para obter a chave Redis da sessão.
-    /// </summary>
-    /// <param name="sessionId">Identificador público da sessão.</param>
-    /// <returns>Chave Redis da sessão.</returns>
+    private static Session Restore(SessionCacheModel sessionModel)
+    {
+        return Session.Restore(
+            sessionModel.SessionId,
+            string.IsNullOrWhiteSpace(sessionModel.PublicSessionId)
+                ? sessionModel.SessionId
+                : sessionModel.PublicSessionId,
+            sessionModel.UserId,
+            sessionModel.Status == default ? SessionStatus.Active : sessionModel.Status,
+            string.IsNullOrWhiteSpace(sessionModel.SecurityStamp)
+                ? SecurityStamp.Create().Value
+                : sessionModel.SecurityStamp,
+            sessionModel.CreatedAtUtc,
+            sessionModel.ExpiresAtUtc,
+            sessionModel.LastSeenAtUtc,
+            sessionModel.IpAddress,
+            sessionModel.UserAgent,
+            sessionModel.RevokedAtUtc,
+            sessionModel.RevocationReason,
+            sessionModel.Version <= 0 ? 1 : sessionModel.Version);
+    }
+
+    private static TimeSpan GetTtl(DateTime expiresAtUtc)
+    {
+        var ttl = expiresAtUtc - DateTime.UtcNow;
+        return ttl > TimeSpan.Zero ? ttl : TimeSpan.FromSeconds(1);
+    }
+
     private string GetSessionKey(string sessionId)
     {
-        return $"{_redisOptions.KeyPrefix}:session:{sessionId.Trim()}";
+        return $"{GetSessionKeyPrefix()}{sessionId.Trim()}";
     }
 
-    /// <summary>
-    /// Operação para obter a chave Redis do índice de sessões do usuário.
-    /// </summary>
-    /// <param name="userId">Identificador interno do usuário.</param>
-    /// <returns>Chave Redis do índice do usuário.</returns>
+    private string GetSessionKeyPrefix()
+    {
+        return $"{_redisOptions.KeyPrefix}:session:";
+    }
+
+    private string GetRevokedSessionKey(string publicSessionId)
+    {
+        return $"{_redisOptions.KeyPrefix}:revoked-session:{publicSessionId.Trim()}";
+    }
+
     private string GetUserSessionsKey(Guid userId)
     {
         return $"{_redisOptions.KeyPrefix}:user:sessions:{userId}";
     }
 
-    /// <summary>
-    /// Representa o payload serializado da sessão em cache.
-    /// </summary>
     private sealed class SessionCacheModel
     {
         public string SessionId { get; set; } = string.Empty;
@@ -209,6 +363,8 @@ internal sealed class RedisSessionStore : ISessionStore
         public Guid UserId { get; set; }
 
         public SessionStatus Status { get; set; }
+
+        public long Version { get; set; }
 
         public string SecurityStamp { get; set; } = string.Empty;
 
@@ -226,5 +382,4 @@ internal sealed class RedisSessionStore : ISessionStore
 
         public SessionRevocationReason? RevocationReason { get; set; }
     }
-
 }

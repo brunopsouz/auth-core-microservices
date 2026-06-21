@@ -37,6 +37,9 @@ public sealed class ActiveSessionAuthorizationHandler : AuthorizationHandler<Act
         AuthorizationHandlerContext context,
         ActiveSessionRequirement requirement)
     {
+        if (context.User.Identity?.IsAuthenticated != true)
+            return Task.CompletedTask;
+
         if (!_authenticatedSessionContext.IsActive)
         {
             context.Fail(new AuthorizationFailureReason(this, "O usuario nao pode autenticar no momento."));

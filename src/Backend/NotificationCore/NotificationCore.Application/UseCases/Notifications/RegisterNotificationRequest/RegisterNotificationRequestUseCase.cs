@@ -69,7 +69,7 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
         var receivedAtUtc = DateTime.UtcNow;
         var shouldMarkInboxAsFailed = false;
 
-        await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync(command.CancellationToken);
 
         try
         {
@@ -78,16 +78,19 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
                 MESSAGE_TYPE,
                 CONSUMER_NAME,
                 payload,
-                receivedAtUtc);
+                receivedAtUtc,
+                command.CancellationToken);
 
             if (!inboxResult.ShouldProcess)
             {
                 if (!inboxResult.WasAlreadyProcessed)
                     throw new InvalidOperationException("Mensagem de inbox ja esta em processamento por outro consumidor.");
 
-                var existingNotification = await _notificationReadRepository.GetByIdempotencyKeyAsync(command.Request.IdempotencyKey);
+                var existingNotification = await _notificationReadRepository.GetByIdempotencyKeyAsync(
+                    command.Request.IdempotencyKey,
+                    command.CancellationToken);
 
-                await _unitOfWork.CommitAsync();
+                await _unitOfWork.CommitAsync(command.CancellationToken);
 
                 return CreateDuplicateResult(existingNotification?.Id);
             }
@@ -106,20 +109,24 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
                 priority,
                 command.Request.RequestedAtUtc);
 
-            var wasNotificationAdded = await _notificationWriterRepository.TryAddAsync(notification);
+            var wasNotificationAdded = await _notificationWriterRepository.TryAddAsync(
+                notification,
+                command.CancellationToken);
 
             if (!wasNotificationAdded)
             {
-                var existingNotification = await _notificationReadRepository.GetByIdempotencyKeyAsync(command.Request.IdempotencyKey);
+                var existingNotification = await _notificationReadRepository.GetByIdempotencyKeyAsync(
+                    command.Request.IdempotencyKey,
+                    command.CancellationToken);
 
-                await MarkAsProcessedAsync(command.Request.MessageId);
-                await _unitOfWork.CommitAsync();
+                await MarkAsProcessedAsync(command.Request.MessageId, command.CancellationToken);
+                await _unitOfWork.CommitAsync(command.CancellationToken);
 
                 return CreateDuplicateResult(existingNotification?.Id);
             }
 
-            await MarkAsProcessedAsync(command.Request.MessageId);
-            await _unitOfWork.CommitAsync();
+            await MarkAsProcessedAsync(command.Request.MessageId, command.CancellationToken);
+            await _unitOfWork.CommitAsync(command.CancellationToken);
 
             return new RegisterNotificationRequestResult
             {
@@ -127,6 +134,11 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
                 WasCreated = true,
                 WasDuplicate = false
             };
+        }
+        catch (OperationCanceledException) when (command.CancellationToken.IsCancellationRequested)
+        {
+            await _unitOfWork.RollbackAsync();
+            throw;
         }
         catch (Exception exception)
         {
@@ -144,13 +156,14 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
     /// Operacao para marcar a mensagem como processada.
     /// </summary>
     /// <param name="messageId">Identificador idempotente da mensagem.</param>
-    private async Task MarkAsProcessedAsync(Guid messageId)
+    private async Task MarkAsProcessedAsync(Guid messageId, CancellationToken cancellationToken)
     {
         await _inboxRepository.MarkAsProcessedAsync(
             messageId,
             MESSAGE_TYPE,
             CONSUMER_NAME,
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            cancellationToken);
     }
 
     /// <summary>

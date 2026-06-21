@@ -11,7 +11,7 @@ public sealed class GetUserSessionsQuery
     public Guid UserId { get; init; }
 
     /// <summary>
-    /// Identificador da sessão atual.
+    /// Identificador público da sessão atual.
     /// </summary>
-    public string CurrentSessionId { get; init; } = string.Empty;
+    public string CurrentPublicSessionId { get; init; } = string.Empty;
 }

@@ -79,7 +79,7 @@ internal sealed class NotificationDispatcherHostedService : BackgroundService
 
                 await using var scope = _serviceScopeFactory.CreateAsyncScope();
                 var useCase = scope.ServiceProvider.GetRequiredService<IDispatchPendingNotificationUseCase>();
-                var result = await useCase.Execute(CreateCommand());
+                var result = await useCase.Execute(CreateCommand(stoppingToken));
 
                 _notificationMetrics.RecordPending(result.Found);
                 _notificationMetrics.RecordSent(result.Sent);
@@ -120,14 +120,15 @@ internal sealed class NotificationDispatcherHostedService : BackgroundService
     /// Operação para criar comando de despacho.
     /// </summary>
     /// <returns>Comando de despacho configurado.</returns>
-    private DispatchPendingNotificationCommand CreateCommand()
+    private DispatchPendingNotificationCommand CreateCommand(CancellationToken stoppingToken)
     {
         return new DispatchPendingNotificationCommand
         {
             DueAtUtc = DateTime.UtcNow,
             Take = _notificationDispatcherOptions.BatchSize,
             RetryDelay = TimeSpan.FromSeconds(_notificationDispatcherOptions.RetryDelaySeconds),
-            ProcessingTimeout = TimeSpan.FromSeconds(_notificationDispatcherOptions.ProcessingTimeoutSeconds)
+            ProcessingTimeout = TimeSpan.FromSeconds(_notificationDispatcherOptions.ProcessingTimeoutSeconds),
+            CancellationToken = stoppingToken
         };
     }
 

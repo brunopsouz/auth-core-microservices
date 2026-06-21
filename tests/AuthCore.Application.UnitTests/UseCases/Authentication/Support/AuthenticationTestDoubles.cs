@@ -307,13 +307,16 @@ internal sealed class FakeOutboxRepository : IOutboxRepository
 
     public List<OutboxMessage> UpdatedMessages { get; } = [];
 
-    public Task AddAsync(OutboxMessage message)
+    public Task AddAsync(OutboxMessage message, CancellationToken cancellationToken = default)
     {
         AddedMessages.Add(message);
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyCollection<OutboxMessage>> GetPendingAsync(int take, int maxAttempts)
+    public Task<IReadOnlyCollection<OutboxMessage>> GetPendingAsync(
+        int take,
+        int maxAttempts,
+        CancellationToken cancellationToken = default)
     {
         IReadOnlyCollection<OutboxMessage> messages = AddedMessages
             .Where(message => message.ProcessedAtUtc is null && message.AttemptCount < maxAttempts)
@@ -323,10 +326,32 @@ internal sealed class FakeOutboxRepository : IOutboxRepository
         return Task.FromResult(messages);
     }
 
-    public Task UpdateAsync(OutboxMessage message)
+    public Task<OutboxMessage?> ClaimPendingAsync(
+        Guid leaseId,
+        DateTime leasedUntilUtc,
+        int maxAttempts,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default)
     {
-        UpdatedMessages.Add(message);
-        return Task.CompletedTask;
+        return Task.FromResult<OutboxMessage?>(AddedMessages.FirstOrDefault());
+    }
+
+    public Task<bool> MarkAsProcessedAsync(
+        Guid messageId,
+        Guid leaseId,
+        DateTime processedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> RegisterFailureAsync(
+        Guid messageId,
+        Guid leaseId,
+        string errorMessage,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(true);
     }
 }
 
@@ -559,22 +584,33 @@ internal sealed class FakeEmailVerificationService : IEmailVerificationService
 
 internal sealed class FakeSessionStore : ISessionStore
 {
-    /// <summary>
-    /// Campo que armazena sessions by id.
-    /// </summary>
     private readonly Dictionary<string, Session> _sessionsById = [];
 
     public List<Session> SavedSessions { get; } = [];
 
     public List<string> RevokedSessionIds { get; } = [];
 
+    public List<string> RevokedPublicSessionIds { get; } = [];
+
     public List<Guid> RevokedAllUserIds { get; } = [];
+
+    public bool TrySaveResult { get; set; } = true;
 
     public Task SaveAsync(Session session)
     {
         SavedSessions.Add(session);
         _sessionsById[session.SessionId] = session;
         return Task.CompletedTask;
+    }
+
+    public Task<bool> TrySaveAsync(Session session)
+    {
+        if (!TrySaveResult)
+            return Task.FromResult(false);
+
+        SavedSessions.Add(session);
+        _sessionsById[session.SessionId] = session;
+        return Task.FromResult(true);
     }
 
     public Task<Session?> GetByIdAsync(string sessionId)
@@ -592,23 +628,38 @@ internal sealed class FakeSessionStore : ISessionStore
         return Task.FromResult(sessions);
     }
 
-    public Task RevokeAsync(string sessionId)
+    public Task RevokeAsync(Session session)
+    {
+        RevokedSessionIds.Add(session.SessionId);
+        RevokedPublicSessionIds.Add(session.PublicSessionId);
+
+        foreach (var cachedSession in _sessionsById.Values
+                     .Where(current => current.PublicSessionId == session.PublicSessionId)
+                     .ToArray())
+        {
+            _sessionsById.Remove(cachedSession.SessionId);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(string sessionId)
     {
         RevokedSessionIds.Add(sessionId);
         _sessionsById.Remove(sessionId);
         return Task.CompletedTask;
     }
 
-    public Task RevokeAllAsync(Guid userId)
+    public Task RemoveWhenVersionIsNotNewerAsync(string sessionId, long maximumVersion)
     {
-        RevokedAllUserIds.Add(userId);
-
-        foreach (var session in _sessionsById.Values.Where(session => session.UserId == userId).ToArray())
+        if (_sessionsById.TryGetValue(sessionId, out var session)
+            && session.Version > maximumVersion)
         {
-            RevokedSessionIds.Add(session.SessionId);
-            _sessionsById.Remove(session.SessionId);
+            return Task.CompletedTask;
         }
 
+        RevokedSessionIds.Add(sessionId);
+        _sessionsById.Remove(sessionId);
         return Task.CompletedTask;
     }
 
@@ -627,6 +678,11 @@ internal sealed class ThrowingSessionStore : ISessionStore
         throw ExceptionToThrow;
     }
 
+    public Task<bool> TrySaveAsync(Session session)
+    {
+        throw ExceptionToThrow;
+    }
+
     public Task<Session?> GetByIdAsync(string sessionId)
     {
         throw ExceptionToThrow;
@@ -637,12 +693,17 @@ internal sealed class ThrowingSessionStore : ISessionStore
         throw ExceptionToThrow;
     }
 
-    public Task RevokeAsync(string sessionId)
+    public Task RevokeAsync(Session session)
     {
         throw ExceptionToThrow;
     }
 
-    public Task RevokeAllAsync(Guid userId)
+    public Task RemoveAsync(string sessionId)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task RemoveWhenVersionIsNotNewerAsync(string sessionId, long maximumVersion)
     {
         throw ExceptionToThrow;
     }
@@ -657,6 +718,8 @@ internal sealed class FakeDurableSessionRepository : IDurableSessionRepository
 
     public List<Session> UpdatedSessions { get; } = [];
 
+    public bool ActiveUpdateResult { get; set; } = true;
+
     public Task AddAsync(Session session)
     {
         AddedSessions.Add(session);
@@ -669,6 +732,24 @@ internal sealed class FakeDurableSessionRepository : IDurableSessionRepository
         UpdatedSessions.Add(session);
         Store(session);
         return Task.CompletedTask;
+    }
+
+    public Task<Session?> TryRevokeAsync(Session session)
+    {
+        UpdatedSessions.Add(session);
+        Store(session);
+        return Task.FromResult<Session?>(session);
+    }
+
+    public Task<Session?> TryUpdateActiveAsync(Session session, DateTime referenceAtUtc)
+    {
+        if (!ActiveUpdateResult)
+            return Task.FromResult<Session?>(null);
+
+        var persistedSession = session.AdvanceVersion();
+        UpdatedSessions.Add(persistedSession);
+        Store(persistedSession);
+        return Task.FromResult<Session?>(persistedSession);
     }
 
     public Task<Session?> GetByIdentifierHashAsync(string sessionIdentifierHash, SessionIdentifier identifier)
@@ -692,16 +773,22 @@ internal sealed class FakeDurableSessionRepository : IDurableSessionRepository
         return Task.FromResult(sessions);
     }
 
-    public Task RevokeActiveByUserIdAsync(Guid userId, SessionRevocationReason reason, DateTime revokedAtUtc)
+    public Task<IReadOnlyCollection<Session>> RevokeActiveByUserIdAsync(
+        Guid userId,
+        SessionRevocationReason reason,
+        DateTime revokedAtUtc)
     {
+        var revokedSessions = new List<Session>();
+
         foreach (var session in _sessionsByPublicSessionId.Values.Where(current => current.UserId == userId).ToArray())
         {
             var revokedSession = session.Revoke(reason, revokedAtUtc);
             UpdatedSessions.Add(revokedSession);
+            revokedSessions.Add(revokedSession);
             Store(revokedSession);
         }
 
-        return Task.CompletedTask;
+        return Task.FromResult<IReadOnlyCollection<Session>>(revokedSessions);
     }
 
     public void Store(Session session)
@@ -725,6 +812,16 @@ internal sealed class ThrowingDurableSessionRepository : IDurableSessionReposito
         throw ExceptionToThrow;
     }
 
+    public Task<Session?> TryRevokeAsync(Session session)
+    {
+        throw ExceptionToThrow;
+    }
+
+    public Task<Session?> TryUpdateActiveAsync(Session session, DateTime referenceAtUtc)
+    {
+        throw ExceptionToThrow;
+    }
+
     public Task<Session?> GetByIdentifierHashAsync(string sessionIdentifierHash, SessionIdentifier identifier)
     {
         throw ExceptionToThrow;
@@ -740,7 +837,10 @@ internal sealed class ThrowingDurableSessionRepository : IDurableSessionReposito
         throw ExceptionToThrow;
     }
 
-    public Task RevokeActiveByUserIdAsync(Guid userId, SessionRevocationReason reason, DateTime revokedAtUtc)
+    public Task<IReadOnlyCollection<Session>> RevokeActiveByUserIdAsync(
+        Guid userId,
+        SessionRevocationReason reason,
+        DateTime revokedAtUtc)
     {
         throw ExceptionToThrow;
     }

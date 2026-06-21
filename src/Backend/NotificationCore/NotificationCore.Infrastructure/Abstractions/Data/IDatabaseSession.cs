@@ -13,9 +13,9 @@ public interface IDatabaseSession
     NpgsqlTransaction? CurrentTransaction { get; }
 
     /// <summary>
-    /// Operação para obter uma conexão aberta da sessão.
+    /// Operação para adquirir uma conexão aberta durante o tempo necessário.
     /// </summary>
     /// <param name="cancellationToken">Token para cancelamento da operação.</param>
-    /// <returns>Conexão aberta pronta para uso.</returns>
-    Task<NpgsqlConnection> GetOpenConnectionAsync(CancellationToken cancellationToken = default);
+    /// <returns>Lease que controla a devolução da conexão ao pool.</returns>
+    ValueTask<IDatabaseConnectionLease> AcquireConnectionAsync(CancellationToken cancellationToken = default);
 }

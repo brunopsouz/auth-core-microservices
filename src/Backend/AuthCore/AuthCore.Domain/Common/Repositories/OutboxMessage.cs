@@ -41,6 +41,16 @@ public sealed class OutboxMessage
     public string? LastError { get; private set; }
 
     /// <summary>
+    /// Identificador do lease atual de processamento.
+    /// </summary>
+    public Guid? LeaseId { get; private set; }
+
+    /// <summary>
+    /// Data de expiração do lease atual em UTC.
+    /// </summary>
+    public DateTime? LeasedUntilUtc { get; private set; }
+
+    /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
     private OutboxMessage()
@@ -64,7 +74,9 @@ public sealed class OutboxMessage
         DateTime occurredAtUtc,
         DateTime? processedAtUtc,
         int attemptCount,
-        string? lastError)
+        string? lastError,
+        Guid? leaseId,
+        DateTime? leasedUntilUtc)
     {
         Id = id;
         Type = Normalize(type);
@@ -73,6 +85,8 @@ public sealed class OutboxMessage
         ProcessedAtUtc = processedAtUtc;
         AttemptCount = attemptCount;
         LastError = NormalizeOptional(lastError);
+        LeaseId = leaseId;
+        LeasedUntilUtc = leasedUntilUtc;
 
         Validate();
     }
@@ -93,7 +107,9 @@ public sealed class OutboxMessage
             occurredAtUtc,
             processedAtUtc: null,
             attemptCount: 0,
-            lastError: null);
+            lastError: null,
+            leaseId: null,
+            leasedUntilUtc: null);
     }
 
     /// <summary>
@@ -106,6 +122,8 @@ public sealed class OutboxMessage
     /// <param name="processedAtUtc">Data de processamento em UTC.</param>
     /// <param name="attemptCount">Quantidade de tentativas registradas.</param>
     /// <param name="lastError">Última mensagem de erro.</param>
+    /// <param name="leaseId">Identificador do lease atual.</param>
+    /// <param name="leasedUntilUtc">Data de expiração do lease atual.</param>
     /// <returns>Mensagem reconstruída.</returns>
     public static OutboxMessage Restore(
         Guid id,
@@ -114,7 +132,9 @@ public sealed class OutboxMessage
         DateTime occurredAtUtc,
         DateTime? processedAtUtc,
         int attemptCount,
-        string? lastError)
+        string? lastError,
+        Guid? leaseId = null,
+        DateTime? leasedUntilUtc = null)
     {
         return new OutboxMessage(
             id,
@@ -123,7 +143,9 @@ public sealed class OutboxMessage
             occurredAtUtc,
             processedAtUtc,
             attemptCount,
-            lastError);
+            lastError,
+            leaseId,
+            leasedUntilUtc);
     }
 
     /// <summary>
@@ -143,7 +165,9 @@ public sealed class OutboxMessage
             OccurredAtUtc,
             processedAtUtc,
             AttemptCount,
-            LastError);
+            LastError,
+            leaseId: null,
+            leasedUntilUtc: null);
     }
 
     /// <summary>
@@ -160,7 +184,9 @@ public sealed class OutboxMessage
             OccurredAtUtc,
             ProcessedAtUtc,
             AttemptCount + 1,
-            errorMessage);
+            errorMessage,
+            leaseId: null,
+            leasedUntilUtc: null);
     }
 
     /// <summary>
@@ -178,6 +204,10 @@ public sealed class OutboxMessage
             throw new InvalidOperationException("A data de ocorrência da mensagem de outbox é obrigatória.");
         if (AttemptCount < 0)
             throw new InvalidOperationException("A quantidade de tentativas da outbox não pode ser negativa.");
+        if (LeaseId.HasValue != LeasedUntilUtc.HasValue)
+            throw new InvalidOperationException("O identificador e a expiração do lease devem ser informados em conjunto.");
+        if (LeaseId == Guid.Empty)
+            throw new InvalidOperationException("O identificador do lease da outbox é inválido.");
     }
 
     /// <summary>

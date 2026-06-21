@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 namespace AuthCore.Api.Authentication;
 
 /// <summary>
-/// Representa handler de autenticação por cookie de sessão.
+/// Representa handler de autenticacao por cookie de sessao.
 /// </summary>
 internal sealed class SessionAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
@@ -20,9 +20,13 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
     /// </summary>
     private readonly AuthCookieOptions _authCookieOptions;
     /// <summary>
-    /// Campo que armazena session service.
+    /// Campo que armazena durable session repository.
     /// </summary>
-    private readonly ISessionService _sessionService;
+    private readonly IDurableSessionRepository _durableSessionRepository;
+    /// <summary>
+    /// Campo que armazena session identifier hasher.
+    /// </summary>
+    private readonly ISessionIdentifierHasher _sessionIdentifierHasher;
     /// <summary>
     /// Campo que armazena session store.
     /// </summary>
@@ -34,41 +38,45 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
 
 
     /// <summary>
-    /// Operação para criar instância da classe.
+    /// Operacao para criar instancia da classe.
     /// </summary>
-    /// <param name="options">Monitor das opções do esquema.</param>
-    /// <param name="logger">Fábrica de logger da autenticação.</param>
+    /// <param name="options">Monitor das opcoes do esquema.</param>
+    /// <param name="logger">Fabrica de logger da autenticacao.</param>
     /// <param name="encoder">Codificador do pipeline.</param>
-    /// <param name="authCookieOptions">Configurações do cookie da sessão.</param>
-    /// <param name="sessionStore">Store da sessão autenticada.</param>
-    /// <param name="sessionService">Serviço de cálculo da expiração da sessão.</param>
-    /// <param name="userReadRepository">Repositório de leitura do usuário autenticado.</param>
+    /// <param name="authCookieOptions">Configuracoes do cookie da sessao.</param>
+    /// <param name="durableSessionRepository">Repositorio duravel da sessao autenticada.</param>
+    /// <param name="sessionIdentifierHasher">Servico de hash do identificador opaco.</param>
+    /// <param name="sessionStore">Store da sessao autenticada.</param>
+    /// <param name="userReadRepository">Repositorio de leitura do usuario autenticado.</param>
     public SessionAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
         IOptions<AuthCookieOptions> authCookieOptions,
+        IDurableSessionRepository durableSessionRepository,
+        ISessionIdentifierHasher sessionIdentifierHasher,
         ISessionStore sessionStore,
-        ISessionService sessionService,
         IUserReadRepository userReadRepository)
         : base(options, logger, encoder)
     {
         ArgumentNullException.ThrowIfNull(authCookieOptions);
+        ArgumentNullException.ThrowIfNull(durableSessionRepository);
+        ArgumentNullException.ThrowIfNull(sessionIdentifierHasher);
         ArgumentNullException.ThrowIfNull(sessionStore);
-        ArgumentNullException.ThrowIfNull(sessionService);
         ArgumentNullException.ThrowIfNull(userReadRepository);
 
         _authCookieOptions = authCookieOptions.Value;
+        _durableSessionRepository = durableSessionRepository;
+        _sessionIdentifierHasher = sessionIdentifierHasher;
         _sessionStore = sessionStore;
-        _sessionService = sessionService;
         _userReadRepository = userReadRepository;
     }
 
 
     /// <summary>
-    /// Operação para autenticar a requisição atual usando o cookie de sessão.
+    /// Operacao para autenticar a requisicao atual usando o cookie de sessao.
     /// </summary>
-    /// <returns>Resultado da autenticação da requisição.</returns>
+    /// <returns>Resultado da autenticacao da requisicao.</returns>
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         if (!Request.Cookies.TryGetValue(_authCookieOptions.SessionCookieName, out var sessionId)
@@ -78,16 +86,16 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
         }
 
         var normalizedSessionId = sessionId.Trim();
-        var session = await _sessionStore.GetByIdAsync(normalizedSessionId);
         var nowUtc = DateTime.UtcNow;
+        var session = await GetAvailableSessionAsync(normalizedSessionId, nowUtc);
 
-        if (session is null || !session.IsAvailableAt(nowUtc))
-            return AuthenticateResult.Fail("A sessão informada é inválida ou expirou.");
+        if (session is null)
+            return AuthenticateResult.Fail("A sessao informada e invalida ou expirou.");
 
         var user = await _userReadRepository.GetByIdAsync(session.UserId);
 
         if (user is null)
-            return AuthenticateResult.Fail("O usuário autenticado não está disponível.");
+            return AuthenticateResult.Fail("O usuario autenticado nao esta disponivel.");
 
         if (!user.CanSignIn)
             return AuthenticateResult.Fail("O usuario autenticado nao pode autenticar no momento.");
@@ -99,13 +107,6 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
         catch (DomainException exception)
         {
             return AuthenticateResult.Fail(exception.Message);
-        }
-
-        if (_sessionService.UseSlidingExpiration)
-        {
-            session = session.Touch(nowUtc, _sessionService.GetSlidingExpiresAtUtc(nowUtc));
-            await _sessionStore.SaveAsync(session);
-            AppendSessionCookie(session);
         }
 
         var claims = new List<Claim>
@@ -130,15 +131,47 @@ internal sealed class SessionAuthenticationHandler : AuthenticationHandler<Authe
 
 
     /// <summary>
-    /// Operação para renovar o cookie da sessão autenticada.
+    /// Operacao para obter a sessao ativa do cache ou reidrata-la pela fonte duravel.
     /// </summary>
-    /// <param name="session">Sessão autenticada atualizada.</param>
-    private void AppendSessionCookie(Session session)
+    /// <param name="sessionId">Identificador opaco da sessao.</param>
+    /// <param name="referenceAtUtc">Data de referencia em UTC.</param>
+    /// <returns>Sessao disponivel ou nula.</returns>
+    private async Task<Session?> GetAvailableSessionAsync(string sessionId, DateTime referenceAtUtc)
     {
-        Response.Cookies.Append(
-            _authCookieOptions.SessionCookieName,
-            session.SessionId,
-            SessionCookiePolicy.CreateSessionCookie(_authCookieOptions, session.ExpiresAtUtc));
-    }
+        var cachedSession = await _sessionStore.GetByIdAsync(sessionId);
 
+        if (cachedSession is not null && cachedSession.IsAvailableAt(referenceAtUtc))
+            return cachedSession;
+
+        if (cachedSession is not null)
+        {
+            await _sessionStore.RemoveWhenVersionIsNotNewerAsync(
+                sessionId,
+                cachedSession.Version);
+        }
+
+        var identifier = SessionIdentifier.Create(sessionId);
+        var identifierHash = _sessionIdentifierHasher.ComputeHash(identifier);
+        var durableSession = await _durableSessionRepository.GetByIdentifierHashAsync(
+            identifierHash,
+            identifier);
+
+        if (durableSession is null || !durableSession.IsAvailableAt(referenceAtUtc))
+            return null;
+
+        if (await _sessionStore.TrySaveAsync(durableSession))
+            return durableSession;
+
+        var concurrentCachedSession = await _sessionStore.GetByIdAsync(sessionId);
+
+        return concurrentCachedSession is not null
+            && concurrentCachedSession.IsAvailableAt(referenceAtUtc)
+            && string.Equals(
+                concurrentCachedSession.PublicSessionId,
+                durableSession.PublicSessionId,
+                StringComparison.Ordinal)
+            && concurrentCachedSession.Version >= durableSession.Version
+                ? concurrentCachedSession
+                : null;
+    }
 }

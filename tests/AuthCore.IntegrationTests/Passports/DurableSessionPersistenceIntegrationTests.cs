@@ -58,6 +58,7 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         Assert.Equal(session.SessionId, persistedSession!.SessionId);
         Assert.Equal(session.PublicSessionId, persistedSession.PublicSessionId);
         Assert.Equal(session.UserId, persistedSession.UserId);
+        Assert.Equal(session.Version, persistedSession.Version);
         Assert.Equal(session.SecurityStamp, persistedSession.SecurityStamp);
         Assert.Equal(session.CreatedAtUtc, persistedSession.CreatedAtUtc);
         Assert.Equal(session.ExpiresAtUtc, persistedSession.ExpiresAtUtc);
@@ -95,7 +96,167 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         Assert.Equal(SessionStatus.Revoked, persistedSession!.Status);
         Assert.Equal(revokedAtUtc, persistedSession.RevokedAtUtc);
         Assert.Equal(SessionRevocationReason.UserRevokedDevice, persistedSession.RevocationReason);
+        Assert.Equal(revokedSession.Version, persistedSession.Version);
         Assert.Equal(session.ExpiresAtUtc, persistedSession.ExpiresAtUtc);
+    }
+
+    /// <summary>
+    /// Verifica se a atualizacao condicional nao sobrescreve uma sessao revogada.
+    /// </summary>
+    [Fact]
+    public async Task TryUpdateActiveAsync_WhenSessionWasRevoked_ShouldNotUpdateSession()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var durableSessionRepository = scope.ServiceProvider.GetRequiredService<IDurableSessionRepository>();
+        var user = CreateVerifiedUser($"durable-session.conditional.{Guid.NewGuid():N}@authcore.dev");
+        var nowUtc = DateTime.UtcNow;
+        var session = Session.Issue(
+            user.Id,
+            user.SecurityStamp,
+            nowUtc.AddHours(2),
+            "127.0.0.2",
+            "IntegrationTests/Conditional");
+
+        await userRepository.AddAsync(user);
+        await durableSessionRepository.AddAsync(session);
+        await durableSessionRepository.UpdateAsync(
+            session.Revoke(SessionRevocationReason.UserLogout, nowUtc));
+
+        var staleActiveSession = session.Touch(nowUtc.AddMinutes(1), nowUtc.AddHours(3));
+        var wasUpdated = await durableSessionRepository.TryUpdateActiveAsync(
+            staleActiveSession,
+            nowUtc.AddMinutes(1));
+        var persistedSession = await durableSessionRepository.GetByPublicSessionIdAsync(session.PublicSessionId);
+
+        Assert.Null(wasUpdated);
+        Assert.NotNull(persistedSession);
+        Assert.Equal(SessionStatus.Revoked, persistedSession!.Status);
+        Assert.Equal(SessionRevocationReason.UserLogout, persistedSession.RevocationReason);
+        Assert.NotEqual(staleActiveSession.ExpiresAtUtc, persistedSession.ExpiresAtUtc);
+    }
+
+    /// <summary>
+    /// Verifica se a atualizacao condicional rejeita sessao expirada.
+    /// </summary>
+    [Fact]
+    public async Task TryUpdateActiveAsync_WhenSessionIsExpired_ShouldNotUpdateSession()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var durableSessionRepository = scope.ServiceProvider.GetRequiredService<IDurableSessionRepository>();
+        var user = CreateVerifiedUser($"durable-session.expired.{Guid.NewGuid():N}@authcore.dev");
+        var nowUtc = DateTime.UtcNow;
+        var expiredSession = Session.Restore(
+            "expired-conditional-session",
+            $"sess_{Guid.NewGuid():N}",
+            user.Id,
+            SessionStatus.Active,
+            user.SecurityStamp.Value,
+            nowUtc.AddHours(-2),
+            nowUtc.AddMinutes(-1),
+            nowUtc.AddHours(-1),
+            "127.0.0.3",
+            "IntegrationTests/Expired",
+            null,
+            null);
+
+        await userRepository.AddAsync(user);
+        await durableSessionRepository.AddAsync(expiredSession);
+
+        var staleActiveSession = expiredSession.Touch(nowUtc, nowUtc.AddHours(2));
+        var wasUpdated = await durableSessionRepository.TryUpdateActiveAsync(staleActiveSession, nowUtc);
+        var persistedSession = await durableSessionRepository.GetByPublicSessionIdAsync(expiredSession.PublicSessionId);
+
+        Assert.Null(wasUpdated);
+        Assert.NotNull(persistedSession);
+        Assert.Equal(expiredSession.ExpiresAtUtc, persistedSession!.ExpiresAtUtc);
+    }
+
+    /// <summary>
+    /// Verifica se a atualizacao condicional rejeita carimbo de seguranca divergente.
+    /// </summary>
+    [Fact]
+    public async Task TryUpdateActiveAsync_WhenSecurityStampDiverges_ShouldNotUpdateSession()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var durableSessionRepository = scope.ServiceProvider.GetRequiredService<IDurableSessionRepository>();
+        var user = CreateVerifiedUser($"durable-session.stamp.{Guid.NewGuid():N}@authcore.dev");
+        var nowUtc = DateTime.UtcNow;
+        var persistedSession = Session.Issue(
+            user.Id,
+            user.SecurityStamp,
+            nowUtc.AddHours(2),
+            "127.0.0.4",
+            "IntegrationTests/Stamp");
+        var divergentSession = Session.Restore(
+            persistedSession.SessionId,
+            persistedSession.PublicSessionId,
+            persistedSession.UserId,
+            persistedSession.Status,
+            SecurityStamp.Create().Value,
+            persistedSession.CreatedAtUtc,
+            nowUtc.AddHours(3),
+            nowUtc,
+            persistedSession.IpAddress,
+            persistedSession.UserAgent,
+            null,
+            null);
+
+        await userRepository.AddAsync(user);
+        await durableSessionRepository.AddAsync(persistedSession);
+
+        var wasUpdated = await durableSessionRepository.TryUpdateActiveAsync(divergentSession, nowUtc);
+        var reloadedSession = await durableSessionRepository.GetByPublicSessionIdAsync(
+            persistedSession.PublicSessionId);
+
+        Assert.Null(wasUpdated);
+        Assert.NotNull(reloadedSession);
+        Assert.Equal(persistedSession.SecurityStamp, reloadedSession!.SecurityStamp);
+        Assert.Equal(persistedSession.ExpiresAtUtc, reloadedSession.ExpiresAtUtc);
+    }
+
+    [Fact]
+    public async Task TryRevokeAsync_WhenRefreshAdvancedVersion_ShouldRevokeWithCurrentDatabaseVersion()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var durableSessionRepository = scope.ServiceProvider.GetRequiredService<IDurableSessionRepository>();
+        var user = CreateVerifiedUser($"durable-session.concurrent-revoke.{Guid.NewGuid():N}@authcore.dev");
+        var nowUtc = DateTime.UtcNow;
+        var session = Session.Issue(
+            user.Id,
+            user.SecurityStamp,
+            nowUtc.AddHours(2),
+            "127.0.0.10",
+            "IntegrationTests/ConcurrentRevoke");
+
+        await userRepository.AddAsync(user);
+        await durableSessionRepository.AddAsync(session);
+
+        var refreshedSession = await durableSessionRepository.TryUpdateActiveAsync(
+            session.Touch(nowUtc.AddMinutes(1), nowUtc.AddHours(3)),
+            nowUtc);
+        var revokedSession = await durableSessionRepository.TryRevokeAsync(
+            session.Revoke(SessionRevocationReason.UserLogout, nowUtc.AddMinutes(2)));
+
+        Assert.NotNull(refreshedSession);
+        Assert.NotNull(revokedSession);
+        Assert.Equal(refreshedSession!.Version + 1, revokedSession!.Version);
+        Assert.Equal(SessionStatus.Revoked, revokedSession.Status);
     }
 
     /// <summary>
@@ -112,30 +273,53 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         var durableSessionRepository = scope.ServiceProvider.GetRequiredService<IDurableSessionRepository>();
         var user = CreateVerifiedUser($"durable-session.list.{Guid.NewGuid():N}@authcore.dev");
         var anotherUser = CreateVerifiedUser($"durable-session.other.{Guid.NewGuid():N}@authcore.dev");
+        var nowUtc = DateTime.UtcNow;
         var firstSession = Session.Issue(
             user.Id,
             user.SecurityStamp,
-            new DateTime(2026, 7, 2, 12, 0, 0, DateTimeKind.Utc),
+            nowUtc.AddHours(2),
             "127.0.0.3",
             "Browser A");
         var secondSession = Session.Issue(
             user.Id,
             user.SecurityStamp,
-            new DateTime(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc),
+            nowUtc.AddHours(3),
             "127.0.0.4",
             "Browser B");
         var foreignSession = Session.Issue(
             anotherUser.Id,
             anotherUser.SecurityStamp,
-            new DateTime(2026, 7, 4, 12, 0, 0, DateTimeKind.Utc),
+            nowUtc.AddHours(4),
             "127.0.0.5",
             "Browser C");
+        var revokedSession = Session.Issue(
+            user.Id,
+            user.SecurityStamp,
+            nowUtc.AddHours(5),
+            "127.0.0.6",
+            "Browser D")
+            .Revoke(SessionRevocationReason.UserLogout, nowUtc);
+        var expiredSession = Session.Restore(
+            "expired-session",
+            "sess_expired_list",
+            user.Id,
+            SessionStatus.Active,
+            user.SecurityStamp.Value,
+            nowUtc.AddHours(-2),
+            nowUtc.AddHours(-1),
+            nowUtc.AddHours(-2),
+            "127.0.0.7",
+            "Browser E",
+            null,
+            null);
 
         await userRepository.AddAsync(user);
         await userRepository.AddAsync(anotherUser);
         await durableSessionRepository.AddAsync(firstSession);
         await durableSessionRepository.AddAsync(secondSession);
         await durableSessionRepository.AddAsync(foreignSession);
+        await durableSessionRepository.AddAsync(revokedSession);
+        await durableSessionRepository.AddAsync(expiredSession);
 
         var persistedSessions = await durableSessionRepository.ListByUserIdAsync(user.Id);
 
@@ -144,6 +328,8 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         Assert.Contains(persistedSessions, session => session.PublicSessionId == firstSession.PublicSessionId);
         Assert.Contains(persistedSessions, session => session.PublicSessionId == secondSession.PublicSessionId);
         Assert.DoesNotContain(persistedSessions, session => session.PublicSessionId == foreignSession.PublicSessionId);
+        Assert.DoesNotContain(persistedSessions, session => session.PublicSessionId == revokedSession.PublicSessionId);
+        Assert.DoesNotContain(persistedSessions, session => session.PublicSessionId == expiredSession.PublicSessionId);
     }
 
     /// <summary>
@@ -207,7 +393,10 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         await durableSessionRepository.AddAsync(revokedSession);
         await durableSessionRepository.AddAsync(foreignSession);
 
-        await durableSessionRepository.RevokeActiveByUserIdAsync(user.Id, SessionRevocationReason.PasswordChanged, nowUtc);
+        var revokedSessions = await durableSessionRepository.RevokeActiveByUserIdAsync(
+            user.Id,
+            SessionRevocationReason.PasswordChanged,
+            nowUtc);
 
         var persistedActiveSession = await durableSessionRepository.GetByPublicSessionIdAsync(activeSession.PublicSessionId);
         var persistedExpiredSession = await durableSessionRepository.GetByPublicSessionIdAsync(expiredSession.PublicSessionId);
@@ -218,6 +407,8 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         Assert.Equal(SessionStatus.Revoked, persistedActiveSession!.Status);
         Assert.Equal(nowUtc, persistedActiveSession.RevokedAtUtc);
         Assert.Equal(SessionRevocationReason.PasswordChanged, persistedActiveSession.RevocationReason);
+        Assert.Equal(activeSession.Version + 1, persistedActiveSession.Version);
+        Assert.Contains(revokedSessions, session => session.PublicSessionId == activeSession.PublicSessionId);
         Assert.NotNull(persistedExpiredSession);
         Assert.Equal(SessionStatus.Expired, persistedExpiredSession!.Status);
         Assert.Null(persistedExpiredSession.RevokedAtUtc);

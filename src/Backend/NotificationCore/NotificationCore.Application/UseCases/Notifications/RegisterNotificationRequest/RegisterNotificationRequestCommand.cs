@@ -11,4 +11,9 @@ public sealed class RegisterNotificationRequestCommand
     /// Mensagem transacional consumida.
     /// </summary>
     public SendTransactionalNotificationRequested Request { get; init; } = null!;
+
+    /// <summary>
+    /// Token para cancelamento do processamento.
+    /// </summary>
+    public CancellationToken CancellationToken { get; init; }
 }

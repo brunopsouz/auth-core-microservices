@@ -49,8 +49,12 @@ internal sealed class RevokeUserSessionUseCase : IRevokeUserSessionUseCase
         if (session is null || session.UserId != command.UserId)
             throw new NotFoundException("A sessão informada não foi encontrada para o usuário.");
 
-        await _durableSessionRepository.UpdateAsync(
-            session.Revoke(SessionRevocationReason.UserRevokedDevice, DateTime.UtcNow));
-        await _sessionStore.RevokeAsync(session.SessionId);
+        var revokedSession = session.Revoke(SessionRevocationReason.UserRevokedDevice, DateTime.UtcNow);
+        var persistedRevokedSession = await _durableSessionRepository.TryRevokeAsync(revokedSession);
+
+        if (persistedRevokedSession is null)
+            throw new NotFoundException("A sessao informada nao esta mais ativa.");
+
+        await _sessionStore.RevokeAsync(persistedRevokedSession);
     }
 }

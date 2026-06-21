@@ -9,5 +9,6 @@ public interface INotificationTemplateReadRepository
     /// Operacao para listar templates ativos.
     /// </summary>
     /// <returns>Templates ativos.</returns>
-    Task<IReadOnlyCollection<NotificationTemplateSummary>> ListActiveAsync();
+    Task<IReadOnlyCollection<NotificationTemplateSummary>> ListActiveAsync(
+        CancellationToken cancellationToken = default);
 }

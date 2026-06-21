@@ -10,6 +10,7 @@ using AuthCore.Infrastructure.Persistences.Read.PostgreSQL.Repositories;
 using AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Connections;
 using AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 using AuthCore.Infrastructure.Persistences.Write.PostgreSQL.UnitOfWork;
+using AuthCore.Infrastructure.Observability;
 using AuthCore.Infrastructure.Security.Emails;
 using AuthCore.Infrastructure.Security.Cryptography;
 using AuthCore.Infrastructure.Security.Tokens;
@@ -18,6 +19,8 @@ using AuthCore.Infrastructure.Services.Messaging;
 using FluentMigrator.Runner;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Npgsql;
 using StackExchange.Redis;
 
 namespace AuthCore.Infrastructure;
@@ -75,6 +78,12 @@ public static class InfrastructureDependencyInjection
     /// <param name="services">Coleção de serviços da aplicação.</param>
     private static void AddPersistence(IServiceCollection services)
     {
+        services.AddSingleton<DatabaseMetrics>();
+        services.AddSingleton(serviceProvider =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+            return NpgsqlDataSource.Create(BuildConnectionString(options.PostgreSql, "AuthCore"));
+        });
         services.AddScoped<IDbConnectionFactory, NpgsqlConnectionFactory>();
         services.AddScoped<NpgsqlUnitOfWork>();
         services.AddScoped<IUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<NpgsqlUnitOfWork>());
@@ -294,6 +303,38 @@ public static class InfrastructureDependencyInjection
         return configuration.GetConnectionString("PostgreSql")
             ?? configuration.GetSection(DatabaseOptions.SectionName).GetValue<string>(nameof(DatabaseOptions.PostgreSql))
             ?? string.Empty;
+    }
+
+    private static string BuildConnectionString(string connectionString, string applicationName)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("Database connection string was not configured.");
+
+        var configured = new NpgsqlConnectionStringBuilder(connectionString);
+        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = configured.ContainsKey("Pooling")
+                ? configured.Pooling
+                : true,
+            MinPoolSize = configured.ContainsKey("Minimum Pool Size")
+                ? configured.MinPoolSize
+                : 0,
+            MaxPoolSize = configured.ContainsKey("Maximum Pool Size")
+                || configured.ContainsKey("Max Pool Size")
+                    ? configured.MaxPoolSize
+                    : 30,
+            Timeout = configured.ContainsKey("Timeout")
+                ? configured.Timeout
+                : 10,
+            CommandTimeout = configured.ContainsKey("Command Timeout")
+                ? configured.CommandTimeout
+                : 30,
+            ApplicationName = string.IsNullOrWhiteSpace(configured.ApplicationName)
+                ? applicationName
+                : configured.ApplicationName
+        };
+
+        return builder.ConnectionString;
     }
 
 }

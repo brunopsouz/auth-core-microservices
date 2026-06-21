@@ -54,7 +54,9 @@ internal sealed class UserReadRepository : IUserReadRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserId", userId);
 
@@ -91,7 +93,9 @@ internal sealed class UserReadRepository : IUserReadRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserIdentifier", userIdentifier);
 
@@ -128,7 +132,9 @@ internal sealed class UserReadRepository : IUserReadRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("Email", email.Trim().ToLowerInvariant());
 

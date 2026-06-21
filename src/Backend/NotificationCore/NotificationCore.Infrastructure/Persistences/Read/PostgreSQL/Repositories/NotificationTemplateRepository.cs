@@ -31,7 +31,8 @@ internal sealed class NotificationTemplateRepository : INotificationTemplateRepo
     /// Operação para listar templates ativos.
     /// </summary>
     /// <returns>Lista de templates ativos.</returns>
-    public async Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync()
+    public async Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync(
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT
@@ -45,13 +46,15 @@ internal sealed class NotificationTemplateRepository : INotificationTemplateRepo
             ORDER BY "TemplateKey", "Channel", "Version" DESC;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
         var templates = new List<NotificationTemplate>();
 
-        while (await reader.ReadAsync())
+        while (await reader.ReadAsync(cancellationToken))
             templates.Add(ReadTemplate(reader));
 
         return templates;
@@ -61,9 +64,10 @@ internal sealed class NotificationTemplateRepository : INotificationTemplateRepo
     /// Operacao para listar templates ativos para leitura da aplicacao.
     /// </summary>
     /// <returns>Templates ativos.</returns>
-    async Task<IReadOnlyCollection<NotificationTemplateSummary>> INotificationTemplateReadRepository.ListActiveAsync()
+    async Task<IReadOnlyCollection<NotificationTemplateSummary>> INotificationTemplateReadRepository.ListActiveAsync(
+        CancellationToken cancellationToken)
     {
-        var templates = await ListActiveAsync();
+        var templates = await ListActiveAsync(cancellationToken);
 
         return templates
             .Select(template => new NotificationTemplateSummary
@@ -100,7 +104,9 @@ internal sealed class NotificationTemplateRepository : INotificationTemplateRepo
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("TemplateKey", templateKey.Trim());

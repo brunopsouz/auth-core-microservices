@@ -32,6 +32,41 @@ public sealed class RevokeUserSessionUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_WhenDurableSessionDoesNotContainOpaqueIdentifier_ShouldInvalidateCacheByPublicSessionId()
+    {
+        var durableSessionRepository = new FakeDurableSessionRepository();
+        var sessionStore = new FakeSessionStore();
+        var useCase = new RevokeUserSessionUseCase(durableSessionRepository, sessionStore);
+        var userId = Guid.NewGuid();
+        var cachedSession = Session.Issue(userId, DateTime.UtcNow.AddMinutes(30), "127.0.0.1", "Browser B");
+        var durableSession = Session.Restore(
+            cachedSession.PublicSessionId,
+            cachedSession.PublicSessionId,
+            cachedSession.UserId,
+            cachedSession.Status,
+            cachedSession.SecurityStamp.Value,
+            cachedSession.CreatedAtUtc,
+            cachedSession.ExpiresAtUtc,
+            cachedSession.LastSeenAtUtc,
+            cachedSession.IpAddress,
+            cachedSession.UserAgent,
+            cachedSession.RevokedAtUtc,
+            cachedSession.RevocationReason);
+
+        durableSessionRepository.Store(durableSession);
+        sessionStore.Store(cachedSession);
+
+        await useCase.Execute(new RevokeUserSessionCommand
+        {
+            UserId = userId,
+            SessionId = cachedSession.PublicSessionId
+        });
+
+        Assert.Equal([cachedSession.PublicSessionId], sessionStore.RevokedPublicSessionIds);
+        Assert.Null(await sessionStore.GetByIdAsync(cachedSession.SessionId));
+    }
+
+    [Fact]
     public async Task Execute_WhenSessionDoesNotBelongToAuthenticatedUser_ShouldThrowNotFoundException()
     {
         var durableSessionRepository = new FakeDurableSessionRepository();

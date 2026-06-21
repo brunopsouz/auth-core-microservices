@@ -158,6 +158,126 @@ public sealed class SessionAuthenticationIntegrationTests
     }
 
     [Fact]
+    public async Task Authenticate_WhenCacheMissesAndDurableSessionIsActive_ShouldRehydrateCache()
+    {
+        var userRepository = new InMemoryUserReadRepository();
+        var sessionStore = new InMemorySessionStore();
+        var provider = BuildServiceProvider(
+            userRepository,
+            new InMemoryPasswordRepository(),
+            sessionStore,
+            new AlwaysValidPasswordEncripter(),
+            new FixedSessionService(),
+            new SpyUnitOfWork());
+        var user = CreateVerifiedUser();
+        var session = Session.Issue(
+            user.Id,
+            user.SecurityStamp,
+            DateTime.UtcNow.AddMinutes(30),
+            "127.0.0.1",
+            "IntegrationTests/CacheMiss");
+
+        userRepository.Store(user);
+        await provider.GetRequiredService<IDurableSessionRepository>().AddAsync(session);
+
+        await using var scope = provider.CreateAsyncScope();
+        var serviceProvider = scope.ServiceProvider;
+        var handlerProvider = serviceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
+        var schemeProvider = serviceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+        var scheme = await schemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
+        var httpContext = new DefaultHttpContext { RequestServices = serviceProvider };
+        SetRequestCookies(httpContext, ("sid", session.SessionId));
+
+        var handler = await handlerProvider.GetHandlerAsync(httpContext, scheme!.Name);
+        var result = await handler!.AuthenticateAsync();
+
+        Assert.True(result.Succeeded);
+        var cachedSession = await sessionStore.GetByIdAsync(session.SessionId);
+        Assert.NotNull(cachedSession);
+        Assert.Equal(session.PublicSessionId, cachedSession!.PublicSessionId);
+        Assert.Equal(session.Version, cachedSession.Version);
+    }
+
+    [Fact]
+    public async Task Authenticate_WhenCacheMissesAndDurableSessionIsRevoked_ShouldFail()
+    {
+        var userRepository = new InMemoryUserReadRepository();
+        var sessionStore = new InMemorySessionStore();
+        var provider = BuildServiceProvider(
+            userRepository,
+            new InMemoryPasswordRepository(),
+            sessionStore,
+            new AlwaysValidPasswordEncripter(),
+            new FixedSessionService(),
+            new SpyUnitOfWork());
+        var user = CreateVerifiedUser();
+        var activeSession = Session.Issue(
+            user.Id,
+            user.SecurityStamp,
+            DateTime.UtcNow.AddMinutes(30),
+            "127.0.0.1",
+            "IntegrationTests/RevokedCacheMiss");
+        var revokedSession = activeSession.Revoke(
+            SessionRevocationReason.UserLogout,
+            DateTime.UtcNow);
+
+        userRepository.Store(user);
+        await provider.GetRequiredService<IDurableSessionRepository>().AddAsync(revokedSession);
+
+        await using var scope = provider.CreateAsyncScope();
+        var serviceProvider = scope.ServiceProvider;
+        var handlerProvider = serviceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
+        var schemeProvider = serviceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+        var scheme = await schemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
+        var httpContext = new DefaultHttpContext { RequestServices = serviceProvider };
+        SetRequestCookies(httpContext, ("sid", activeSession.SessionId));
+
+        var handler = await handlerProvider.GetHandlerAsync(httpContext, scheme!.Name);
+        var result = await handler!.AuthenticateAsync();
+
+        Assert.False(result.Succeeded);
+        Assert.Null(await sessionStore.GetByIdAsync(activeSession.SessionId));
+    }
+
+    [Fact]
+    public async Task Authenticate_WhenCacheRehydrationIsRejected_ShouldFail()
+    {
+        var userRepository = new InMemoryUserReadRepository();
+        var sessionStore = new InMemorySessionStore { TrySaveResult = false };
+        var provider = BuildServiceProvider(
+            userRepository,
+            new InMemoryPasswordRepository(),
+            sessionStore,
+            new AlwaysValidPasswordEncripter(),
+            new FixedSessionService(),
+            new SpyUnitOfWork());
+        var user = CreateVerifiedUser();
+        var session = Session.Issue(
+            user.Id,
+            user.SecurityStamp,
+            DateTime.UtcNow.AddMinutes(30),
+            "127.0.0.1",
+            "IntegrationTests/RejectedRehydration");
+
+        userRepository.Store(user);
+        await provider.GetRequiredService<IDurableSessionRepository>().AddAsync(session);
+
+        await using var scope = provider.CreateAsyncScope();
+        var serviceProvider = scope.ServiceProvider;
+        var handlerProvider = serviceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
+        var schemeProvider = serviceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+        var scheme = await schemeProvider.GetSchemeAsync(SessionAuthenticationDefaults.AuthenticationScheme);
+        var httpContext = new DefaultHttpContext { RequestServices = serviceProvider };
+        SetRequestCookies(httpContext, ("sid", session.SessionId));
+
+        var handler = await handlerProvider.GetHandlerAsync(httpContext, scheme!.Name);
+        var result = await handler!.AuthenticateAsync();
+
+        Assert.False(result.Succeeded);
+        Assert.Null(await sessionStore.GetByIdAsync(session.SessionId));
+    }
+
+    [Fact]
     public async Task Refresh_WhenSlidingExpirationIsEnabled_ShouldRenewSessionCookie()
     {
         var userRepository = new InMemoryUserReadRepository();
@@ -330,6 +450,9 @@ public sealed class SessionAuthenticationIntegrationTests
         userRepository.Store(user);
         sessionStore.Store(currentSession);
         sessionStore.Store(anotherSession);
+        var durableSessionRepository = provider.GetRequiredService<IDurableSessionRepository>();
+        await durableSessionRepository.AddAsync(currentSession);
+        await durableSessionRepository.AddAsync(anotherSession);
 
         await using var authScope = provider.CreateAsyncScope();
         var serviceProvider = authScope.ServiceProvider;
@@ -599,10 +722,21 @@ public sealed class SessionAuthenticationIntegrationTests
 
         public List<string> RevokedSessionIds { get; } = [];
 
+        public bool TrySaveResult { get; set; } = true;
+
         public Task SaveAsync(Session session)
         {
             _sessionsById[session.SessionId] = session;
             return Task.CompletedTask;
+        }
+
+        public Task<bool> TrySaveAsync(Session session)
+        {
+            if (!TrySaveResult)
+                return Task.FromResult(false);
+
+            _sessionsById[session.SessionId] = session;
+            return Task.FromResult(true);
         }
 
         public void Store(Session session)
@@ -625,21 +759,37 @@ public sealed class SessionAuthenticationIntegrationTests
             return Task.FromResult(sessions);
         }
 
-        public Task RevokeAsync(string sessionId)
+        public Task RevokeAsync(Session session)
+        {
+            RevokedSessionIds.Add(session.SessionId);
+
+            foreach (var cachedSession in _sessionsById.Values
+                         .Where(current => current.PublicSessionId == session.PublicSessionId)
+                         .ToArray())
+            {
+                _sessionsById.Remove(cachedSession.SessionId);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveAsync(string sessionId)
         {
             RevokedSessionIds.Add(sessionId);
             _sessionsById.Remove(sessionId);
             return Task.CompletedTask;
         }
 
-        public Task RevokeAllAsync(Guid userId)
+        public Task RemoveWhenVersionIsNotNewerAsync(string sessionId, long maximumVersion)
         {
-            foreach (var session in _sessionsById.Values.Where(session => session.UserId == userId).ToArray())
+            if (_sessionsById.TryGetValue(sessionId, out var session)
+                && session.Version > maximumVersion)
             {
-                RevokedSessionIds.Add(session.SessionId);
-                _sessionsById.Remove(session.SessionId);
+                return Task.CompletedTask;
             }
 
+            RevokedSessionIds.Add(sessionId);
+            _sessionsById.Remove(sessionId);
             return Task.CompletedTask;
         }
     }
@@ -766,6 +916,35 @@ public sealed class SessionAuthenticationIntegrationTests
             return Task.CompletedTask;
         }
 
+        public Task<Session?> TryRevokeAsync(Session session)
+        {
+            var existingSession = _sessionsByHash.Values.FirstOrDefault(current =>
+                string.Equals(current.PublicSessionId, session.PublicSessionId, StringComparison.Ordinal)
+                && current.Status == SessionStatus.Active);
+
+            if (existingSession is null)
+                return Task.FromResult<Session?>(null);
+
+            var persistedSession = session.Version > existingSession.Version
+                ? session
+                : session.AdvanceVersion();
+            _sessionsByHash[$"{existingSession.SessionId}-hash"] = persistedSession;
+            return Task.FromResult<Session?>(persistedSession);
+        }
+
+        public Task<Session?> TryUpdateActiveAsync(Session session, DateTime referenceAtUtc)
+        {
+            var existingSession = _sessionsByHash.Values.FirstOrDefault(current =>
+                string.Equals(current.PublicSessionId, session.PublicSessionId, StringComparison.Ordinal));
+
+            if (existingSession is null || !existingSession.IsAvailableAt(referenceAtUtc))
+                return Task.FromResult<Session?>(null);
+
+            var persistedSession = session.AdvanceVersion();
+            _sessionsByHash[$"{session.SessionId}-hash"] = persistedSession;
+            return Task.FromResult<Session?>(persistedSession);
+        }
+
         public Task<Session?> GetByIdentifierHashAsync(string sessionIdentifierHash, SessionIdentifier identifier)
         {
             _sessionsByHash.TryGetValue(sessionIdentifierHash.Trim(), out var session);
@@ -789,12 +968,21 @@ public sealed class SessionAuthenticationIntegrationTests
             return Task.FromResult(sessions);
         }
 
-        public Task RevokeActiveByUserIdAsync(Guid userId, SessionRevocationReason reason, DateTime revokedAtUtc)
+        public Task<IReadOnlyCollection<Session>> RevokeActiveByUserIdAsync(
+            Guid userId,
+            SessionRevocationReason reason,
+            DateTime revokedAtUtc)
         {
-            foreach (var session in _sessionsByHash.Values.Where(current => current.UserId == userId).ToArray())
-                _sessionsByHash[$"{session.SessionId}-hash"] = session.Revoke(reason, revokedAtUtc);
+            var revokedSessions = new List<Session>();
 
-            return Task.CompletedTask;
+            foreach (var session in _sessionsByHash.Values.Where(current => current.UserId == userId).ToArray())
+            {
+                var revokedSession = session.Revoke(reason, revokedAtUtc);
+                revokedSessions.Add(revokedSession);
+                _sessionsByHash[$"{session.SessionId}-hash"] = revokedSession;
+            }
+
+            return Task.FromResult<IReadOnlyCollection<Session>>(revokedSessions);
         }
     }
 

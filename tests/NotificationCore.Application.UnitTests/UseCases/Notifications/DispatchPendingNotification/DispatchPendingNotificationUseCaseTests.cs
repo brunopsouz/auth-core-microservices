@@ -374,7 +374,7 @@ public sealed class DispatchPendingNotificationUseCaseTests
             return Task.CompletedTask;
         }
 
-        public Task<bool> TryAddAsync(Notification notification)
+        public Task<bool> TryAddAsync(Notification notification, CancellationToken cancellationToken = default)
         {
             if (_notifications.Any(current => current.IdempotencyKey.Value == notification.IdempotencyKey.Value))
                 return Task.FromResult(false);
@@ -394,7 +394,10 @@ public sealed class DispatchPendingNotificationUseCaseTests
             return Task.FromResult(_notifications.SingleOrDefault(notification => notification.IdempotencyKey.Value == idempotencyKey));
         }
 
-        public Task<IReadOnlyCollection<Notification>> GetPendingForDispatchAsync(DateTime dueAtUtc, int take)
+        public Task<IReadOnlyCollection<Notification>> GetPendingForDispatchAsync(
+            DateTime dueAtUtc,
+            int take,
+            CancellationToken cancellationToken = default)
         {
             IReadOnlyCollection<Notification> notifications = _notifications
                 .Where(notification => notification.Status is NotificationStatus.Pending or NotificationStatus.RetryScheduled)
@@ -405,7 +408,10 @@ public sealed class DispatchPendingNotificationUseCaseTests
             return Task.FromResult(notifications);
         }
 
-        public Task<IReadOnlyCollection<Notification>> GetProcessingTimedOutAsync(DateTime dueAtUtc, int take)
+        public Task<IReadOnlyCollection<Notification>> GetProcessingTimedOutAsync(
+            DateTime dueAtUtc,
+            int take,
+            CancellationToken cancellationToken = default)
         {
             IReadOnlyCollection<Notification> notifications = _notifications
                 .Where(notification => notification.Status == NotificationStatus.Processing)
@@ -438,14 +444,17 @@ public sealed class DispatchPendingNotificationUseCaseTests
             return Task.FromResult(notifications);
         }
 
-        public Task UpdateAsync(Notification notification)
+        public Task UpdateAsync(Notification notification, CancellationToken cancellationToken = default)
         {
             UpdatedNotifications.Add(notification);
 
             return Task.CompletedTask;
         }
 
-        public Task<bool> TryUpdateProcessingTimedOutAsync(Notification notification, DateTime processingTimeoutAtUtc)
+        public Task<bool> TryUpdateProcessingTimedOutAsync(
+            Notification notification,
+            DateTime processingTimeoutAtUtc,
+            CancellationToken cancellationToken = default)
         {
             if (notification.ScheduledAtUtc != processingTimeoutAtUtc)
                 return Task.FromResult(false);
@@ -473,14 +482,17 @@ public sealed class DispatchPendingNotificationUseCaseTests
             string messageType,
             string consumerName,
             string payload,
-            DateTime receivedAtUtc)
+            DateTime receivedAtUtc,
+            CancellationToken cancellationToken = default)
         {
             _payloads.Add(payload);
 
             return Task.FromResult(InboxProcessingStartResult.Started(retryCount: 0));
         }
 
-        public Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(string idempotencyKey)
+        public Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(
+            string idempotencyKey,
+            CancellationToken cancellationToken = default)
         {
             var payload = _payloads.SingleOrDefault(payload =>
             {
@@ -496,7 +508,8 @@ public sealed class DispatchPendingNotificationUseCaseTests
             Guid messageId,
             string messageType,
             string consumerName,
-            DateTime processedAtUtc)
+            DateTime processedAtUtc,
+            CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }
@@ -507,7 +520,8 @@ public sealed class DispatchPendingNotificationUseCaseTests
             string consumerName,
             string payload,
             DateTime receivedAtUtc,
-            string error)
+            string error,
+            CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }

@@ -1,0 +1,20 @@
+# All
+.\scripts\update-containers.ps1
+
+# Só AuthCore
+.\scripts\update-containers.ps1 -Services authcore-api
+
+# Só NotificationCore
+.\scripts\update-containers.ps1 -Services notificationcore-api
+
+# Só Gateway
+.\scripts\update-containers.ps1 -Services gateway-api
+
+# Todas as APIs
+.\scripts\update-containers.ps1 -Services authcore-api,notificationcore-api,gateway-api
+
+# Tudo, incluindo Postgres, Redis e RabbitMQ
+.\scripts\update-containers.ps1 -All
+
+# Rebuild sem cache
+.\scripts\update-containers.ps1 -Services authcore-api -NoCache

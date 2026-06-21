@@ -56,7 +56,8 @@ internal sealed class PasswordRepository : IPasswordRepository
             );
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("UserId", password.UserId);
@@ -89,7 +90,8 @@ internal sealed class PasswordRepository : IPasswordRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserId", userId);
 
@@ -133,7 +135,8 @@ internal sealed class PasswordRepository : IPasswordRepository
             WHERE "UserId" = @UserId;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("UserId", password.UserId);

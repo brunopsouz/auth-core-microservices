@@ -53,6 +53,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
                 "user_id",
                 "session_identifier_hash",
                 "status",
+                "version",
                 "security_stamp",
                 "device_name",
                 "user_agent",
@@ -70,6 +71,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
                 @UserId,
                 @SessionIdentifierHash,
                 @Status,
+                @Version,
                 @SecurityStamp,
                 @DeviceName,
                 @UserAgent,
@@ -82,7 +84,8 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
             );
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("Id", Guid.NewGuid());
@@ -90,6 +93,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
         command.Parameters.AddWithValue("UserId", session.UserId);
         command.Parameters.AddWithValue("SessionIdentifierHash", _sessionIdentifierHasher.ComputeHash(session.Identifier));
         command.Parameters.AddWithValue("Status", (short)session.Status);
+        command.Parameters.AddWithValue("Version", session.Version);
         command.Parameters.AddWithValue("SecurityStamp", session.SecurityStamp.Value);
         command.Parameters.AddWithValue("DeviceName", DBNull.Value);
         command.Parameters.AddWithValue("UserAgent", session.UserAgent ?? (object)DBNull.Value);
@@ -117,6 +121,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
             UPDATE "auth_sessions"
             SET
                 "status" = @Status,
+                "version" = @Version,
                 "security_stamp" = @SecurityStamp,
                 "user_agent" = @UserAgent,
                 "ip_address" = @IpAddress,
@@ -124,14 +129,18 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
                 "last_seen_at_utc" = @LastSeenAtUtc,
                 "revoked_at_utc" = @RevokedAtUtc,
                 "revocation_reason" = @RevocationReason
-            WHERE "public_session_id" = @PublicSessionId;
+            WHERE "public_session_id" = @PublicSessionId
+              AND "version" = @ExpectedVersion;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("PublicSessionId", session.PublicSessionId);
         command.Parameters.AddWithValue("Status", (short)session.Status);
+        command.Parameters.AddWithValue("Version", session.Version);
+        command.Parameters.AddWithValue("ExpectedVersion", session.Version - 1);
         command.Parameters.AddWithValue("SecurityStamp", session.SecurityStamp.Value);
         command.Parameters.AddWithValue("UserAgent", session.UserAgent ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("IpAddress", session.IpAddress ?? (object)DBNull.Value);
@@ -142,7 +151,107 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
             ? (short)session.RevocationReason.Value
             : (object)DBNull.Value);
 
-        await command.ExecuteNonQueryAsync();
+        if (await command.ExecuteNonQueryAsync() != 1)
+            throw new InvalidOperationException("A sessao foi alterada por outra operacao.");
+    }
+
+    /// <summary>
+    /// Operacao para revogar atomicamente uma sessao ainda ativa.
+    /// </summary>
+    /// <param name="session">Sessao com os dados da revogacao solicitada.</param>
+    /// <returns>Sessao revogada com a versao persistida ou nula quando ja nao estava ativa.</returns>
+    public async Task<Session?> TryRevokeAsync(Session session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        if (session.Status != SessionStatus.Revoked)
+            throw new ArgumentException("A sessao informada deve estar revogada.", nameof(session));
+
+        const string sql = """
+            UPDATE "auth_sessions"
+            SET
+                "status" = @Status,
+                "version" = "version" + 1,
+                "revoked_at_utc" = @RevokedAtUtc,
+                "revocation_reason" = @RevocationReason
+            WHERE "public_session_id" = @PublicSessionId
+              AND "status" = @ActiveStatus
+              AND "revoked_at_utc" IS NULL
+            RETURNING
+                "public_session_id",
+                "user_id",
+                "status",
+                "version",
+                "security_stamp",
+                "user_agent",
+                "ip_address",
+                "created_at_utc",
+                "expires_at_utc",
+                "last_seen_at_utc",
+                "revoked_at_utc",
+                "revocation_reason";
+            """;
+
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
+        await using var command = CreateCommand(connection, sql);
+
+        command.Parameters.AddWithValue("PublicSessionId", session.PublicSessionId);
+        command.Parameters.AddWithValue("Status", (short)SessionStatus.Revoked);
+        command.Parameters.AddWithValue("ActiveStatus", (short)SessionStatus.Active);
+        command.Parameters.AddWithValue("RevokedAtUtc", session.RevokedAtUtc!.Value);
+        command.Parameters.AddWithValue("RevocationReason", (short)session.RevocationReason!.Value);
+
+        await using var reader = await command.ExecuteReaderAsync();
+
+        return await ReadSessionAsync(reader, session.SessionId);
+    }
+
+    /// <summary>
+    /// Operacao para atualizar uma sessao apenas quando ela ainda estiver ativa.
+    /// </summary>
+    /// <param name="session">Sessao com o estado a ser persistido.</param>
+    /// <param name="referenceAtUtc">Data de referencia da validacao em UTC.</param>
+    /// <returns>Sessao com a versao persistida ou nula quando a atualizacao foi rejeitada.</returns>
+    public async Task<Session?> TryUpdateActiveAsync(Session session, DateTime referenceAtUtc)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        if (referenceAtUtc == default)
+            throw new ArgumentException("A data de referencia da sessao e obrigatoria.", nameof(referenceAtUtc));
+
+        const string sql = """
+            UPDATE "auth_sessions"
+            SET
+                "expires_at_utc" = @ExpiresAtUtc,
+                "last_seen_at_utc" = @LastSeenAtUtc,
+                "version" = "version" + 1
+            WHERE "public_session_id" = @PublicSessionId
+              AND "status" = @ActiveStatus
+              AND "revoked_at_utc" IS NULL
+              AND "expires_at_utc" > @ReferenceAtUtc
+              AND "security_stamp" = @SecurityStamp
+              AND "version" = @ExpectedVersion
+            RETURNING "version";
+            """;
+
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
+        await using var command = CreateCommand(connection, sql);
+
+        command.Parameters.AddWithValue("PublicSessionId", session.PublicSessionId);
+        command.Parameters.AddWithValue("ActiveStatus", (short)SessionStatus.Active);
+        command.Parameters.AddWithValue("ReferenceAtUtc", referenceAtUtc);
+        command.Parameters.AddWithValue("SecurityStamp", session.SecurityStamp.Value);
+        command.Parameters.AddWithValue("ExpiresAtUtc", session.ExpiresAtUtc);
+        command.Parameters.AddWithValue("LastSeenAtUtc", session.LastSeenAtUtc ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("ExpectedVersion", session.Version);
+
+        var persistedVersion = await command.ExecuteScalarAsync();
+
+        return persistedVersion is long version && version == session.Version + 1
+            ? session.AdvanceVersion()
+            : null;
     }
 
     /// <summary>
@@ -162,6 +271,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
                 "public_session_id",
                 "user_id",
                 "status",
+                "version",
                 "security_stamp",
                 "user_agent",
                 "ip_address",
@@ -175,7 +285,8 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("SessionIdentifierHash", NormalizeSessionIdentifierHash(sessionIdentifierHash));
 
@@ -196,6 +307,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
                 "public_session_id",
                 "user_id",
                 "status",
+                "version",
                 "security_stamp",
                 "user_agent",
                 "ip_address",
@@ -209,7 +321,8 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("PublicSessionId", NormalizePublicSessionId(publicSessionId));
 
@@ -230,6 +343,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
                 "public_session_id",
                 "user_id",
                 "status",
+                "version",
                 "security_stamp",
                 "user_agent",
                 "ip_address",
@@ -240,12 +354,18 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
                 "revocation_reason"
             FROM "auth_sessions"
             WHERE "user_id" = @UserId
+              AND "status" = @ActiveStatus
+              AND "revoked_at_utc" IS NULL
+              AND "expires_at_utc" > @ReferenceAtUtc
             ORDER BY COALESCE("last_seen_at_utc", "created_at_utc") DESC, "created_at_utc" DESC;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserId", userId);
+        command.Parameters.AddWithValue("ActiveStatus", (short)SessionStatus.Active);
+        command.Parameters.AddWithValue("ReferenceAtUtc", DateTime.UtcNow);
 
         await using var reader = await command.ExecuteReaderAsync();
 
@@ -258,7 +378,7 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
     /// <param name="userId">Identificador interno do usuário.</param>
     /// <param name="reason">Motivo da revogação.</param>
     /// <param name="revokedAtUtc">Data de revogação em UTC.</param>
-    public async Task RevokeActiveByUserIdAsync(
+    public async Task<IReadOnlyCollection<Session>> RevokeActiveByUserIdAsync(
         Guid userId,
         SessionRevocationReason reason,
         DateTime revokedAtUtc)
@@ -270,15 +390,30 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
             UPDATE "auth_sessions"
             SET
                 "status" = @Status,
+                "version" = "version" + 1,
                 "revoked_at_utc" = @RevokedAtUtc,
                 "revocation_reason" = @RevocationReason
             WHERE "user_id" = @UserId
               AND "status" = @ActiveStatus
               AND "revoked_at_utc" IS NULL
-              AND "expires_at_utc" > @ReferenceAtUtc;
+              AND "expires_at_utc" > @ReferenceAtUtc
+            RETURNING
+                "public_session_id",
+                "user_id",
+                "status",
+                "version",
+                "security_stamp",
+                "user_agent",
+                "ip_address",
+                "created_at_utc",
+                "expires_at_utc",
+                "last_seen_at_utc",
+                "revoked_at_utc",
+                "revocation_reason";
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("UserId", userId);
@@ -288,7 +423,9 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
         command.Parameters.AddWithValue("RevocationReason", (short)reason);
         command.Parameters.AddWithValue("ReferenceAtUtc", revokedAtUtc);
 
-        await command.ExecuteNonQueryAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        return await ReadSessionsAsync(reader);
     }
 
 
@@ -365,7 +502,8 @@ internal sealed class DurableSessionRepository : IDurableSessionRepository
                 : reader.GetDateTime(reader.GetOrdinal("revoked_at_utc")),
             reader.IsDBNull(reader.GetOrdinal("revocation_reason"))
                 ? null
-                : (SessionRevocationReason)reader.GetInt16(reader.GetOrdinal("revocation_reason")));
+                : (SessionRevocationReason)reader.GetInt16(reader.GetOrdinal("revocation_reason")),
+            reader.GetInt64(reader.GetOrdinal("version")));
     }
 
     /// <summary>

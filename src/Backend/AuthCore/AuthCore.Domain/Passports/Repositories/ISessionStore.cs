@@ -3,39 +3,53 @@ using AuthCore.Domain.Passports;
 namespace AuthCore.Domain.Passports.Repositories;
 
 /// <summary>
-/// Define operações de persistência de sessão autenticada.
+/// Define operacoes de persistencia de sessao autenticada em cache.
 /// </summary>
 public interface ISessionStore
 {
     /// <summary>
-    /// Operação para persistir uma sessão autenticada.
+    /// Operacao para persistir uma nova sessao autenticada.
     /// </summary>
-    /// <param name="session">Sessão autenticada a ser persistida.</param>
+    /// <param name="session">Sessao autenticada a ser persistida.</param>
     Task SaveAsync(Session session);
 
     /// <summary>
-    /// Operação para obter uma sessão pelo identificador.
+    /// Operacao para persistir uma sessao quando nao houver revogacao e a versao for mais recente.
     /// </summary>
-    /// <param name="sessionId">Identificador público da sessão.</param>
-    /// <returns>Sessão encontrada ou nula.</returns>
+    /// <param name="session">Sessao autenticada a ser persistida.</param>
+    /// <returns>Verdadeiro quando a sessao foi persistida.</returns>
+    Task<bool> TrySaveAsync(Session session);
+
+    /// <summary>
+    /// Operacao para obter uma sessao pelo identificador secreto.
+    /// </summary>
+    /// <param name="sessionId">Identificador secreto da sessao.</param>
+    /// <returns>Sessao encontrada ou nula.</returns>
     Task<Session?> GetByIdAsync(string sessionId);
 
     /// <summary>
-    /// Operação para listar as sessões ativas de um usuário.
+    /// Operacao para listar as sessoes ativas de um usuario.
     /// </summary>
-    /// <param name="userId">Identificador interno do usuário.</param>
-    /// <returns>Sessões ativas encontradas.</returns>
+    /// <param name="userId">Identificador interno do usuario.</param>
+    /// <returns>Sessoes ativas encontradas.</returns>
     Task<IReadOnlyCollection<Session>> ListByUserIdAsync(Guid userId);
 
     /// <summary>
-    /// Operação para revogar uma sessão específica.
+    /// Operacao para registrar a revogacao de uma sessao.
     /// </summary>
-    /// <param name="sessionId">Identificador público da sessão.</param>
-    Task RevokeAsync(string sessionId);
+    /// <param name="session">Sessao revogada com a versao persistida.</param>
+    Task RevokeAsync(Session session);
 
     /// <summary>
-    /// Operação para revogar todas as sessões de um usuário.
+    /// Operacao para remover uma sessao ativa pelo identificador secreto.
     /// </summary>
-    /// <param name="userId">Identificador interno do usuário.</param>
-    Task RevokeAllAsync(Guid userId);
+    /// <param name="sessionId">Identificador secreto da sessao.</param>
+    Task RemoveAsync(string sessionId);
+
+    /// <summary>
+    /// Operacao para remover uma sessao apenas quando a versao em cache nao for mais recente.
+    /// </summary>
+    /// <param name="sessionId">Identificador secreto da sessao.</param>
+    /// <param name="maximumVersion">Maior versao que pode ser removida.</param>
+    Task RemoveWhenVersionIsNotNewerAsync(string sessionId, long maximumVersion);
 }

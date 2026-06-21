@@ -13,7 +13,10 @@ public interface INotificationDispatchRepository
     /// <param name="dueAtUtc">Data limite de agendamento em UTC.</param>
     /// <param name="take">Quantidade maxima de notificacoes.</param>
     /// <returns>Colecao de notificacoes disponiveis para processamento.</returns>
-    Task<IReadOnlyCollection<Notification>> GetPendingForDispatchAsync(DateTime dueAtUtc, int take);
+    Task<IReadOnlyCollection<Notification>> GetPendingForDispatchAsync(
+        DateTime dueAtUtc,
+        int take,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Operacao para obter notificacoes em processamento com lease expirado.
@@ -21,7 +24,10 @@ public interface INotificationDispatchRepository
     /// <param name="dueAtUtc">Data limite de expiracao em UTC.</param>
     /// <param name="take">Quantidade maxima de notificacoes.</param>
     /// <returns>Colecao de notificacoes com processamento expirado.</returns>
-    Task<IReadOnlyCollection<Notification>> GetProcessingTimedOutAsync(DateTime dueAtUtc, int take);
+    Task<IReadOnlyCollection<Notification>> GetProcessingTimedOutAsync(
+        DateTime dueAtUtc,
+        int take,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Operacao para tentar atualizar notificacao com processamento expirado.
@@ -29,5 +35,8 @@ public interface INotificationDispatchRepository
     /// <param name="notification">Notificacao atualizada.</param>
     /// <param name="processingTimeoutAtUtc">Data de expiracao esperada do processamento.</param>
     /// <returns>Verdadeiro quando a notificacao foi atualizada.</returns>
-    Task<bool> TryUpdateProcessingTimedOutAsync(Notification notification, DateTime processingTimeoutAtUtc);
+    Task<bool> TryUpdateProcessingTimedOutAsync(
+        Notification notification,
+        DateTime processingTimeoutAtUtc,
+        CancellationToken cancellationToken = default);
 }

@@ -93,6 +93,40 @@
       }
     },
     {
+      "Key": "auth-external-google",
+      "UpstreamPathTemplate": "/api/auth/external/google",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/api/auth/external/google",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "authcore-api", "Port": 8080 }
+      ],
+      "Priority": 2,
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 20
+      }
+    },
+    {
+      "Key": "auth-external-google-callback",
+      "UpstreamPathTemplate": "/api/auth/external/google/callback",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/api/auth/external/google/callback",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "authcore-api", "Port": 8080 }
+      ],
+      "Priority": 2,
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 60
+      }
+    },
+    {
       "Key": "authcore-auth",
       "UpstreamPathTemplate": "/api/auth/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ],

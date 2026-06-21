@@ -107,7 +107,8 @@ public sealed class SearchNotificationsUseCaseTests
             string? correlationId,
             NotificationStatus? status,
             int skip,
-            int take)
+            int take,
+            CancellationToken cancellationToken = default)
         {
             CorrelationId = correlationId;
             Status = status;

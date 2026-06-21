@@ -65,7 +65,8 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
             );
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("Id", externalLogin.Id);
@@ -102,7 +103,8 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
             WHERE id = @Id;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("Id", externalLogin.Id);
@@ -128,7 +130,8 @@ internal sealed class ExternalLoginRepository : IExternalLoginRepository
             WHERE id = @Id;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("Id", externalLogin.Id);

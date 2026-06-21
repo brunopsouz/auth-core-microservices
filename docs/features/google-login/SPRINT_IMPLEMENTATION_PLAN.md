@@ -1404,6 +1404,8 @@ dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.
 
 ## Task 4.1 - Adicionar configuração Google OAuth/OIDC
 
+Status: concluida em 2026-06-15.
+
 ### Objetivo
 
 Configurar autenticação externa com Google no AuthCore.Api.
@@ -1461,6 +1463,8 @@ dotnet build AuthCore.sln
 
 ## Task 4.2 - Criar endpoint para iniciar login Google
 
+Status: concluida em 2026-06-15.
+
 ### Objetivo
 
 Criar rota pública que inicia challenge Google.
@@ -1516,6 +1520,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 ```
 
 ## Task 4.3 - Criar callback Google
+
+Status: concluida em 2026-06-15.
 
 ### Objetivo
 
@@ -1579,6 +1585,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 
 ## Task 4.4 - Emitir cookies internos após login Google
 
+Status: concluida em 2026-06-15.
+
 ### Objetivo
 
 Reutilizar o padrão atual de sessão browser/PWA após autenticação externa.
@@ -1635,6 +1643,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 
 ## Task 4.5 - Documentar Swagger e erros HTTP
 
+Status: concluida em 2026-06-16.
+
 ### Objetivo
 
 Manter contratos HTTP previsíveis e documentados.
@@ -1686,6 +1696,8 @@ dotnet build AuthCore.sln
 
 ## Task 5.1 - Configurar appsettings de desenvolvimento
 
+Status: concluida em 2026-06-16.
+
 ### Objetivo
 
 Adicionar placeholders seguros para Google Login em desenvolvimento.
@@ -1736,6 +1748,8 @@ dotnet build AuthCore.sln
 ```
 
 ## Task 5.2 - Atualizar env example e Docker Compose
+
+Status: concluida em 2026-06-16.
 
 ### Objetivo
 
@@ -1790,6 +1804,8 @@ dotnet build AuthCore.sln
 
 ## Task 5.3 - Atualizar Gateway/Ocelot
 
+Status: concluida em 2026-06-16.
+
 ### Objetivo
 
 Publicar rotas Google Login via Gateway quando Gateway for ponto de entrada.
@@ -1843,6 +1859,8 @@ dotnet test tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj
 ```
 
 ## Task 5.4 - Revisar forwarded headers, CORS e cookies
+
+Status: concluida em 2026-06-16.
 
 ### Objetivo
 
@@ -1901,6 +1919,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 
 ## Task 6.1 - Adicionar testes de integração HTTP
 
+Status: concluida em 2026-06-16.
+
 ### Objetivo
 
 Validar contrato HTTP e composição de autenticação externa sem depender de Google real.
@@ -1956,6 +1976,8 @@ dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj
 
 ## Task 6.2 - Validar logs, auditoria e métricas
 
+Status: concluida em 2026-06-16.
+
 ### Objetivo
 
 Garantir observabilidade sem expor dados sensíveis.
@@ -2010,6 +2032,8 @@ dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.
 ```
 
 ## Task 6.3 - Executar checklist manual em development/homologação
+
+Status: pendente de execução manual real com OAuth Client/secret e ambiente de homologação.
 
 ### Objetivo
 

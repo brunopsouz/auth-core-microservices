@@ -12,11 +12,11 @@ public interface INotificationWriterRepository
     /// </summary>
     /// <param name="notification">Notificacao a ser persistida.</param>
     /// <returns>Verdadeiro quando a notificacao foi adicionada.</returns>
-    Task<bool> TryAddAsync(Notification notification);
+    Task<bool> TryAddAsync(Notification notification, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Operacao para atualizar uma notificacao.
     /// </summary>
     /// <param name="notification">Notificacao atualizada.</param>
-    Task UpdateAsync(Notification notification);
+    Task UpdateAsync(Notification notification, CancellationToken cancellationToken = default);
 }

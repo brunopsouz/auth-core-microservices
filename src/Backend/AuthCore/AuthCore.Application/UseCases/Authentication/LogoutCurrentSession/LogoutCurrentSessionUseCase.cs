@@ -66,8 +66,11 @@ internal sealed class LogoutCurrentSessionUseCase : ILogoutCurrentSessionUseCase
         if (session is null)
             return;
 
-        await _durableSessionRepository.UpdateAsync(session.Revoke(SessionRevocationReason.UserLogout, DateTime.UtcNow));
-        await _sessionStore.RevokeAsync(session.SessionId);
+        var revokedSession = session.Revoke(SessionRevocationReason.UserLogout, DateTime.UtcNow);
+        var persistedRevokedSession = await _durableSessionRepository.TryRevokeAsync(revokedSession);
+
+        if (persistedRevokedSession is not null)
+            await _sessionStore.RevokeAsync(persistedRevokedSession);
     }
 
     /// <summary>

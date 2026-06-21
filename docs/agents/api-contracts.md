@@ -54,6 +54,8 @@ Mesmo que a API referencie `Infrastructure` no projeto para permitir o bootstrap
 
 Controllers devem depender das abstrações públicas de casos de uso, como `I...UseCase`. As implementações concretas desses casos de uso devem permanecer `internal` e ser resolvidas apenas pela composição de injeção de dependência.
 
+Controllers não devem envolver chamadas de use case em `try/catch` apenas para converter exceções previsíveis em resposta HTTP. Exceções da aplicação e do domínio devem seguir para o handler global da API, que centraliza o contrato de erro. Tratamento local no controller é aceitável somente quando a decisão pertence à borda HTTP, como rate limit, validação de contexto autenticado, CSRF, manipulação de cookies ou redirecionamentos seguros de fluxos externos.
+
 O padrão atual está bem representado em:
 
 - `Controllers/UserController.cs`
@@ -263,7 +265,7 @@ Mapeamento atual do handler global:
 - `ConflictException` da aplicação -> `409 Conflict`
 - exceções não tratadas -> `500 Internal Server Error`
 
-Os controllers de autenticação também possuem mapeamento local para exceções conhecidas. Ao criar novos endpoints, preserve consistência com o formato de erro já exposto pela API.
+Controllers não devem duplicar esse mapeamento com blocos `try/catch` ao redor de casos de uso. Ao criar novos endpoints, preserve a consistência deixando falhas previsíveis da aplicação e do domínio serem convertidas pelo handler global.
 
 ## Swagger e documentação do contrato
 
@@ -294,7 +296,8 @@ Antes de concluir uma mudança em contrato HTTP, confirme:
 8. a mudança preserva compatibilidade com contratos já expostos ou trata claramente a evolução
 9. nenhum tipo concreto de `Infrastructure` foi exposto na assinatura pública do endpoint ou no contrato JSON
 10. o controller não acessa infraestrutura diretamente quando existe ou deve existir um caso de uso
-11. as dependências do endpoint estão explícitas e alinhadas ao checklist SOLID
+11. o controller não envolve use cases em `try/catch` para mapear exceções já cobertas pelo handler global
+12. as dependências do endpoint estão explícitas e alinhadas ao checklist SOLID
 
 ## Arquivos de referência
 

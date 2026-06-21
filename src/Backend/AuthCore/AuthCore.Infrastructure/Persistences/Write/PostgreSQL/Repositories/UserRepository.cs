@@ -71,7 +71,8 @@ internal sealed class UserRepository : IUserRepository
             );
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("Id", user.Id);
@@ -117,7 +118,8 @@ internal sealed class UserRepository : IUserRepository
             WHERE "Id" = @Id;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("Id", user.Id);
@@ -149,7 +151,8 @@ internal sealed class UserRepository : IUserRepository
             WHERE "Id" = @Id;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("Id", user.Id);
 

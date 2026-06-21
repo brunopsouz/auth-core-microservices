@@ -1,4 +1,5 @@
 using System.Text;
+using AuthCore.Api.Authentication;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Configuration;
 
@@ -113,6 +114,27 @@ internal static class ApiSecurityOptions
         }
 
         return csrfOptions;
+    }
+
+    /// <summary>
+    /// Operacao para obter as configuracoes de autenticacao externa com Google.
+    /// </summary>
+    /// <param name="configuration">Configuracao da aplicacao.</param>
+    /// <returns>Configuracoes de autenticacao externa com Google.</returns>
+    public static GoogleExternalAuthenticationOptions GetGoogleExternalAuthenticationOptions(IConfiguration configuration)
+    {
+        var googleOptions = configuration
+            .GetSection(GoogleExternalAuthenticationOptions.SectionName)
+            .Get<GoogleExternalAuthenticationOptions>()
+            ?? new GoogleExternalAuthenticationOptions();
+
+        if (string.IsNullOrWhiteSpace(googleOptions.CallbackPath))
+            throw new InvalidOperationException("O caminho de callback do Google nao foi configurado.");
+
+        if (!googleOptions.CallbackPath.Trim().StartsWith("/", StringComparison.Ordinal))
+            throw new InvalidOperationException("O caminho de callback do Google deve iniciar com '/'.");
+
+        return googleOptions;
     }
 
     /// <summary>

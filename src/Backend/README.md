@@ -77,7 +77,7 @@ As rotas `/api/auth/...` permanecem sob responsabilidade do AuthCore, inclusive 
 
 ### Login com Google
 
-O suporte a login com Google esta em implementacao no AuthCore. Ate o momento, existem dominio, persistencia e casos de uso de Application para concluir, vincular e desvincular logins Google a partir de dados externos ja validados. Ainda nao existem endpoints HTTP de challenge/callback, configuracao OAuth/OIDC ou rotas publicadas pelo Gateway para esse fluxo.
+O suporte a login com Google esta em implementacao no AuthCore. Ate o momento, existem dominio, persistencia, casos de uso de Application e o endpoint publico `GET /api/auth/external/google` para iniciar o challenge quando `ClientId` e `ClientSecret` estao configurados por ambiente. Ainda nao existem callback, emissao de sessao apos retorno do Google ou rotas publicadas pelo Gateway para esse fluxo.
 
 ## Solucoes
 
@@ -111,7 +111,15 @@ Crie o arquivo de ambiente local a partir do exemplo:
 cp src/Backend/.env.development.example src/Backend/.env.development
 ```
 
-O arquivo `.env.development` e usado pelo `docker-compose.yml` e pelo `run.sh`.
+O arquivo `.env.development` e usado pelo `docker-compose.yml`, pelo `run.sh` e pelo perfil `AuthCore.Api Launch` do VS Code. Preencha nele senhas, chaves JWT/CSRF, credenciais SMTP e as credenciais Google OAuth.
+
+As configuracoes consumidas diretamente pelo .NET usam `__` para representar a hierarquia das secoes. Por exemplo, `AUTH__CSRF__SIGNINGKEY` corresponde a `Auth:Csrf:SigningKey`. O mesmo nome e reutilizado pelo VS Code, pelo script e pelo Docker Compose, sem traducao intermediaria.
+
+Os arquivos `appsettings.Development.json` sao versionados e devem conter apenas configuracoes nao sensiveis, como URLs, portas, timeouts e nomes logicos. Nao coloque credenciais, tokens ou chaves nesses arquivos.
+
+Depois de preencher o `.env.development`, use `./run.sh dev`, `./run.sh watch`, `./run.sh docker` ou execute o perfil `AuthCore.Api Launch` pelo VS Code.
+
+Se um segredo tiver sido salvo anteriormente em arquivo versionado, revogue-o no provedor antes de gerar e configurar o substituto.
 
 ## Execucao local
 
@@ -153,7 +161,36 @@ docker compose --env-file src/Backend/.env.development -f src/Backend/docker-com
 docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml down --remove-orphans
 ```
 
-Sem Bash, a execucao local direta da API tambem exige exportar as variaveis esperadas pelo projeto antes de chamar `dotnet run`. Para esse fluxo, prefira usar Bash ou Docker Compose.
+No Windows com VS Code:
+
+1. Suba a infraestrutura com o primeiro comando Docker Compose acima.
+2. Selecione o perfil `AuthCore.Api Launch`.
+3. Pressione `F5`.
+
+O perfil carrega diretamente `src/Backend/.env.development`; nao e necessario Bash nem um segundo arquivo `.env`.
+
+Para migrar um arquivo criado antes desta padronizacao, use os seguintes renomes:
+
+| Nome anterior | Nome atual |
+| --- | --- |
+| `AUTHENTICATION_JWT_*` | `AUTHENTICATION__JWT__*` |
+| `AUTH_COOKIE_SESSION_COOKIE_NAME` | `AUTH__COOKIE__SESSIONCOOKIENAME` |
+| `AUTH_COOKIE_ACCESS_TOKEN_COOKIE_NAME` | `AUTH__COOKIE__ACCESSTOKENCOOKIENAME` |
+| `AUTH_CSRF_SIGNING_KEY` | `AUTH__CSRF__SIGNINGKEY` |
+| `AUTH_CSRF_ALLOWED_ORIGIN_N` | `AUTH__CSRF__ALLOWEDORIGINS__N` |
+| `AUTHCORE_REDIS_KEYPREFIX` | `REDIS__KEYPREFIX` |
+| `AUTHCORE_OUTBOX_ENABLED` | `OUTBOX__ENABLED` |
+| `AUTHCORE_OUTBOX_BATCH_SIZE` | `OUTBOX__BATCHSIZE` |
+| `AUTHCORE_OUTBOX_POLLING_INTERVAL_SECONDS` | `OUTBOX__POLLINGINTERVALSECONDS` |
+| `AUTHCORE_OUTBOX_MAX_ATTEMPTS` | `OUTBOX__MAXATTEMPTS` |
+| `RABBITMQ_USERNAME` | `RABBITMQ__USERNAME` |
+| `RABBITMQ_PASSWORD` | `RABBITMQ__PASSWORD` |
+| `RABBITMQ_EXCHANGE` | `RABBITMQ__EXCHANGE` |
+| `RABBITMQ_ROUTING_KEY` | `RABBITMQ__ROUTINGKEY` |
+| `RABBITMQ_QUEUE` | `RABBITMQ__QUEUE` |
+| `RABBITMQ_DEAD_LETTER_QUEUE` | `RABBITMQ__DEADLETTERQUEUE` |
+
+O arquivo tambem precisa conter `CONNECTIONSTRINGS__POSTGRESQL` e `REDIS__CONNECTIONSTRING` com os endpoints locais usados pelo VS Code.
 
 ## Builds separados
 

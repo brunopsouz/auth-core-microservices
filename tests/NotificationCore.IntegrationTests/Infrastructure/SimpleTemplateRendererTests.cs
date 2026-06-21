@@ -112,7 +112,8 @@ public sealed class SimpleTemplateRendererTests
         /// </summary>
         private readonly List<NotificationTemplate> _templates = [];
 
-        public Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync()
+        public Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync(
+            CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyCollection<NotificationTemplate>>(_templates);
         }

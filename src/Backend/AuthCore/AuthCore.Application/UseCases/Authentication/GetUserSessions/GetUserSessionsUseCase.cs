@@ -35,7 +35,10 @@ internal sealed class GetUserSessionsUseCase : IGetUserSessionsUseCase
 
         var sessions = await _durableSessionRepository.ListByUserIdAsync(query.UserId);
         var currentSessionId = sessions
-            .FirstOrDefault(session => string.Equals(session.SessionId, query.CurrentSessionId, StringComparison.Ordinal))
+            .FirstOrDefault(session => string.Equals(
+                session.PublicSessionId,
+                query.CurrentPublicSessionId,
+                StringComparison.Ordinal))
             ?.PublicSessionId
             ?? string.Empty;
 

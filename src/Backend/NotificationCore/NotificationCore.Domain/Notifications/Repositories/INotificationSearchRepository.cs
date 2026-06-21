@@ -20,5 +20,6 @@ public interface INotificationSearchRepository
         string? correlationId,
         NotificationStatus? status,
         int skip,
-        int take);
+        int take,
+        CancellationToken cancellationToken = default);
 }

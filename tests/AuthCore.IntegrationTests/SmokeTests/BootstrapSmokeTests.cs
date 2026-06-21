@@ -12,6 +12,7 @@ using AuthCore.Infrastructure.Abstractions.Data;
 using AuthCore.Infrastructure.Configurations;
 using AuthCore.Infrastructure.Services.Messaging;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -50,6 +51,9 @@ public sealed class BootstrapSmokeTests
         var externalLoginRepository = scope.ServiceProvider.GetService<IExternalLoginRepository>();
         var externalLoginReadRepository = scope.ServiceProvider.GetService<IExternalLoginReadRepository>();
         var authenticationSchemeProvider = scope.ServiceProvider.GetService<IAuthenticationSchemeProvider>();
+        var googleAuthenticationOptions = scope.ServiceProvider
+            .GetRequiredService<IOptionsMonitor<GoogleOptions>>()
+            .Get("Google");
         var healthCheckService = scope.ServiceProvider.GetService<HealthCheckService>();
         var outboxProcessor = scope.ServiceProvider.GetService<IOutboxProcessor>();
         var notificationRequestPublisher = scope.ServiceProvider.GetService<INotificationRequestPublisher>();
@@ -64,6 +68,12 @@ public sealed class BootstrapSmokeTests
         Assert.NotNull(externalLoginRepository);
         Assert.NotNull(externalLoginReadRepository);
         Assert.NotNull(authenticationSchemeProvider);
+        Assert.False(googleAuthenticationOptions.SaveTokens);
+        Assert.Equal("AuthCore.External", googleAuthenticationOptions.SignInScheme);
+        Assert.Equal("/api/auth/external/google/callback", googleAuthenticationOptions.CallbackPath);
+        Assert.Contains("openid", googleAuthenticationOptions.Scope);
+        Assert.Contains("profile", googleAuthenticationOptions.Scope);
+        Assert.Contains("email", googleAuthenticationOptions.Scope);
         Assert.NotNull(healthCheckService);
         Assert.NotNull(outboxProcessor);
         Assert.NotNull(notificationRequestPublisher);
@@ -133,6 +143,11 @@ public sealed class BootstrapSmokeTests
             ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "5",
             ["Authentication:Jwt:RefreshTokenLifetimeDays"] = "7",
             ["Authentication:Jwt:ClockSkewSeconds"] = "60",
+            ["Authentication:Google:ClientId"] = "google-client-id",
+            ["Authentication:Google:ClientSecret"] = "google-client-secret",
+            ["Authentication:Google:CallbackPath"] = "/api/auth/external/google/callback",
+            ["Authentication:DefaultReturnUrl"] = "http://localhost:5173",
+            ["Authentication:AllowedReturnUrls:0"] = "http://localhost:5173",
             ["Auth:Csrf:SigningKey"] = "tests-csrf-signing-key-2026",
             ["Redis:ConnectionString"] = "localhost:6379",
             ["Redis:KeyPrefix"] = "authcore-tests",

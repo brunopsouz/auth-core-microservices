@@ -120,13 +120,14 @@ internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
         var updatedPassword = password.Change(newPasswordHash, PasswordStatus.Active);
         user.RotateSecurityStamp();
 
+        IReadOnlyCollection<Session> revokedSessions;
         await _unitOfWork.BeginTransactionAsync();
 
         try
         {
             await _passwordRepository.UpdateAsync(updatedPassword);
             await _userRepository.UpdateAsync(user);
-            await _durableSessionRepository.RevokeActiveByUserIdAsync(
+            revokedSessions = await _durableSessionRepository.RevokeActiveByUserIdAsync(
                 user.Id,
                 SessionRevocationReason.PasswordChanged,
                 changedAtUtc);
@@ -141,7 +142,8 @@ internal sealed class ChangePasswordUseCase : IChangePasswordUseCase
 
         try
         {
-            await _sessionStore.RevokeAllAsync(user.Id);
+            foreach (var revokedSession in revokedSessions)
+                await _sessionStore.RevokeAsync(revokedSession);
         }
         catch (Exception exception)
         {

@@ -70,13 +70,57 @@ public sealed class OutboxRepositoryPersistenceTests : IClassFixture<PostgreSqlI
         Assert.True(auditColumns.IsActive);
 
         var processedAtUtc = occurredAtUtc.AddMinutes(1);
-        await outboxRepository.UpdateAsync(message.MarkAsProcessed(processedAtUtc));
+        var leaseId = Guid.NewGuid();
+        var claimedMessage = await outboxRepository.ClaimPendingAsync(
+            leaseId,
+            processedAtUtc.AddMinutes(1),
+            maxAttempts: 3,
+            processedAtUtc);
+        Assert.NotNull(claimedMessage);
+        Assert.True(await outboxRepository.MarkAsProcessedAsync(message.Id, leaseId, processedAtUtc));
 
         var remainingMessages = await outboxRepository.GetPendingAsync(take: 10, maxAttempts: 3);
         var updatedAuditColumns = await GetAuditColumnsAsync(message.Id);
 
         Assert.Empty(remainingMessages);
         Assert.True(updatedAuditColumns.UpdateAt >= auditColumns.UpdateAt);
+    }
+
+    [Fact]
+    public async Task ClaimPendingAsync_WhenLeaseExpires_ShouldRejectOldLeaseAndAllowRecovery()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
+        var nowUtc = DateTime.UtcNow;
+        var message = OutboxMessage.Create("PoolingLeaseTest", "{}", nowUtc);
+        await repository.AddAsync(message);
+
+        var firstLeaseId = Guid.NewGuid();
+        var firstClaim = await repository.ClaimPendingAsync(
+            firstLeaseId,
+            nowUtc.AddSeconds(1),
+            maxAttempts: 3,
+            nowUtc);
+        var unavailableClaim = await repository.ClaimPendingAsync(
+            Guid.NewGuid(),
+            nowUtc.AddMinutes(1),
+            maxAttempts: 3,
+            nowUtc.AddMilliseconds(500));
+        var secondLeaseId = Guid.NewGuid();
+        var recoveredClaim = await repository.ClaimPendingAsync(
+            secondLeaseId,
+            nowUtc.AddMinutes(1),
+            maxAttempts: 3,
+            nowUtc.AddSeconds(2));
+
+        Assert.NotNull(firstClaim);
+        Assert.Null(unavailableClaim);
+        Assert.NotNull(recoveredClaim);
+        Assert.False(await repository.MarkAsProcessedAsync(message.Id, firstLeaseId, nowUtc.AddSeconds(3)));
+        Assert.True(await repository.MarkAsProcessedAsync(message.Id, secondLeaseId, nowUtc.AddSeconds(3)));
     }
 
     /// <summary>

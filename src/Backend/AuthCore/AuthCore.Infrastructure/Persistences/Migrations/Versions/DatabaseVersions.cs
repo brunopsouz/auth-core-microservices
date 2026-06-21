@@ -59,4 +59,14 @@ internal static class DatabaseVersions
     /// Versao de criacao da tabela de logins externos.
     /// </summary>
     public const long TABLE_EXTERNAL_LOGINS = 11;
+
+    /// <summary>
+    /// Versão de inclusão do lease de processamento da outbox.
+    /// </summary>
+    public const long OUTBOX_PROCESSING_LEASE = 12;
+
+    /// <summary>
+    /// Versao de inclusao do controle monotonicamente crescente das sessoes.
+    /// </summary>
+    public const long AUTH_SESSIONS_VERSION = 13;
 }

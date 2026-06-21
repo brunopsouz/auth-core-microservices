@@ -46,7 +46,8 @@ internal sealed class InboxRepository : IInboxRepository
         string messageType,
         string consumerName,
         string payload,
-        DateTime receivedAtUtc)
+        DateTime receivedAtUtc,
+        CancellationToken cancellationToken = default)
     {
         const string insertSql = """
             INSERT INTO "InboxMessages"
@@ -80,7 +81,9 @@ internal sealed class InboxRepository : IInboxRepository
             ON CONFLICT ("MessageId", "MessageType", "ConsumerName") DO NOTHING;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var insertCommand = CreateCommand(connection, insertSql);
         AddIdentityParameters(insertCommand, messageId, messageType, consumerName);
         insertCommand.Parameters.AddWithValue("Id", Guid.NewGuid());
@@ -89,7 +92,7 @@ internal sealed class InboxRepository : IInboxRepository
         insertCommand.Parameters.AddWithValue("ReceivedAtUtc", receivedAtUtc);
         insertCommand.Parameters.AddWithValue("Status", STATUS_PROCESSING);
 
-        if (await insertCommand.ExecuteNonQueryAsync() > 0)
+        if (await insertCommand.ExecuteNonQueryAsync(cancellationToken) > 0)
             return InboxProcessingStartResult.Started(retryCount: 0);
 
         return await TryRestartFailedAsync(
@@ -98,7 +101,8 @@ internal sealed class InboxRepository : IInboxRepository
             messageType,
             consumerName,
             payload,
-            receivedAtUtc);
+            receivedAtUtc,
+            cancellationToken);
     }
 
     /// <summary>
@@ -106,7 +110,9 @@ internal sealed class InboxRepository : IInboxRepository
     /// </summary>
     /// <param name="idempotencyKey">Chave de idempotencia da notificacao.</param>
     /// <returns>Payload encontrado ou nulo.</returns>
-    public async Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(string idempotencyKey)
+    public async Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT "Payload"
@@ -116,11 +122,13 @@ internal sealed class InboxRepository : IInboxRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("IdempotencyKey", idempotencyKey.Trim());
 
-        var payload = await command.ExecuteScalarAsync();
+        var payload = await command.ExecuteScalarAsync(cancellationToken);
 
         return payload as string;
     }
@@ -137,7 +145,8 @@ internal sealed class InboxRepository : IInboxRepository
         Guid messageId,
         string messageType,
         string consumerName,
-        DateTime processedAtUtc)
+        DateTime processedAtUtc,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             UPDATE "InboxMessages"
@@ -151,13 +160,15 @@ internal sealed class InboxRepository : IInboxRepository
                 AND "ConsumerName" = @ConsumerName;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         AddIdentityParameters(command, messageId, messageType, consumerName);
         command.Parameters.AddWithValue("Status", STATUS_PROCESSED);
         command.Parameters.AddWithValue("ProcessedAtUtc", processedAtUtc);
 
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>
@@ -176,7 +187,8 @@ internal sealed class InboxRepository : IInboxRepository
         string consumerName,
         string payload,
         DateTime receivedAtUtc,
-        string error)
+        string error,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             INSERT INTO "InboxMessages"
@@ -218,7 +230,9 @@ internal sealed class InboxRepository : IInboxRepository
             WHERE "InboxMessages"."Status" <> @ProcessedStatus;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         AddIdentityParameters(command, messageId, messageType, consumerName);
         command.Parameters.AddWithValue("Id", Guid.NewGuid());
@@ -230,7 +244,7 @@ internal sealed class InboxRepository : IInboxRepository
         command.Parameters.AddWithValue("ProcessedStatus", STATUS_PROCESSED);
         command.Parameters.AddWithValue("Error", SensitivePayloadSanitizer.SanitizeText(error));
 
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
 
@@ -250,7 +264,8 @@ internal sealed class InboxRepository : IInboxRepository
         string messageType,
         string consumerName,
         string payload,
-        DateTime receivedAtUtc)
+        DateTime receivedAtUtc,
+        CancellationToken cancellationToken)
     {
         const string updateSql = """
             UPDATE "InboxMessages"
@@ -277,12 +292,17 @@ internal sealed class InboxRepository : IInboxRepository
         updateCommand.Parameters.AddWithValue("ReceivedStatus", STATUS_RECEIVED);
         updateCommand.Parameters.AddWithValue("FailedStatus", STATUS_FAILED);
 
-        var retryCount = await updateCommand.ExecuteScalarAsync();
+        var retryCount = await updateCommand.ExecuteScalarAsync(cancellationToken);
 
         if (retryCount is int count)
             return InboxProcessingStartResult.Started(count);
 
-        return await GetSkippedResultAsync(connection, messageId, messageType, consumerName);
+        return await GetSkippedResultAsync(
+            connection,
+            messageId,
+            messageType,
+            consumerName,
+            cancellationToken);
     }
 
     /// <summary>
@@ -297,7 +317,8 @@ internal sealed class InboxRepository : IInboxRepository
         NpgsqlConnection connection,
         Guid messageId,
         string messageType,
-        string consumerName)
+        string consumerName,
+        CancellationToken cancellationToken)
     {
         const string sql = """
             SELECT "Status", "RetryCount"
@@ -311,9 +332,9 @@ internal sealed class InboxRepository : IInboxRepository
         await using var command = CreateCommand(connection, sql);
         AddIdentityParameters(command, messageId, messageType, consumerName);
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-        if (!await reader.ReadAsync())
+        if (!await reader.ReadAsync(cancellationToken))
             return InboxProcessingStartResult.Skipped(wasAlreadyProcessed: false, retryCount: 0);
 
         var status = reader.GetInt32(reader.GetOrdinal("Status"));

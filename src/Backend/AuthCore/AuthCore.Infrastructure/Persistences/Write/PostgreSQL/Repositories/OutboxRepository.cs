@@ -27,7 +27,7 @@ internal sealed class OutboxRepository : IOutboxRepository
     /// Operação para adicionar uma mensagem de outbox.
     /// </summary>
     /// <param name="message">Mensagem a ser persistida.</param>
-    public async Task AddAsync(OutboxMessage message)
+    public async Task AddAsync(OutboxMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -60,11 +60,12 @@ internal sealed class OutboxRepository : IOutboxRepository
             );
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         AddParameters(command, message);
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>
@@ -73,7 +74,10 @@ internal sealed class OutboxRepository : IOutboxRepository
     /// <param name="take">Quantidade máxima de mensagens.</param>
     /// <param name="maxAttempts">Quantidade máxima de tentativas permitidas.</param>
     /// <returns>Coleção de mensagens pendentes.</returns>
-    public async Task<IReadOnlyCollection<OutboxMessage>> GetPendingAsync(int take, int maxAttempts)
+    public async Task<IReadOnlyCollection<OutboxMessage>> GetPendingAsync(
+        int take,
+        int maxAttempts,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT
@@ -83,65 +87,143 @@ internal sealed class OutboxRepository : IOutboxRepository
                 "OccurredAtUtc",
                 "ProcessedAtUtc",
                 "AttemptCount",
-                "LastError"
+                "LastError",
+                "LeaseId",
+                "LeasedUntilUtc"
             FROM "OutboxMessages"
             WHERE "ProcessedAtUtc" IS NULL
                 AND "AttemptCount" < @MaxAttempts
             ORDER BY "OccurredAtUtc" ASC
-            LIMIT @Take
-            FOR UPDATE SKIP LOCKED;
+            LIMIT @Take;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("Take", take);
         command.Parameters.AddWithValue("MaxAttempts", maxAttempts);
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var messages = new List<OutboxMessage>();
 
-        while (await reader.ReadAsync())
-        {
-            messages.Add(OutboxMessage.Restore(
-                reader.GetGuid(reader.GetOrdinal("Id")),
-                reader.GetString(reader.GetOrdinal("Type")),
-                reader.GetString(reader.GetOrdinal("Content")),
-                reader.GetDateTime(reader.GetOrdinal("OccurredAtUtc")),
-                reader.IsDBNull(reader.GetOrdinal("ProcessedAtUtc"))
-                    ? null
-                    : reader.GetDateTime(reader.GetOrdinal("ProcessedAtUtc")),
-                reader.GetInt32(reader.GetOrdinal("AttemptCount")),
-                reader.IsDBNull(reader.GetOrdinal("LastError"))
-                    ? null
-                    : reader.GetString(reader.GetOrdinal("LastError"))));
-        }
+        while (await reader.ReadAsync(cancellationToken))
+            messages.Add(ReadMessage(reader));
 
         return messages;
     }
 
     /// <summary>
-    /// Operação para atualizar uma mensagem de outbox.
+    /// Operação para reservar a próxima mensagem pendente.
     /// </summary>
-    /// <param name="message">Mensagem atualizada.</param>
-    public async Task UpdateAsync(OutboxMessage message)
+    public async Task<OutboxMessage?> ClaimPendingAsync(
+        Guid leaseId,
+        DateTime leasedUntilUtc,
+        int maxAttempts,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(message);
+        const string sql = """
+            WITH candidate AS
+            (
+                SELECT "Id"
+                FROM "OutboxMessages"
+                WHERE "ProcessedAtUtc" IS NULL
+                    AND "AttemptCount" < @MaxAttempts
+                    AND ("LeasedUntilUtc" IS NULL OR "LeasedUntilUtc" <= @NowUtc)
+                ORDER BY "OccurredAtUtc" ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE "OutboxMessages" AS message
+            SET
+                "UpdateAt" = @NowUtc,
+                "LeaseId" = @LeaseId,
+                "LeasedUntilUtc" = @LeasedUntilUtc
+            FROM candidate
+            WHERE message."Id" = candidate."Id"
+            RETURNING
+                message."Id",
+                message."Type",
+                message."Content",
+                message."OccurredAtUtc",
+                message."ProcessedAtUtc",
+                message."AttemptCount",
+                message."LastError",
+                message."LeaseId",
+                message."LeasedUntilUtc";
+            """;
 
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+        var connection = connectionLease.Connection;
+        await using var command = CreateCommand(connection, sql);
+        command.Parameters.AddWithValue("LeaseId", leaseId);
+        command.Parameters.AddWithValue("LeasedUntilUtc", leasedUntilUtc);
+        command.Parameters.AddWithValue("MaxAttempts", maxAttempts);
+        command.Parameters.AddWithValue("NowUtc", nowUtc);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? ReadMessage(reader)
+            : null;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> MarkAsProcessedAsync(
+        Guid messageId,
+        Guid leaseId,
+        DateTime processedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
         const string sql = """
             UPDATE "OutboxMessages"
             SET
-                "UpdateAt" = @UpdateAt,
+                "UpdateAt" = @ProcessedAtUtc,
                 "ProcessedAtUtc" = @ProcessedAtUtc,
-                "AttemptCount" = @AttemptCount,
-                "LastError" = @LastError
-            WHERE "Id" = @Id;
+                "LeaseId" = NULL,
+                "LeasedUntilUtc" = NULL,
+                "LastError" = NULL
+            WHERE "Id" = @MessageId
+                AND "LeaseId" = @LeaseId
+                AND "ProcessedAtUtc" IS NULL;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
-        await using var command = CreateCommand(connection, sql);
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+        await using var command = CreateCommand(connectionLease.Connection, sql);
+        command.Parameters.AddWithValue("MessageId", messageId);
+        command.Parameters.AddWithValue("LeaseId", leaseId);
+        command.Parameters.AddWithValue("ProcessedAtUtc", processedAtUtc);
 
-        AddParameters(command, message, includeStaticColumns: false);
-        await command.ExecuteNonQueryAsync();
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RegisterFailureAsync(
+        Guid messageId,
+        Guid leaseId,
+        string errorMessage,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE "OutboxMessages"
+            SET
+                "UpdateAt" = @FailedAtUtc,
+                "AttemptCount" = "AttemptCount" + 1,
+                "LastError" = @LastError,
+                "LeaseId" = NULL,
+                "LeasedUntilUtc" = NULL
+            WHERE "Id" = @MessageId
+                AND "LeaseId" = @LeaseId
+                AND "ProcessedAtUtc" IS NULL;
+            """;
+
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+        await using var command = CreateCommand(connectionLease.Connection, sql);
+        command.Parameters.AddWithValue("MessageId", messageId);
+        command.Parameters.AddWithValue("LeaseId", leaseId);
+        command.Parameters.AddWithValue("FailedAtUtc", DateTime.UtcNow);
+        command.Parameters.AddWithValue("LastError", errorMessage);
+
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
     /// <summary>
@@ -171,6 +253,28 @@ internal sealed class OutboxRepository : IOutboxRepository
         command.Parameters.AddWithValue("ProcessedAtUtc", message.ProcessedAtUtc ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("AttemptCount", message.AttemptCount);
         command.Parameters.AddWithValue("LastError", message.LastError ?? (object)DBNull.Value);
+    }
+
+    private static OutboxMessage ReadMessage(NpgsqlDataReader reader)
+    {
+        return OutboxMessage.Restore(
+            reader.GetGuid(reader.GetOrdinal("Id")),
+            reader.GetString(reader.GetOrdinal("Type")),
+            reader.GetString(reader.GetOrdinal("Content")),
+            reader.GetDateTime(reader.GetOrdinal("OccurredAtUtc")),
+            reader.IsDBNull(reader.GetOrdinal("ProcessedAtUtc"))
+                ? null
+                : reader.GetDateTime(reader.GetOrdinal("ProcessedAtUtc")),
+            reader.GetInt32(reader.GetOrdinal("AttemptCount")),
+            reader.IsDBNull(reader.GetOrdinal("LastError"))
+                ? null
+                : reader.GetString(reader.GetOrdinal("LastError")),
+            reader.IsDBNull(reader.GetOrdinal("LeaseId"))
+                ? null
+                : reader.GetGuid(reader.GetOrdinal("LeaseId")),
+            reader.IsDBNull(reader.GetOrdinal("LeasedUntilUtc"))
+                ? null
+                : reader.GetDateTime(reader.GetOrdinal("LeasedUntilUtc")));
     }
 
     /// <summary>

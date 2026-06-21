@@ -224,7 +224,7 @@ public sealed class SessionAuthController : ControllerBase
         var result = await useCase.Execute(new GetUserSessionsQuery
         {
             UserId = _authenticatedSessionContext.InternalUserId,
-            CurrentSessionId = _authenticatedSessionContext.SessionId
+            CurrentPublicSessionId = _authenticatedSessionContext.PublicSessionId
         });
 
         return Ok(new ResponseUserSessionsJson

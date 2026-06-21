@@ -11,7 +11,8 @@ internal interface INotificationTemplateRepository
     /// Operação para listar templates ativos.
     /// </summary>
     /// <returns>Lista de templates ativos.</returns>
-    Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync();
+    Task<IReadOnlyCollection<NotificationTemplate>> ListActiveAsync(
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Operação para obter o template ativo mais recente.

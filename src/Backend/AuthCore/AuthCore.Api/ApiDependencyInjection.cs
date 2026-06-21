@@ -3,10 +3,14 @@ using System.Security.Claims;
 using AuthCore.Api.Authentication;
 using AuthCore.Api.Exceptions;
 using AuthCore.Api.HealthChecks;
+using AuthCore.Api.Observability;
 using AuthCore.Api.Security;
+using AuthCore.Application.UseCases.Authentication.ExternalLogin;
 using AuthCore.Api.Workers;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -49,6 +53,8 @@ public static class ApiDependencyInjection
         services.AddScoped<ICsrfTokenService, CookieCsrfTokenService>();
         services.AddScoped<ICsrfRequestValidator, CookieCsrfRequestValidator>();
         services.AddScoped<IAuthenticatedUserAccessValidator, AuthenticatedUserAccessValidator>();
+        services.AddSingleton<ExternalAuthenticationMetrics>();
+        services.AddScoped<IExternalAuthenticationOptionsProvider, ConfiguredExternalAuthenticationOptionsProvider>();
         services.AddScoped<IAuthenticatedSessionContext>(serviceProvider =>
         {
             var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
@@ -118,8 +124,9 @@ public static class ApiDependencyInjection
     {
         var jwtOptions = ApiSecurityOptions.GetJwtOptions(configuration);
         var authCookieOptions = ApiSecurityOptions.GetAuthCookieOptions(configuration);
+        var googleOptions = ApiSecurityOptions.GetGoogleExternalAuthenticationOptions(configuration);
 
-        services.AddAuthentication(options =>
+        var authenticationBuilder = services.AddAuthentication(options =>
             {
                 options.DefaultScheme = PolicyAuthenticationScheme;
                 options.DefaultAuthenticateScheme = PolicyAuthenticationScheme;
@@ -162,7 +169,45 @@ public static class ApiDependencyInjection
             })
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(
                 SessionAuthenticationDefaults.AuthenticationScheme,
-                _ => { });
+                _ => { })
+            .AddCookie(ExternalAuthenticationDefaults.ExternalScheme, options =>
+            {
+                options.Cookie.Name = "__Host-auth.external";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.Path = "/";
+                options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+                options.SlidingExpiration = false;
+            });
+
+        if (!IsGoogleAuthenticationConfigured(googleOptions))
+            return;
+
+        authenticationBuilder.AddGoogle(ExternalAuthenticationDefaults.GoogleScheme, options =>
+        {
+            options.ClientId = googleOptions.ClientId.Trim();
+            options.ClientSecret = googleOptions.ClientSecret.Trim();
+            options.CallbackPath = googleOptions.CallbackPath.Trim();
+            options.SignInScheme = ExternalAuthenticationDefaults.ExternalScheme;
+            options.SaveTokens = false;
+            options.Scope.Clear();
+            options.Scope.Add("openid");
+            options.Scope.Add("profile");
+            options.Scope.Add("email");
+        });
+    }
+
+    /// <summary>
+    /// Operacao para indicar se a autenticacao Google esta configurada.
+    /// </summary>
+    /// <param name="googleOptions">Configuracoes do Google.</param>
+    /// <returns><c>true</c> quando ClientId e ClientSecret foram informados; caso contrario, <c>false</c>.</returns>
+    private static bool IsGoogleAuthenticationConfigured(GoogleExternalAuthenticationOptions googleOptions)
+    {
+        return !string.IsNullOrWhiteSpace(googleOptions.ClientId)
+            && !string.IsNullOrWhiteSpace(googleOptions.ClientSecret);
     }
 
     /// <summary>

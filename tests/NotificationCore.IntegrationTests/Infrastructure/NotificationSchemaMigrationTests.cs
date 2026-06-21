@@ -87,6 +87,8 @@ public sealed class NotificationSchemaMigrationTests : IClassFixture<PostgreSqlI
             "IX_Notifications_Status",
             "IX_Notifications_CorrelationId",
             "IX_Notifications_ScheduledAtUtc",
+            "IX_Notifications_Dispatch",
+            "IX_InboxMessages_IdempotencyKey",
             "IX_NotificationDeliveryAttempts_NotificationId_AttemptNumber",
             "IX_NotificationTemplates_TemplateKey_Channel_Version");
 

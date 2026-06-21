@@ -14,6 +14,7 @@
                 "action": "openExternally",
                 "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
             },
+            "envFile": "${workspaceFolder}/src/Backend/.env.development",
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development"
             }

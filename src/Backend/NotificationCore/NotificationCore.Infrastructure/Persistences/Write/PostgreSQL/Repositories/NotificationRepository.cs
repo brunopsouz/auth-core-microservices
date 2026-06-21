@@ -37,13 +37,17 @@ internal sealed class NotificationRepository :
     /// Operação para adicionar uma notificação.
     /// </summary>
     /// <param name="notification">Notificação a ser persistida.</param>
-    public async Task AddAsync(Notification notification)
+    public async Task AddAsync(
+        Notification notification,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
-        await InsertNotificationAsync(connection, notification);
-        await UpsertDeliveryAttemptsAsync(connection, notification.DeliveryAttempts);
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
+        await InsertNotificationAsync(connection, notification, cancellationToken);
+        await UpsertDeliveryAttemptsAsync(connection, notification.DeliveryAttempts, cancellationToken);
     }
 
     /// <summary>
@@ -51,7 +55,9 @@ internal sealed class NotificationRepository :
     /// </summary>
     /// <param name="notification">Notificação a ser persistida.</param>
     /// <returns>Verdadeiro quando a notificação foi adicionada.</returns>
-    public async Task<bool> TryAddAsync(Notification notification)
+    public async Task<bool> TryAddAsync(
+        Notification notification,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
@@ -95,15 +101,17 @@ internal sealed class NotificationRepository :
             ON CONFLICT ("IdempotencyKey") DO NOTHING;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         AddNotificationParameters(command, notification);
 
-        var wasInserted = await command.ExecuteNonQueryAsync() > 0;
+        var wasInserted = await command.ExecuteNonQueryAsync(cancellationToken) > 0;
 
         if (wasInserted)
-            await UpsertDeliveryAttemptsAsync(connection, notification.DeliveryAttempts);
+            await UpsertDeliveryAttemptsAsync(connection, notification.DeliveryAttempts, cancellationToken);
 
         return wasInserted;
     }
@@ -113,7 +121,9 @@ internal sealed class NotificationRepository :
     /// </summary>
     /// <param name="notificationId">Identificador da notificação.</param>
     /// <returns>Notificação encontrada ou nula.</returns>
-    public async Task<Notification?> GetByIdAsync(Guid notificationId)
+    public async Task<Notification?> GetByIdAsync(
+        Guid notificationId,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT
@@ -137,16 +147,18 @@ internal sealed class NotificationRepository :
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("NotificationId", notificationId);
 
-        var notification = await ReadNotificationAsync(command);
+        var notification = await ReadNotificationAsync(command, cancellationToken);
 
         if (notification is null)
             return null;
 
-        var attempts = await GetDeliveryAttemptsAsync(connection, [notification.Id]);
+        var attempts = await GetDeliveryAttemptsAsync(connection, [notification.Id], cancellationToken);
 
         return RestoreNotification(notification, attempts);
     }
@@ -156,7 +168,9 @@ internal sealed class NotificationRepository :
     /// </summary>
     /// <param name="idempotencyKey">Chave de idempotência da notificação.</param>
     /// <returns>Notificação encontrada ou nula.</returns>
-    public async Task<Notification?> GetByIdempotencyKeyAsync(string idempotencyKey)
+    public async Task<Notification?> GetByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT
@@ -180,16 +194,18 @@ internal sealed class NotificationRepository :
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("IdempotencyKey", idempotencyKey.Trim());
 
-        var notification = await ReadNotificationAsync(command);
+        var notification = await ReadNotificationAsync(command, cancellationToken);
 
         if (notification is null)
             return null;
 
-        var attempts = await GetDeliveryAttemptsAsync(connection, [notification.Id]);
+        var attempts = await GetDeliveryAttemptsAsync(connection, [notification.Id], cancellationToken);
 
         return RestoreNotification(notification, attempts);
     }
@@ -200,7 +216,10 @@ internal sealed class NotificationRepository :
     /// <param name="dueAtUtc">Data limite de agendamento em UTC.</param>
     /// <param name="take">Quantidade máxima de notificações.</param>
     /// <returns>Coleção de notificações disponíveis para processamento.</returns>
-    public async Task<IReadOnlyCollection<Notification>> GetPendingForDispatchAsync(DateTime dueAtUtc, int take)
+    public async Task<IReadOnlyCollection<Notification>> GetPendingForDispatchAsync(
+        DateTime dueAtUtc,
+        int take,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT
@@ -227,14 +246,16 @@ internal sealed class NotificationRepository :
             FOR UPDATE SKIP LOCKED;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("PendingStatus", (int)NotificationStatus.Pending);
         command.Parameters.AddWithValue("RetryScheduledStatus", (int)NotificationStatus.RetryScheduled);
         command.Parameters.AddWithValue("DueAtUtc", dueAtUtc);
         command.Parameters.AddWithValue("Take", take);
 
-        return await ReadNotificationsWithAttemptsAsync(connection, command);
+        return await ReadNotificationsWithAttemptsAsync(connection, command, cancellationToken);
     }
 
     /// <summary>
@@ -243,7 +264,10 @@ internal sealed class NotificationRepository :
     /// <param name="dueAtUtc">Data limite de expiração em UTC.</param>
     /// <param name="take">Quantidade máxima de notificações.</param>
     /// <returns>Coleção de notificações com processamento expirado.</returns>
-    public async Task<IReadOnlyCollection<Notification>> GetProcessingTimedOutAsync(DateTime dueAtUtc, int take)
+    public async Task<IReadOnlyCollection<Notification>> GetProcessingTimedOutAsync(
+        DateTime dueAtUtc,
+        int take,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT
@@ -270,13 +294,15 @@ internal sealed class NotificationRepository :
             FOR UPDATE SKIP LOCKED;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("ProcessingStatus", (int)NotificationStatus.Processing);
         command.Parameters.AddWithValue("DueAtUtc", dueAtUtc);
         command.Parameters.AddWithValue("Take", take);
 
-        return await ReadNotificationsWithAttemptsAsync(connection, command);
+        return await ReadNotificationsWithAttemptsAsync(connection, command, cancellationToken);
     }
 
     /// <summary>
@@ -291,7 +317,8 @@ internal sealed class NotificationRepository :
         string? correlationId,
         NotificationStatus? status,
         int skip,
-        int take)
+        int take,
+        CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT
@@ -318,27 +345,33 @@ internal sealed class NotificationRepository :
             LIMIT @Take;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("CorrelationId", string.IsNullOrWhiteSpace(correlationId) ? DBNull.Value : correlationId.Trim());
         command.Parameters.AddWithValue("Status", status.HasValue ? (int)status.Value : DBNull.Value);
         command.Parameters.AddWithValue("Skip", skip);
         command.Parameters.AddWithValue("Take", take);
 
-        return await ReadNotificationsWithAttemptsAsync(connection, command);
+        return await ReadNotificationsWithAttemptsAsync(connection, command, cancellationToken);
     }
 
     /// <summary>
     /// Operação para atualizar uma notificação.
     /// </summary>
     /// <param name="notification">Notificação atualizada.</param>
-    public async Task UpdateAsync(Notification notification)
+    public async Task UpdateAsync(
+        Notification notification,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
-        await UpdateNotificationAsync(connection, notification);
-        await UpsertDeliveryAttemptsAsync(connection, notification.DeliveryAttempts);
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
+        await UpdateNotificationAsync(connection, notification, cancellationToken);
+        await UpsertDeliveryAttemptsAsync(connection, notification.DeliveryAttempts, cancellationToken);
     }
 
     /// <summary>
@@ -349,7 +382,8 @@ internal sealed class NotificationRepository :
     /// <returns>Verdadeiro quando a notificação foi atualizada.</returns>
     public async Task<bool> TryUpdateProcessingTimedOutAsync(
         Notification notification,
-        DateTime processingTimeoutAtUtc)
+        DateTime processingTimeoutAtUtc,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
@@ -375,17 +409,19 @@ internal sealed class NotificationRepository :
                 AND "ScheduledAtUtc" = @ProcessingTimeoutAtUtc;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync(cancellationToken);
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         AddNotificationParameters(command, notification);
         command.Parameters.AddWithValue("ExpectedStatus", (int)NotificationStatus.Processing);
         command.Parameters.AddWithValue("ProcessingTimeoutAtUtc", processingTimeoutAtUtc);
 
-        var wasUpdated = await command.ExecuteNonQueryAsync() > 0;
+        var wasUpdated = await command.ExecuteNonQueryAsync(cancellationToken) > 0;
 
         if (wasUpdated)
-            await UpsertDeliveryAttemptsAsync(connection, notification.DeliveryAttempts);
+            await UpsertDeliveryAttemptsAsync(connection, notification.DeliveryAttempts, cancellationToken);
 
         return wasUpdated;
     }
@@ -396,7 +432,10 @@ internal sealed class NotificationRepository :
     /// </summary>
     /// <param name="connection">Conexão aberta da sessão.</param>
     /// <param name="notification">Notificação a persistir.</param>
-    private async Task InsertNotificationAsync(NpgsqlConnection connection, Notification notification)
+    private async Task InsertNotificationAsync(
+        NpgsqlConnection connection,
+        Notification notification,
+        CancellationToken cancellationToken)
     {
         const string sql = """
             INSERT INTO "Notifications"
@@ -440,7 +479,7 @@ internal sealed class NotificationRepository :
         await using var command = CreateCommand(connection, sql);
         AddNotificationParameters(command, notification);
 
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>
@@ -448,7 +487,10 @@ internal sealed class NotificationRepository :
     /// </summary>
     /// <param name="connection">Conexão aberta da sessão.</param>
     /// <param name="notification">Notificação atualizada.</param>
-    private async Task UpdateNotificationAsync(NpgsqlConnection connection, Notification notification)
+    private async Task UpdateNotificationAsync(
+        NpgsqlConnection connection,
+        Notification notification,
+        CancellationToken cancellationToken)
     {
         const string sql = """
             UPDATE "Notifications"
@@ -473,7 +515,7 @@ internal sealed class NotificationRepository :
         await using var command = CreateCommand(connection, sql);
         AddNotificationParameters(command, notification);
 
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>
@@ -483,7 +525,8 @@ internal sealed class NotificationRepository :
     /// <param name="deliveryAttempts">Tentativas a persistir.</param>
     private async Task UpsertDeliveryAttemptsAsync(
         NpgsqlConnection connection,
-        IReadOnlyCollection<DeliveryAttempt> deliveryAttempts)
+        IReadOnlyCollection<DeliveryAttempt> deliveryAttempts,
+        CancellationToken cancellationToken)
     {
         const string sql = """
             INSERT INTO "NotificationDeliveryAttempts"
@@ -529,7 +572,7 @@ internal sealed class NotificationRepository :
         {
             await using var command = CreateCommand(connection, sql);
             AddDeliveryAttemptParameters(command, deliveryAttempt);
-            await command.ExecuteNonQueryAsync();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 
@@ -541,7 +584,8 @@ internal sealed class NotificationRepository :
     /// <returns>Tentativas agrupadas por notificação.</returns>
     private async Task<Dictionary<Guid, List<DeliveryAttempt>>> GetDeliveryAttemptsAsync(
         NpgsqlConnection connection,
-        IReadOnlyCollection<Guid> notificationIds)
+        IReadOnlyCollection<Guid> notificationIds,
+        CancellationToken cancellationToken)
     {
         if (notificationIds.Count == 0)
             return [];
@@ -566,10 +610,10 @@ internal sealed class NotificationRepository :
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("NotificationIds", notificationIds.ToArray());
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var attempts = new Dictionary<Guid, List<DeliveryAttempt>>();
 
-        while (await reader.ReadAsync())
+        while (await reader.ReadAsync(cancellationToken))
         {
             var deliveryAttempt = ReadDeliveryAttempt(reader);
 
@@ -647,10 +691,14 @@ internal sealed class NotificationRepository :
     /// <returns>Coleção de notificações materializadas.</returns>
     private async Task<IReadOnlyCollection<Notification>> ReadNotificationsWithAttemptsAsync(
         NpgsqlConnection connection,
-        NpgsqlCommand command)
+        NpgsqlCommand command,
+        CancellationToken cancellationToken)
     {
-        var notifications = await ReadNotificationsAsync(command);
-        var attempts = await GetDeliveryAttemptsAsync(connection, notifications.Select(notification => notification.Id).ToArray());
+        var notifications = await ReadNotificationsAsync(command, cancellationToken);
+        var attempts = await GetDeliveryAttemptsAsync(
+            connection,
+            notifications.Select(notification => notification.Id).ToArray(),
+            cancellationToken);
 
         return notifications
             .Select(notification => RestoreNotification(notification, attempts))
@@ -662,12 +710,14 @@ internal sealed class NotificationRepository :
     /// </summary>
     /// <param name="command">Comando SQL configurado.</param>
     /// <returns>Coleção de notificações sem tentativas.</returns>
-    private static async Task<IReadOnlyCollection<Notification>> ReadNotificationsAsync(NpgsqlCommand command)
+    private static async Task<IReadOnlyCollection<Notification>> ReadNotificationsAsync(
+        NpgsqlCommand command,
+        CancellationToken cancellationToken)
     {
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var notifications = new List<Notification>();
 
-        while (await reader.ReadAsync())
+        while (await reader.ReadAsync(cancellationToken))
         {
             notifications.Add(ReadNotification(reader));
         }
@@ -680,11 +730,13 @@ internal sealed class NotificationRepository :
     /// </summary>
     /// <param name="command">Comando SQL configurado.</param>
     /// <returns>Notificação materializada ou nula.</returns>
-    private static async Task<Notification?> ReadNotificationAsync(NpgsqlCommand command)
+    private static async Task<Notification?> ReadNotificationAsync(
+        NpgsqlCommand command,
+        CancellationToken cancellationToken)
     {
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-        if (!await reader.ReadAsync())
+        if (!await reader.ReadAsync(cancellationToken))
             return null;
 
         return ReadNotification(reader);

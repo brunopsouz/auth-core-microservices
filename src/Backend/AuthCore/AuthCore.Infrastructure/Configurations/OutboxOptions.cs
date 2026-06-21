@@ -34,4 +34,10 @@ internal sealed class OutboxOptions
     /// </summary>
     [Range(1, 100)]
     public int MaxAttempts { get; init; } = 5;
+
+    /// <summary>
+    /// Duração do lease de processamento em segundos.
+    /// </summary>
+    [Range(10, 600)]
+    public int LeaseDurationSeconds { get; init; } = 30;
 }

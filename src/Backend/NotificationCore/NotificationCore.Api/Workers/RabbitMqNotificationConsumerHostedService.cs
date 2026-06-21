@@ -137,7 +137,8 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
             var useCase = serviceScope.ServiceProvider.GetRequiredService<IRegisterNotificationRequestUseCase>();
             var result = await useCase.Execute(new RegisterNotificationRequestCommand
             {
-                Request = request
+                Request = request,
+                CancellationToken = cancellationToken
             });
 
             using var notificationScope = _logger.BeginScope(new Dictionary<string, object?>

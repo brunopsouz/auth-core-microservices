@@ -19,4 +19,9 @@ internal static class DatabaseVersions
     /// Versao de evolucao da inbox idempotente por consumidor.
     /// </summary>
     public const long IDEMPOTENT_CONSUMER_INBOX = 3;
+
+    /// <summary>
+    /// Versao de otimizacao das consultas de despacho e inbox.
+    /// </summary>
+    public const long NOTIFICATION_QUERY_INDEXES = 4;
 }

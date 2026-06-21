@@ -20,6 +20,21 @@ public interface IDurableSessionRepository
     Task UpdateAsync(Session session);
 
     /// <summary>
+    /// Operacao para revogar atomicamente uma sessao ainda ativa.
+    /// </summary>
+    /// <param name="session">Sessao com os dados da revogacao solicitada.</param>
+    /// <returns>Sessao revogada com a versao persistida ou nula quando ja nao estava ativa.</returns>
+    Task<Session?> TryRevokeAsync(Session session);
+
+    /// <summary>
+    /// Operacao para atualizar uma sessao apenas quando ela ainda estiver ativa.
+    /// </summary>
+    /// <param name="session">Sessao com o estado a ser persistido.</param>
+    /// <param name="referenceAtUtc">Data de referencia da validacao em UTC.</param>
+    /// <returns>Sessao com a versao persistida ou nula quando a atualizacao foi rejeitada.</returns>
+    Task<Session?> TryUpdateActiveAsync(Session session, DateTime referenceAtUtc);
+
+    /// <summary>
     /// Operacao para obter sessao pelo hash do identificador opaco.
     /// </summary>
     /// <param name="sessionIdentifierHash">Hash do identificador opaco.</param>
@@ -49,7 +64,8 @@ public interface IDurableSessionRepository
     /// <param name="userId">Identificador interno do usuario.</param>
     /// <param name="reason">Motivo da revogacao.</param>
     /// <param name="revokedAtUtc">Data de revogacao em UTC.</param>
-    Task RevokeActiveByUserIdAsync(
+    /// <returns>Sessoes revogadas com as versoes persistidas.</returns>
+    Task<IReadOnlyCollection<Session>> RevokeActiveByUserIdAsync(
         Guid userId,
         SessionRevocationReason reason,
         DateTime revokedAtUtc);

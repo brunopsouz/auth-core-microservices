@@ -39,6 +39,40 @@ public sealed class AuthFlowRouteContractIntegrationTests
     }
 
     [Fact]
+    public async Task Google_WhenMvcIsConfigured_ShouldExposeExternalGoogleAsPublicGetEndpoint()
+    {
+        var endpoints = await GetRouteEndpointsAsync();
+
+        var endpoint = Assert.Single(endpoints, endpoint => IsRoute(endpoint, "api/auth/external/google", "GET"));
+        var action = endpoint.Metadata.GetRequiredMetadata<ControllerActionDescriptor>();
+
+        Assert.Equal(nameof(ExternalAuthController), action.ControllerTypeInfo.Name);
+        Assert.Equal(nameof(ExternalAuthController.Google), action.ActionName);
+        Assert.False(RequiresAuthentication(endpoint));
+    }
+
+    [Fact]
+    public async Task GoogleComplete_WhenMvcIsConfigured_ShouldExposeExternalGoogleCompletionAsPublicGetEndpoint()
+    {
+        var endpoints = await GetRouteEndpointsAsync();
+
+        var endpoint = Assert.Single(endpoints, endpoint => IsRoute(endpoint, "api/auth/external/google/complete", "GET"));
+        var action = endpoint.Metadata.GetRequiredMetadata<ControllerActionDescriptor>();
+
+        Assert.Equal(nameof(ExternalAuthController), action.ControllerTypeInfo.Name);
+        Assert.Equal(nameof(ExternalAuthController.GoogleComplete), action.ActionName);
+        Assert.False(RequiresAuthentication(endpoint));
+    }
+
+    [Fact]
+    public async Task GoogleCallback_WhenMvcIsConfigured_ShouldNotExposeGoogleMiddlewareCallbackAsControllerEndpoint()
+    {
+        var endpoints = await GetRouteEndpointsAsync();
+
+        Assert.DoesNotContain(endpoints, endpoint => IsRoute(endpoint, "api/auth/external/google/callback", "GET"));
+    }
+
+    [Fact]
     public async Task UserController_WhenMvcIsConfigured_ShouldKeepAuthenticatedEndpointsProtected()
     {
         var endpoints = await GetRouteEndpointsAsync();

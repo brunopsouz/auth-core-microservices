@@ -19,14 +19,17 @@ public interface IInboxRepository
         string messageType,
         string consumerName,
         string payload,
-        DateTime receivedAtUtc);
+        DateTime receivedAtUtc,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Operacao para obter o payload original pela chave de idempotencia da notificacao.
     /// </summary>
     /// <param name="idempotencyKey">Chave de idempotencia da notificacao.</param>
     /// <returns>Payload encontrado ou nulo.</returns>
-    Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(string idempotencyKey);
+    Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Operacao para marcar mensagem como processada.
@@ -39,7 +42,8 @@ public interface IInboxRepository
         Guid messageId,
         string messageType,
         string consumerName,
-        DateTime processedAtUtc);
+        DateTime processedAtUtc,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Operacao para marcar mensagem como falha.
@@ -56,7 +60,8 @@ public interface IInboxRepository
         string consumerName,
         string payload,
         DateTime receivedAtUtc,
-        string error);
+        string error,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

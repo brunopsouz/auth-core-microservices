@@ -69,7 +69,8 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
             );
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("Id", refreshToken.Id);
@@ -116,7 +117,8 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("TokenHash", NormalizeTokenHash(tokenHash));
 
@@ -145,7 +147,8 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
             WHERE "Id" = @Id;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("Id", refreshToken.Id);
@@ -179,7 +182,8 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
               AND "RevokedAtUtc" IS NULL;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("FamilyId", familyId);
@@ -213,7 +217,8 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
               AND "ExpiresAtUtc" > @ReferenceAtUtc;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         command.Parameters.AddWithValue("UserId", userId);

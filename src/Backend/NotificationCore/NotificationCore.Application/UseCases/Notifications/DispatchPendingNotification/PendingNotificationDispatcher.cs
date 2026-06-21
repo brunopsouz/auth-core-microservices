@@ -98,7 +98,11 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
 
         foreach (var notification in notifications)
         {
-            await DispatchNotificationAsync(notification, command.RetryDelay, counters);
+            await DispatchNotificationAsync(
+                notification,
+                command.RetryDelay,
+                counters,
+                command.CancellationToken);
         }
     }
 
@@ -112,11 +116,14 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
         DispatchPendingNotificationCommand command,
         int take)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync(command.CancellationToken);
 
         try
         {
-            var notifications = await _notificationRepository.GetPendingForDispatchAsync(command.DueAtUtc, take);
+            var notifications = await _notificationRepository.GetPendingForDispatchAsync(
+                command.DueAtUtc,
+                take,
+                command.CancellationToken);
             var processingStartedAtUtc = DateTime.UtcNow;
 
             foreach (var notification in notifications)
@@ -125,10 +132,10 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
                     processingStartedAtUtc,
                     processingStartedAtUtc.Add(command.ProcessingTimeout));
 
-                await _notificationWriterRepository.UpdateAsync(notification);
+                await _notificationWriterRepository.UpdateAsync(notification, command.CancellationToken);
             }
 
-            await _unitOfWork.CommitAsync();
+            await _unitOfWork.CommitAsync(command.CancellationToken);
 
             return notifications;
         }
@@ -148,10 +155,11 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
     private async Task DispatchNotificationAsync(
         Notification notification,
         TimeSpan retryDelay,
-        DispatchCounters counters)
+        DispatchCounters counters,
+        CancellationToken cancellationToken)
     {
         var processingStartedAtUtc = DateTime.UtcNow;
-        var request = await GetOriginalRequestAsync(notification);
+        var request = await GetOriginalRequestAsync(notification, cancellationToken);
 
         if (request is null)
         {
@@ -161,7 +169,7 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
                 processingStartedAtUtc,
                 NOTIFICATION_REQUEST_NOT_FOUND_CODE,
                 NOTIFICATION_REQUEST_NOT_FOUND_MESSAGE);
-            await PersistProcessedNotificationAsync(notification);
+            await PersistProcessedNotificationAsync(notification, cancellationToken);
             counters.DeadLettered++;
             return;
         }
@@ -183,14 +191,14 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
                 processingStartedAtUtc,
                 TEMPLATE_RENDERING_FAILED_CODE,
                 TEMPLATE_RENDERING_FAILED_MESSAGE);
-            await PersistProcessedNotificationAsync(notification);
+            await PersistProcessedNotificationAsync(notification, cancellationToken);
             counters.DeadLettered++;
             return;
         }
 
         var attemptStartedAtUtc = DateTime.UtcNow;
         var providerMessage = CreateProviderMessage(notification, renderedTemplate);
-        var providerResult = await SendEmailAsync(providerMessage);
+        var providerResult = await SendEmailAsync(providerMessage, cancellationToken);
         var attemptFinishedAtUtc = DateTime.UtcNow;
 
         ApplyProviderResult(
@@ -201,21 +209,23 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
             retryDelay,
             counters);
 
-        await PersistProcessedNotificationAsync(notification);
+        await PersistProcessedNotificationAsync(notification, cancellationToken);
     }
 
     /// <summary>
     /// Operacao para persistir a notificacao processada.
     /// </summary>
     /// <param name="notification">Notificacao processada.</param>
-    private async Task PersistProcessedNotificationAsync(Notification notification)
+    private async Task PersistProcessedNotificationAsync(
+        Notification notification,
+        CancellationToken cancellationToken)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            await _notificationWriterRepository.UpdateAsync(notification);
-            await _unitOfWork.CommitAsync();
+            await _notificationWriterRepository.UpdateAsync(notification, cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
         }
         catch
         {
@@ -229,9 +239,13 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
     /// </summary>
     /// <param name="notification">Notificacao em processamento.</param>
     /// <returns>Mensagem original ou nula.</returns>
-    private async Task<SendTransactionalNotificationRequested?> GetOriginalRequestAsync(Notification notification)
+    private async Task<SendTransactionalNotificationRequested?> GetOriginalRequestAsync(
+        Notification notification,
+        CancellationToken cancellationToken)
     {
-        var payload = await _inboxRepository.GetPayloadByNotificationIdempotencyKeyAsync(notification.IdempotencyKey.Value);
+        var payload = await _inboxRepository.GetPayloadByNotificationIdempotencyKeyAsync(
+            notification.IdempotencyKey.Value,
+            cancellationToken);
 
         return payload is null
             ? null
@@ -243,11 +257,17 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
     /// </summary>
     /// <param name="providerMessage">Mensagem a enviar.</param>
     /// <returns>Resultado do provedor.</returns>
-    private async Task<EmailProviderResult> SendEmailAsync(EmailProviderMessage providerMessage)
+    private async Task<EmailProviderResult> SendEmailAsync(
+        EmailProviderMessage providerMessage,
+        CancellationToken cancellationToken)
     {
         try
         {
-            return await _emailProvider.SendAsync(providerMessage);
+            return await _emailProvider.SendAsync(providerMessage, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {

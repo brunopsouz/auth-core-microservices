@@ -12,12 +12,14 @@ public interface INotificationReadRepository
     /// </summary>
     /// <param name="notificationId">Identificador da notificacao.</param>
     /// <returns>Notificacao encontrada ou nula.</returns>
-    Task<Notification?> GetByIdAsync(Guid notificationId);
+    Task<Notification?> GetByIdAsync(Guid notificationId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Operacao para obter uma notificacao pela chave de idempotencia.
     /// </summary>
     /// <param name="idempotencyKey">Chave de idempotencia da notificacao.</param>
     /// <returns>Notificacao encontrada ou nula.</returns>
-    Task<Notification?> GetByIdempotencyKeyAsync(string idempotencyKey);
+    Task<Notification?> GetByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default);
 }

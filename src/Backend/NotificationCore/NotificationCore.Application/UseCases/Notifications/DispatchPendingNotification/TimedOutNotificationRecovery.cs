@@ -50,11 +50,14 @@ internal sealed class TimedOutNotificationRecovery : ITimedOutNotificationRecove
         if (remaining <= 0)
             return;
 
-        await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync(command.CancellationToken);
 
         try
         {
-            var timedOutNotifications = await _notificationRepository.GetProcessingTimedOutAsync(command.DueAtUtc, remaining);
+            var timedOutNotifications = await _notificationRepository.GetProcessingTimedOutAsync(
+                command.DueAtUtc,
+                remaining,
+                command.CancellationToken);
             counters.Found += timedOutNotifications.Count;
 
             foreach (var notification in timedOutNotifications)
@@ -65,11 +68,14 @@ internal sealed class TimedOutNotificationRecovery : ITimedOutNotificationRecove
                     notification,
                     DateTime.UtcNow);
 
-                if (await _notificationRepository.TryUpdateProcessingTimedOutAsync(notification, processingTimeoutAtUtc))
+                if (await _notificationRepository.TryUpdateProcessingTimedOutAsync(
+                        notification,
+                        processingTimeoutAtUtc,
+                        command.CancellationToken))
                     counters.DeadLettered++;
             }
 
-            await _unitOfWork.CommitAsync();
+            await _unitOfWork.CommitAsync(command.CancellationToken);
         }
         catch
         {

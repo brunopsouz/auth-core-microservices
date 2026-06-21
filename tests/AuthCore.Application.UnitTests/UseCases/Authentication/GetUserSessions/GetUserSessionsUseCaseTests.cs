@@ -42,7 +42,7 @@ public sealed class GetUserSessionsUseCaseTests
         var result = await useCase.Execute(new GetUserSessionsQuery
         {
             UserId = userId,
-            CurrentSessionId = latestSession.SessionId
+            CurrentPublicSessionId = latestSession.PublicSessionId
         });
 
         Assert.Equal(latestSession.PublicSessionId, result.CurrentSessionId);
@@ -82,6 +82,16 @@ public sealed class GetUserSessionsUseCaseTests
             throw new NotSupportedException();
         }
 
+        public Task<Session?> TryRevokeAsync(Session session)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<Session?> TryUpdateActiveAsync(Session session, DateTime referenceAtUtc)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task<Session?> GetByIdentifierHashAsync(string sessionIdentifierHash, SessionIdentifier identifier)
         {
             throw new NotSupportedException();
@@ -101,7 +111,10 @@ public sealed class GetUserSessionsUseCaseTests
             return Task.FromResult(sessions);
         }
 
-        public Task RevokeActiveByUserIdAsync(Guid userId, SessionRevocationReason reason, DateTime revokedAtUtc)
+        public Task<IReadOnlyCollection<Session>> RevokeActiveByUserIdAsync(
+            Guid userId,
+            SessionRevocationReason reason,
+            DateTime revokedAtUtc)
         {
             throw new NotSupportedException();
         }

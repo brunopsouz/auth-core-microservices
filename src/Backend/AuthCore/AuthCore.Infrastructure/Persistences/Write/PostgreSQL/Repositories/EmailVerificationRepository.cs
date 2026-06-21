@@ -71,7 +71,8 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
             );
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         AddParameters(command, emailVerification);
@@ -103,7 +104,8 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
             WHERE "Id" = @Id;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
 
         AddParameters(command, emailVerification);
@@ -139,7 +141,8 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
             LIMIT 1
             """ + GetLockClause();
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserId", userId);
 
@@ -180,7 +183,8 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
             LIMIT 1
             """ + GetLockClause();
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("Email", email.Trim().ToLowerInvariant());
         command.Parameters.AddWithValue("ReferenceAtUtc", DateTime.UtcNow);
@@ -222,7 +226,8 @@ internal sealed class EmailVerificationRepository : IEmailVerificationRepository
             LIMIT 1
             """ + GetLockClause();
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserId", userId);
         command.Parameters.AddWithValue("ReferenceAtUtc", DateTime.UtcNow);

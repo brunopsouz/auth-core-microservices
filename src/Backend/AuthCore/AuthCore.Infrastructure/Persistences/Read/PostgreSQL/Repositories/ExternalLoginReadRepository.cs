@@ -55,7 +55,9 @@ internal sealed class ExternalLoginReadRepository : IExternalLoginReadRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("Provider", (short)provider);
         command.Parameters.AddWithValue("ProviderUserId", providerUserId.Trim());
@@ -94,7 +96,9 @@ internal sealed class ExternalLoginReadRepository : IExternalLoginReadRepository
             LIMIT 1;
             """;
 
-        var connection = await _databaseSession.GetOpenConnectionAsync();
+        await using var connectionLease = await _databaseSession.AcquireConnectionAsync();
+
+        var connection = connectionLease.Connection;
         await using var command = CreateCommand(connection, sql);
         command.Parameters.AddWithValue("UserId", userId);
         command.Parameters.AddWithValue("Provider", (short)provider);

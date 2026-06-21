@@ -451,6 +451,23 @@ public sealed class AuthControllerIntegrationTests
     }
 
     [Fact]
+    public async Task ActiveSessionAuthorization_WhenUserIsNotAuthenticated_ShouldNotReadSessionClaims()
+    {
+        var principal = new ClaimsPrincipal(new ClaimsIdentity());
+        var requirement = new ActiveSessionRequirement();
+        var authorizationContext = new AuthorizationHandlerContext(
+            [requirement],
+            principal,
+            resource: null);
+        var handler = new ActiveSessionAuthorizationHandler(new AuthenticatedSessionContext(principal));
+
+        await handler.HandleAsync(authorizationContext);
+
+        Assert.False(authorizationContext.HasSucceeded);
+        Assert.False(authorizationContext.HasFailed);
+    }
+
+    [Fact]
     public async Task Logout_WhenUseCaseSucceeds_ShouldReturnNoContentAndDeleteCookie()
     {
         var useCase = new SpyLogoutCurrentSessionUseCase();
@@ -522,7 +539,8 @@ public sealed class AuthControllerIntegrationTests
         var controller = CreateSessionController(new[]
         {
             new Claim(SessionAuthenticationDefaults.InternalUserIdClaimType, userId.ToString()),
-            new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-123")
+            new Claim(SessionAuthenticationDefaults.SessionIdClaimType, "session-secret-123"),
+            new Claim(SessionAuthenticationDefaults.PublicSessionIdClaimType, "session-123")
         });
 
         var result = await controller.GetSessions(useCase);
@@ -532,7 +550,7 @@ public sealed class AuthControllerIntegrationTests
         var session = Assert.Single(response.Sessions);
 
         Assert.Equal(userId, useCase.LastQuery!.UserId);
-        Assert.Equal("session-123", useCase.LastQuery.CurrentSessionId);
+        Assert.Equal("session-123", useCase.LastQuery.CurrentPublicSessionId);
         Assert.Equal("session-123", response.CurrentSid);
         Assert.Equal("session-123", session.Sid);
         Assert.Equal("127.0.0.1", session.Ip);
@@ -925,6 +943,8 @@ public sealed class AuthControllerIntegrationTests
         Assert.Contains("api/auth/token/login", actions);
         Assert.Contains("api/auth/token/refresh", actions);
         Assert.Contains("api/auth/token/logout", actions);
+        Assert.Contains("api/auth/external/google", actions);
+        Assert.Contains("api/auth/external/google/complete", actions);
         Assert.Contains("api/auth/session/refresh", actions);
         Assert.Contains("api/auth/session/me", actions);
         Assert.Contains("api/auth/session/logout", actions);

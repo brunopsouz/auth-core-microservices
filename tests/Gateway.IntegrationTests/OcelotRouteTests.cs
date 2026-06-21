@@ -33,6 +33,8 @@ public sealed class OcelotRouteTests
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/resend-verification", "POST", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/token/login", "POST", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/session/login", "POST", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/api/auth/external/google", "GET", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/api/auth/external/google/callback", "GET", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/{everything}", "GET", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/{everything}", "POST", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/{everything}", "PUT", requiresAuthentication: false));
@@ -89,7 +91,12 @@ public sealed class OcelotRouteTests
         AssertRouteKey(routes, "/api/auth/resend-verification", "auth-resend-verification");
         AssertRouteKey(routes, "/api/auth/token/login", "auth-token-login");
         AssertRouteKey(routes, "/api/auth/session/login", "auth-session-login");
+        AssertRouteKey(routes, "/api/auth/external/google", "auth-external-google");
+        AssertRouteKey(routes, "/api/auth/external/google/callback", "auth-external-google-callback");
         AssertRouteKey(routes, "/api/auth/{everything}", "authcore-auth");
+        AssertRoutePriority(routes, "/api/auth/external/google", 2);
+        AssertRoutePriority(routes, "/api/auth/external/google/callback", 2);
+        AssertRoutePriority(routes, "/api/auth/{everything}", 0);
         AssertRouteKey(routes, "/api/users/{everything}", "authcore-users");
         AssertRouteKey(routes, "/api/users/change-password", "users-change-password");
         AssertRouteKey(routes, "/api/users", "users-delete");
@@ -102,6 +109,8 @@ public sealed class OcelotRouteTests
         AssertRouteRateLimit(routes, "/api/auth/resend-verification", 5, "1m", 60);
         AssertRouteRateLimit(routes, "/api/auth/token/login", 10, "1m", 60);
         AssertRouteRateLimit(routes, "/api/auth/session/login", 10, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/auth/external/google", 20, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/auth/external/google/callback", 60, "1m", 60);
         AssertRouteRateLimit(routes, "/api/auth/{everything}", 120, "1m", 60);
         AssertRouteRateLimit(routes, "/api/users/change-password", 20, "1m", 60);
         AssertRouteRateLimit(routes, "/api/users", 10, "1m", 60);
@@ -109,6 +118,19 @@ public sealed class OcelotRouteTests
 
         AssertHealthRouteIsNotRateLimited(routes, "/authcore/health");
         AssertHealthRouteIsNotRateLimited(routes, "/notificationcore/health");
+    }
+
+    [Fact]
+    public void DockerCompose_WhenGoogleEnvironmentIsMapped_ShouldUseExampleVariableNames()
+    {
+        var compose = File.ReadAllText(GetDockerComposePath());
+
+        Assert.Contains("${AUTHENTICATION__GOOGLE__CLIENTID}", compose, StringComparison.Ordinal);
+        Assert.Contains("${AUTHENTICATION__GOOGLE__CLIENTSECRET}", compose, StringComparison.Ordinal);
+        Assert.Contains("${AUTHENTICATION__GOOGLE__CALLBACKPATH}", compose, StringComparison.Ordinal);
+        Assert.Contains("${AUTHENTICATION__ALLOWEDRETURNURLS__0}", compose, StringComparison.Ordinal);
+        Assert.DoesNotContain("${AUTHENTICATION_GOOGLE_CLIENTID}", compose, StringComparison.Ordinal);
+        Assert.DoesNotContain("${AUTHENTICATION_ALLOWEDRETURNURL_0}", compose, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -297,6 +319,46 @@ public sealed class OcelotRouteTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(path, await response.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
+    [InlineData("/api/auth/external/google")]
+    [InlineData("/api/auth/external/google/callback")]
+    public async Task PublicGoogleExternalRoute_WhenRequestHasNoJwt_ShouldForwardToAuthCore(string path)
+    {
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/auth/external/{**everything}", (HttpContext context) =>
+            {
+                return Results.Text($"{context.Request.Path.Value}{context.Request.QueryString.Value}");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/auth/external/google",
+                "/api/auth/external/google",
+                "GET",
+                authCore,
+                rateLimit: new RateLimitConfiguration(20, "1m", "1m")),
+            CreateRoute(
+                "/api/auth/external/google/callback",
+                "/api/auth/external/google/callback",
+                "GET",
+                authCore,
+                rateLimit: new RateLimitConfiguration(60, "1m", "1m")),
+            CreateRoute(
+                "/api/auth/{everything}",
+                "/api/auth/{everything}",
+                "GET",
+                authCore)
+        ]));
+
+        using var httpClient = new HttpClient();
+        using var response = await httpClient.GetAsync($"{GetAddress(gateway)}{path}?returnUrl=http%3A%2F%2Flocalhost%3A5173");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal($"{path}?returnUrl=http%3A%2F%2Flocalhost%3A5173", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -1090,6 +1152,16 @@ public sealed class OcelotRouteTests
         Assert.Equal(expectedPeriodTimespan, rateLimitOptions.GetProperty("PeriodTimespan").GetInt32());
     }
 
+    private static void AssertRoutePriority(
+        IReadOnlyCollection<JsonElement> routes,
+        string upstreamPathTemplate,
+        int expectedPriority)
+    {
+        var route = GetRoute(routes, upstreamPathTemplate);
+
+        Assert.Equal(expectedPriority, route.GetProperty("Priority").GetInt32());
+    }
+
     private static void AssertHealthRouteIsNotRateLimited(
         IReadOnlyCollection<JsonElement> routes,
         string upstreamPathTemplate)
@@ -1167,6 +1239,23 @@ public sealed class OcelotRouteTests
             "Gateway",
             "Gateway.Api",
             "ocelot.json");
+    }
+
+    private static string GetDockerComposePath()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "AuthCore.sln")))
+            directory = directory.Parent;
+
+        if (directory is null)
+            throw new InvalidOperationException("Raiz do repositorio nao encontrada.");
+
+        return Path.Combine(
+            directory.FullName,
+            "src",
+            "Backend",
+            "docker-compose.yml");
     }
 
     private sealed class RouteConfiguration

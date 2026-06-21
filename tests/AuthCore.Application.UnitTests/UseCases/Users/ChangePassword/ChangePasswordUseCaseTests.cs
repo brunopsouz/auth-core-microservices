@@ -66,7 +66,6 @@ public sealed class ChangePasswordUseCaseTests
         Assert.Equal("password-changed", revokeCall.Reason);
         Assert.Equal(SessionStatus.Revoked, updatedSession.Status);
         Assert.Equal(SessionRevocationReason.PasswordChanged, updatedSession.RevocationReason);
-        Assert.Equal([user.Id], sessionStore.RevokedAllUserIds);
         Assert.Contains(existingSession.SessionId, sessionStore.RevokedSessionIds);
         Assert.Equal(1, unitOfWork.BegunTransactions);
         Assert.Equal(1, unitOfWork.CommittedTransactions);
@@ -115,7 +114,7 @@ public sealed class ChangePasswordUseCaseTests
         Assert.Empty(passwordRepository.UpdatedPasswords);
         Assert.Empty(userRepository.UpdatedUsers);
         Assert.Empty(refreshTokenRepository.RevokeUserCalls);
-        Assert.Empty(sessionStore.RevokedAllUserIds);
+        Assert.Empty(sessionStore.RevokedSessionIds);
         Assert.Equal(0, unitOfWork.BegunTransactions);
         Assert.Equal(0, unitOfWork.CommittedTransactions);
         Assert.Equal(0, unitOfWork.RolledBackTransactions);
@@ -163,7 +162,7 @@ public sealed class ChangePasswordUseCaseTests
         Assert.Equal(0, unitOfWork.CommittedTransactions);
         Assert.Equal(1, unitOfWork.RolledBackTransactions);
         Assert.Empty(refreshTokenRepository.RevokeUserCalls);
-        Assert.Empty(sessionStore.RevokedAllUserIds);
+        Assert.Empty(sessionStore.RevokedSessionIds);
     }
 
     /// <summary>

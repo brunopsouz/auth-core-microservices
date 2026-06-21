@@ -87,30 +87,55 @@ internal sealed class RefreshBrowserSessionUseCase : IRefreshBrowserSessionUseCa
         var session = await _durableSessionRepository.GetByIdentifierHashAsync(sessionIdentifierHash, sessionIdentifier);
 
         if (session is null)
+        {
+            await _sessionStore.RemoveAsync(command.SessionId);
             throw CreateInvalidSessionException();
+        }
 
         var user = await _userReadRepository.GetByIdAsync(session.UserId);
 
         if (user is null || !user.CanSignIn)
+        {
+            await _sessionStore.RemoveAsync(session.SessionId);
             throw CreateInvalidSessionException();
+        }
+
+        var nowUtc = DateTime.UtcNow;
 
         try
         {
-            session.EnsureCanIssueAccessToken(DateTime.UtcNow, user.SecurityStamp);
+            session.EnsureCanIssueAccessToken(nowUtc, user.SecurityStamp);
         }
         catch (DomainException)
         {
+            await _sessionStore.RemoveAsync(session.SessionId);
             throw CreateInvalidSessionException();
         }
 
-        var accessToken = _accessTokenGenerator.Generate(user, session);
-        var updatedSession = await TryTouchSessionAsync(session);
+        var updatedSession = TouchSessionWhenRequired(session, nowUtc);
+        var persistedSession = await _durableSessionRepository.TryUpdateActiveAsync(updatedSession, nowUtc);
+
+        if (persistedSession is null)
+        {
+            await _sessionStore.RemoveWhenVersionIsNotNewerAsync(session.SessionId, session.Version);
+            throw CreateInvalidSessionException();
+        }
+
+        if (!await _sessionStore.TrySaveAsync(persistedSession))
+        {
+            await _sessionStore.RemoveWhenVersionIsNotNewerAsync(
+                session.SessionId,
+                persistedSession.Version);
+            throw CreateInvalidSessionException();
+        }
+
+        var accessToken = _accessTokenGenerator.Generate(user, persistedSession);
 
         return new RefreshedSessionAccessResult
         {
             AccessToken = accessToken.Token,
             AccessTokenExpiresAtUtc = accessToken.ExpiresAtUtc,
-            SessionExpiresAtUtc = updatedSession?.ExpiresAtUtc ?? session.ExpiresAtUtc
+            SessionExpiresAtUtc = persistedSession.ExpiresAtUtc
         };
     }
 
@@ -119,25 +144,21 @@ internal sealed class RefreshBrowserSessionUseCase : IRefreshBrowserSessionUseCa
     /// Operacao para atualizar o ultimo uso da sessao quando a janela minima permitir.
     /// </summary>
     /// <param name="session">Sessao autenticada atual.</param>
-    /// <returns>Sessao atualizada quando houve touch; caso contrario, nula.</returns>
-    private async Task<Session?> TryTouchSessionAsync(Session session)
+    /// <param name="nowUtc">Data atual em UTC.</param>
+    /// <returns>Sessao atualizada quando o intervalo permitir; caso contrario, a sessao original.</returns>
+    private Session TouchSessionWhenRequired(Session session, DateTime nowUtc)
     {
-        var nowUtc = DateTime.UtcNow;
         var lastSeenAtUtc = session.LastSeenAtUtc ?? session.CreatedAtUtc;
         var updateInterval = _sessionService.GetLastSeenUpdateInterval();
 
         if (nowUtc - lastSeenAtUtc < updateInterval)
-            return null;
+            return session;
 
         var expiresAtUtc = _sessionService.UseSlidingExpiration
             ? _sessionService.GetSlidingExpiresAtUtc(nowUtc)
             : session.ExpiresAtUtc;
-        var updatedSession = session.Touch(nowUtc, expiresAtUtc);
 
-        await _durableSessionRepository.UpdateAsync(updatedSession);
-        await _sessionStore.SaveAsync(updatedSession);
-
-        return updatedSession;
+        return session.Touch(nowUtc, expiresAtUtc);
     }
 
     /// <summary>

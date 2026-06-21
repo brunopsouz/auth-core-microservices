@@ -21,9 +21,8 @@ public sealed class OutboxProcessorTests
             payload,
             DateTime.UtcNow);
         var outboxRepository = new FakeOutboxRepository(message);
-        var unitOfWork = new SpyUnitOfWork();
         var publisher = new SpyNotificationRequestPublisher();
-        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
+        var processor = CreateProcessor(outboxRepository, publisher);
 
         var result = await processor.ProcessPendingAsync();
 
@@ -34,9 +33,6 @@ public sealed class OutboxProcessorTests
         Assert.Equal(payload, publisher.PublishedMessages[0].Payload);
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.NotNull(outboxRepository.UpdatedMessages[0].ProcessedAtUtc);
-        Assert.Equal(1, unitOfWork.BeginCount);
-        Assert.Equal(1, unitOfWork.CommitCount);
-        Assert.Equal(0, unitOfWork.RollbackCount);
     }
 
     [Fact]
@@ -54,9 +50,8 @@ public sealed class OutboxProcessorTests
             JsonSerializer.Serialize(outboxEvent),
             DateTime.UtcNow);
         var outboxRepository = new FakeOutboxRepository(message);
-        var unitOfWork = new SpyUnitOfWork();
         var publisher = new SpyNotificationRequestPublisher();
-        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
+        var processor = CreateProcessor(outboxRepository, publisher);
 
         var result = await processor.ProcessPendingAsync();
 
@@ -69,9 +64,6 @@ public sealed class OutboxProcessorTests
         Assert.Contains("auth-email-confirmation-legacy", publisher.PublishedMessages[0].Request.IdempotencyKey);
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.NotNull(outboxRepository.UpdatedMessages[0].ProcessedAtUtc);
-        Assert.Equal(1, unitOfWork.BeginCount);
-        Assert.Equal(1, unitOfWork.CommitCount);
-        Assert.Equal(0, unitOfWork.RollbackCount);
     }
 
     [Fact]
@@ -82,9 +74,8 @@ public sealed class OutboxProcessorTests
             "{}",
             DateTime.UtcNow);
         var outboxRepository = new FakeOutboxRepository(message);
-        var unitOfWork = new SpyUnitOfWork();
         var publisher = new SpyNotificationRequestPublisher();
-        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
+        var processor = CreateProcessor(outboxRepository, publisher);
 
         var result = await processor.ProcessPendingAsync();
 
@@ -94,8 +85,6 @@ public sealed class OutboxProcessorTests
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.Equal(1, outboxRepository.UpdatedMessages[0].AttemptCount);
         Assert.Contains("não suportado", outboxRepository.UpdatedMessages[0].LastError);
-        Assert.Equal(1, unitOfWork.CommitCount);
-        Assert.Equal(0, unitOfWork.RollbackCount);
     }
 
     [Fact]
@@ -107,12 +96,11 @@ public sealed class OutboxProcessorTests
             JsonSerializer.Serialize(notificationRequest),
             DateTime.UtcNow);
         var outboxRepository = new FakeOutboxRepository(message);
-        var unitOfWork = new SpyUnitOfWork();
         var publisher = new SpyNotificationRequestPublisher
         {
             ExceptionToThrow = new InvalidOperationException("RabbitMQ indisponível.")
         };
-        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
+        var processor = CreateProcessor(outboxRepository, publisher);
 
         var result = await processor.ProcessPendingAsync();
 
@@ -121,8 +109,6 @@ public sealed class OutboxProcessorTests
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.Equal(1, outboxRepository.UpdatedMessages[0].AttemptCount);
         Assert.Equal("RabbitMQ indisponível.", outboxRepository.UpdatedMessages[0].LastError);
-        Assert.Equal(1, unitOfWork.CommitCount);
-        Assert.Equal(0, unitOfWork.RollbackCount);
     }
 
     [Fact]
@@ -134,12 +120,11 @@ public sealed class OutboxProcessorTests
             JsonSerializer.Serialize(notificationRequest),
             DateTime.UtcNow);
         var outboxRepository = new FakeOutboxRepository(message);
-        var unitOfWork = new SpyUnitOfWork();
         var publisher = new SpyNotificationRequestPublisher
         {
             ExceptionToThrow = new InvalidOperationException("Falha com confirmationCode=123456.")
         };
-        var processor = CreateProcessor(outboxRepository, unitOfWork, publisher);
+        var processor = CreateProcessor(outboxRepository, publisher);
 
         var result = await processor.ProcessPendingAsync();
 
@@ -174,12 +159,10 @@ public sealed class OutboxProcessorTests
 
     private static OutboxProcessor CreateProcessor(
         IOutboxRepository outboxRepository,
-        IUnitOfWork unitOfWork,
         INotificationRequestPublisher publisher)
     {
         return new OutboxProcessor(
             outboxRepository,
-            unitOfWork,
             publisher,
             Options.Create(new OutboxOptions
             {
@@ -204,13 +187,16 @@ public sealed class OutboxProcessorTests
 
         public List<OutboxMessage> UpdatedMessages { get; } = [];
 
-        public Task AddAsync(OutboxMessage message)
+        public Task AddAsync(OutboxMessage message, CancellationToken cancellationToken = default)
         {
             _messages.Add(message);
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyCollection<OutboxMessage>> GetPendingAsync(int take, int maxAttempts)
+        public Task<IReadOnlyCollection<OutboxMessage>> GetPendingAsync(
+            int take,
+            int maxAttempts,
+            CancellationToken cancellationToken = default)
         {
             IReadOnlyCollection<OutboxMessage> messages = _messages
                 .Where(message => message.ProcessedAtUtc is null && message.AttemptCount < maxAttempts)
@@ -220,42 +206,51 @@ public sealed class OutboxProcessorTests
             return Task.FromResult(messages);
         }
 
-        public Task UpdateAsync(OutboxMessage message)
+        public Task<OutboxMessage?> ClaimPendingAsync(
+            Guid leaseId,
+            DateTime leasedUntilUtc,
+            int maxAttempts,
+            DateTime nowUtc,
+            CancellationToken cancellationToken = default)
         {
-            var index = _messages.FindIndex(current => current.Id == message.Id);
+            var message = _messages.FirstOrDefault(current =>
+                current.ProcessedAtUtc is null
+                && current.AttemptCount < maxAttempts
+                && (!current.LeasedUntilUtc.HasValue || current.LeasedUntilUtc <= nowUtc));
 
-            if (index >= 0)
-                _messages[index] = message;
-
-            UpdatedMessages.Add(message);
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class SpyUnitOfWork : IUnitOfWork
-    {
-        public int BeginCount { get; private set; }
-
-        public int CommitCount { get; private set; }
-
-        public int RollbackCount { get; private set; }
-
-        public Task BeginTransactionAsync(CancellationToken cancellationToken = default)
-        {
-            BeginCount++;
-            return Task.CompletedTask;
+            return Task.FromResult(message);
         }
 
-        public Task CommitAsync(CancellationToken cancellationToken = default)
+        public Task<bool> MarkAsProcessedAsync(
+            Guid messageId,
+            Guid leaseId,
+            DateTime processedAtUtc,
+            CancellationToken cancellationToken = default)
         {
-            CommitCount++;
-            return Task.CompletedTask;
+            var index = _messages.FindIndex(current => current.Id == messageId);
+            if (index < 0)
+                return Task.FromResult(false);
+
+            var updated = _messages[index].MarkAsProcessed(processedAtUtc);
+            _messages[index] = updated;
+            UpdatedMessages.Add(updated);
+            return Task.FromResult(true);
         }
 
-        public Task RollbackAsync(CancellationToken cancellationToken = default)
+        public Task<bool> RegisterFailureAsync(
+            Guid messageId,
+            Guid leaseId,
+            string errorMessage,
+            CancellationToken cancellationToken = default)
         {
-            RollbackCount++;
-            return Task.CompletedTask;
+            var index = _messages.FindIndex(current => current.Id == messageId);
+            if (index < 0)
+                return Task.FromResult(false);
+
+            var updated = _messages[index].RegisterFailure(errorMessage);
+            _messages[index] = updated;
+            UpdatedMessages.Add(updated);
+            return Task.FromResult(true);
         }
     }
 

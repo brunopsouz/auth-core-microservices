@@ -22,6 +22,7 @@ public sealed class SessionTests
 
         Assert.Equal(userId, session.UserId);
         Assert.Equal(SessionStatus.Active, session.Status);
+        Assert.Equal(1, session.Version);
         Assert.Equal(securityStamp, session.SecurityStamp);
         Assert.NotEqual(string.Empty, session.SessionId);
         Assert.NotEqual(string.Empty, session.PublicSessionId);
@@ -58,6 +59,7 @@ public sealed class SessionTests
         Assert.Equal("opaque-session", session.SessionId);
         Assert.Equal("public-session", session.PublicSessionId);
         Assert.Equal(SessionStatus.Active, session.Status);
+        Assert.Equal(1, session.Version);
         Assert.Equal(securityStamp, session.SecurityStamp);
         Assert.Equal(lastSeenAtUtc, session.LastSeenAtUtc);
     }
@@ -156,6 +158,7 @@ public sealed class SessionTests
         var revokedSession = session.Revoke(SessionRevocationReason.UserRevokedDevice, revokedAtUtc);
 
         Assert.Equal(SessionStatus.Revoked, revokedSession.Status);
+        Assert.Equal(session.Version + 1, revokedSession.Version);
         Assert.Equal(revokedAtUtc, revokedSession.RevokedAtUtc);
         Assert.Equal(SessionRevocationReason.UserRevokedDevice, revokedSession.RevocationReason);
     }
@@ -178,6 +181,23 @@ public sealed class SessionTests
             activeSession.CreatedAtUtc.AddMinutes(2));
 
         Assert.Same(session, updatedSession);
+    }
+
+    [Fact]
+    public void AdvanceVersion_WhenSessionIsActive_ShouldIncrementVersionWithoutChangingState()
+    {
+        var session = Session.Issue(
+            Guid.NewGuid(),
+            SecurityStamp.Create(),
+            DateTime.UtcNow.AddDays(7),
+            ipAddress: null,
+            userAgent: null);
+
+        var updatedSession = session.AdvanceVersion();
+
+        Assert.Equal(session.Version + 1, updatedSession.Version);
+        Assert.Equal(session.Status, updatedSession.Status);
+        Assert.Equal(session.PublicSessionId, updatedSession.PublicSessionId);
     }
 
     [Fact]

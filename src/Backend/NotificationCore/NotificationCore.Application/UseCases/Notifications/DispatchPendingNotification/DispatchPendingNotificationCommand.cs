@@ -24,4 +24,9 @@ public sealed class DispatchPendingNotificationCommand
     /// Intervalo máximo permitido para uma notificação permanecer em processamento.
     /// </summary>
     public TimeSpan ProcessingTimeout { get; init; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>
+    /// Token para cancelamento do ciclo de processamento.
+    /// </summary>
+    public CancellationToken CancellationToken { get; init; }
 }

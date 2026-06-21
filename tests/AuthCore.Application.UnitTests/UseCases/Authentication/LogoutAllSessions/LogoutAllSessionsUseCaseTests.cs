@@ -30,7 +30,6 @@ public sealed class LogoutAllSessionsUseCaseTests
 
         Assert.Equal(2, updatedSessions.Count);
         Assert.All(updatedSessions, session => Assert.Equal(SessionRevocationReason.UserLogout, session.RevocationReason));
-        Assert.Equal([userId], sessionStore.RevokedAllUserIds);
         Assert.Contains(firstSession.SessionId, sessionStore.RevokedSessionIds);
         Assert.Contains(secondSession.SessionId, sessionStore.RevokedSessionIds);
     }

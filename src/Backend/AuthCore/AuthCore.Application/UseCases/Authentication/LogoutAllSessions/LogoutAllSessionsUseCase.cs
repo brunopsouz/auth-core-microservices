@@ -43,10 +43,12 @@ internal sealed class LogoutAllSessionsUseCase : ILogoutAllSessionsUseCase
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        await _durableSessionRepository.RevokeActiveByUserIdAsync(
+        var revokedSessions = await _durableSessionRepository.RevokeActiveByUserIdAsync(
             command.UserId,
             SessionRevocationReason.UserLogout,
             DateTime.UtcNow);
-        await _sessionStore.RevokeAllAsync(command.UserId);
+
+        foreach (var revokedSession in revokedSessions)
+            await _sessionStore.RevokeAsync(revokedSession);
     }
 }

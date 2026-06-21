@@ -1,7 +1,7 @@
+using System.Diagnostics;
 using System.Data;
 using AuthCore.Infrastructure.Abstractions.Data;
-using AuthCore.Infrastructure.Configurations;
-using Microsoft.Extensions.Options;
+using AuthCore.Infrastructure.Observability;
 using Npgsql;
 
 namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Connections;
@@ -12,25 +12,22 @@ namespace AuthCore.Infrastructure.Persistences.Write.PostgreSQL.Connections;
 internal sealed class NpgsqlConnectionFactory : IDbConnectionFactory
 {
     /// <summary>
-    /// Campo que armazena connection string.
+    /// Campo que armazena a fonte de dados PostgreSQL.
     /// </summary>
-    private readonly string _connectionString;
+    private readonly NpgsqlDataSource _dataSource;
+    private readonly DatabaseMetrics _metrics;
 
 
     /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
-    /// <param name="options">Opções de configuração do banco de dados.</param>
-    public NpgsqlConnectionFactory(IOptions<DatabaseOptions> options)
+    /// <param name="dataSource">Fonte de dados PostgreSQL compartilhada.</param>
+    public NpgsqlConnectionFactory(NpgsqlDataSource dataSource, DatabaseMetrics metrics)
     {
-        ArgumentNullException.ThrowIfNull(options);
-
-        _connectionString = options.Value.PostgreSql;
-
-        if (string.IsNullOrWhiteSpace(_connectionString))
-        {
-            throw new InvalidOperationException("Database connection string was not configured.");
-        }
+        ArgumentNullException.ThrowIfNull(dataSource);
+        ArgumentNullException.ThrowIfNull(metrics);
+        _dataSource = dataSource;
+        _metrics = metrics;
     }
 
 
@@ -41,8 +38,20 @@ internal sealed class NpgsqlConnectionFactory : IDbConnectionFactory
     /// <returns>Conexão aberta pronta para uso.</returns>
     public async Task<IDbConnection> CreateOpenConnectionAsync(CancellationToken cancellationToken = default)
     {
-        var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        return connection;
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            return await _dataSource.OpenConnectionAsync(cancellationToken);
+        }
+        catch
+        {
+            _metrics.RecordAcquisitionFailure();
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _metrics.RecordAcquisition(stopwatch.Elapsed);
+        }
     }
 }

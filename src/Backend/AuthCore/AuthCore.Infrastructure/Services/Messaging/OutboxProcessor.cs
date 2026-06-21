@@ -29,10 +29,6 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     /// </summary>
     private readonly IOutboxRepository _outboxRepository;
     /// <summary>
-    /// Campo que armazena unit of work.
-    /// </summary>
-    private readonly IUnitOfWork _unitOfWork;
-    /// <summary>
     /// Campo que armazena notification request publisher.
     /// </summary>
     private readonly INotificationRequestPublisher _notificationRequestPublisher;
@@ -53,21 +49,18 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     /// Operação para criar instância da classe.
     /// </summary>
     /// <param name="outboxRepository">Repositório da outbox.</param>
-    /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
     /// <param name="notificationRequestPublisher">Publisher de solicitações de notificação.</param>
     /// <param name="outboxOptions">Opções de processamento da outbox.</param>
     /// <param name="outboxMetrics">Métricas da outbox.</param>
     /// <param name="logger">Serviço de logging.</param>
     public OutboxProcessor(
         IOutboxRepository outboxRepository,
-        IUnitOfWork unitOfWork,
         INotificationRequestPublisher notificationRequestPublisher,
         IOptions<OutboxOptions> outboxOptions,
         OutboxMetrics outboxMetrics,
         ILogger<OutboxProcessor> logger)
     {
         _outboxRepository = outboxRepository;
-        _unitOfWork = unitOfWork;
         _notificationRequestPublisher = notificationRequestPublisher;
         _outboxOptions = outboxOptions.Value;
         _outboxMetrics = outboxMetrics;
@@ -131,32 +124,19 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     /// <returns>Indicador de sucesso no processamento, ou nulo quando não houver mensagem pendente.</returns>
     private async Task<bool?> ProcessNextPendingMessageAsync(CancellationToken cancellationToken)
     {
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        var leaseId = Guid.NewGuid();
+        var nowUtc = DateTime.UtcNow;
+        var message = await _outboxRepository.ClaimPendingAsync(
+            leaseId,
+            nowUtc.AddSeconds(_outboxOptions.LeaseDurationSeconds),
+            _outboxOptions.MaxAttempts,
+            nowUtc,
+            cancellationToken);
 
-        try
-        {
-            var messages = await _outboxRepository.GetPendingAsync(
-                take: 1,
-                maxAttempts: _outboxOptions.MaxAttempts);
-            var message = messages.FirstOrDefault();
+        if (message is null)
+            return null;
 
-            if (message is null)
-            {
-                await _unitOfWork.CommitAsync(cancellationToken);
-                return null;
-            }
-
-            var processed = await TryProcessMessageAsync(message, cancellationToken);
-
-            await _unitOfWork.CommitAsync(cancellationToken);
-
-            return processed;
-        }
-        catch
-        {
-            await _unitOfWork.RollbackAsync();
-            throw;
-        }
+        return await TryProcessMessageAsync(message, leaseId, cancellationToken);
     }
 
     /// <summary>
@@ -167,6 +147,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     /// <returns>Indicador de sucesso no processamento.</returns>
     private async Task<bool> TryProcessMessageAsync(
         OutboxMessage message,
+        Guid leaseId,
         CancellationToken cancellationToken)
     {
         using var scope = _logger.BeginScope(new Dictionary<string, object?>
@@ -179,8 +160,13 @@ internal sealed class OutboxProcessor : IOutboxProcessor
         {
             await DispatchAsync(message, cancellationToken);
 
-            var processedMessage = message.MarkAsProcessed(DateTime.UtcNow);
-            await _outboxRepository.UpdateAsync(processedMessage);
+            var wasCompleted = await _outboxRepository.MarkAsProcessedAsync(
+                message.Id,
+                leaseId,
+                DateTime.UtcNow,
+                cancellationToken);
+            if (!wasCompleted)
+                throw new InvalidOperationException("O lease da mensagem de outbox não é mais válido.");
             _outboxMetrics.RecordProcessed(message.Type);
 
             _logger.LogInformation(
@@ -196,17 +182,21 @@ internal sealed class OutboxProcessor : IOutboxProcessor
         }
         catch (Exception exception)
         {
-            var failedMessage = message.RegisterFailure(GetErrorMessage(exception));
-            await _outboxRepository.UpdateAsync(failedMessage);
+            var errorMessage = GetErrorMessage(exception);
+            await _outboxRepository.RegisterFailureAsync(
+                message.Id,
+                leaseId,
+                errorMessage,
+                cancellationToken);
             _outboxMetrics.RecordFailed(message.Type);
 
             _logger.LogWarning(
                 "Falha ao processar mensagem de outbox. MessageId={MessageId}, Type={MessageType}, AttemptCount={AttemptCount}, ExceptionType={ExceptionType}, ErrorMessage={ErrorMessage}, ExceptionDetails={ExceptionDetails}.",
                 message.Id,
                 message.Type,
-                failedMessage.AttemptCount,
+                message.AttemptCount + 1,
                 exception.GetType().Name,
-                failedMessage.LastError,
+                errorMessage,
                 SensitivePayloadSanitizer.SanitizeText(exception.ToString()));
 
             return false;
