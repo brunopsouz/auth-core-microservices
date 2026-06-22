@@ -1,11 +1,13 @@
 # AuthCore
 
-![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
-![ASP.NET Core](https://img.shields.io/badge/ASP.NET%20Core-Web%20API-512BD4)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
-![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3-FF6600?logo=rabbitmq&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
+<p>
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white">
+  <img alt="ASP.NET Core" src="https://img.shields.io/badge/ASP.NET_Core-Web_API-512BD4?style=for-the-badge&logo=dotnet&logoColor=white">
+  <img alt="PostgreSQL 17" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white">
+  <img alt="Redis 7" src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white">
+  <img alt="RabbitMQ 3" src="https://img.shields.io/badge/RabbitMQ-3-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white">
+  <img alt="Docker Compose" src="https://img.shields.io/badge/Docker_Compose-local-2496ED?style=for-the-badge&logo=docker&logoColor=white">
+</p>
 
 AuthCore é uma solução backend em .NET 10 para autenticação, gestão de usuários e notificações transacionais. A base está organizada por serviços backend, API Gateway, mensageria assíncrona e camadas internas com influência de Clean Architecture e DDD tático.
 
