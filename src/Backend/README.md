@@ -77,7 +77,13 @@ As rotas `/api/auth/...` permanecem sob responsabilidade do AuthCore, inclusive 
 
 ### Login com Google
 
-O suporte a login com Google esta em implementacao no AuthCore. Ate o momento, existem dominio, persistencia, casos de uso de Application e o endpoint publico `GET /api/auth/external/google` para iniciar o challenge quando `ClientId` e `ClientSecret` estao configurados por ambiente. Ainda nao existem callback, emissao de sessao apos retorno do Google ou rotas publicadas pelo Gateway para esse fluxo.
+O AuthCore ja suporta login com Google no fluxo browser com sessao interna. O fluxo exposto atualmente inclui:
+
+- `GET /api/auth/external/google` para iniciar o challenge;
+- `GET /api/auth/external/google/callback` como callback tecnico do middleware externo;
+- `GET /api/auth/external/google/complete` para concluir o login e emitir a autenticacao interna do AuthCore.
+
+Essas rotas tambem estao publicadas no Gateway. `ClientId` e `ClientSecret` continuam obrigatorios por ambiente e devem permanecer fora de arquivos versionados.
 
 ## Solucoes
 

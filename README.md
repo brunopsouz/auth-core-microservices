@@ -301,14 +301,20 @@ Quando `Authorization: Bearer` está presente, ele tem prioridade sobre qualquer
 
 ### Login com Google
 
-O suporte a login com Google esta em implementacao. A base interna ja possui dominio, persistencia e casos de uso de Application para:
+O suporte a login com Google esta disponivel no AuthCore para o fluxo browser com sessao interna. A implementacao cobre:
 
 - representar vinculo externo por `provider + providerUserId`;
 - concluir login Google a partir de dados externos ja validados pela borda;
 - vincular Google a usuario autenticado;
 - desvincular Google sem deixar o usuario sem metodo de autenticacao utilizavel.
 
-O endpoint publico `GET /api/auth/external/google` ja inicia o challenge com Google quando `ClientId` e `ClientSecret` estao configurados por ambiente. O callback, a criacao da sessao apos retorno do Google e o roteamento pelo Gateway ainda nao estao disponiveis. Ate essa etapa ser concluida, o login Google nao deve ser anunciado como fluxo funcional ponta a ponta para clientes.
+O fluxo HTTP publicado atualmente e este:
+
+- `GET /api/auth/external/google`: inicia o challenge com Google.
+- `GET /api/auth/external/google/callback`: callback tecnico do middleware OAuth/OIDC.
+- `GET /api/auth/external/google/complete`: conclui o login, emite a autenticacao interna do AuthCore e redireciona para uma `returnUrl` validada por allowlist.
+
+As rotas publicas do Google tambem estao publicadas no Gateway quando a aplicacao completa roda em Docker Compose. `ClientId` e `ClientSecret` devem ser fornecidos por ambiente, nunca em arquivos versionados.
 
 ### Teste manual do fluxo Browser/PWA
 
@@ -368,6 +374,9 @@ Quando a aplicação completa está em Docker, prefira acessar as rotas publicad
 | `POST` | `/api/auth/token/login` | Autentica por JWT e refresh token |
 | `POST` | `/api/auth/token/refresh` | Renova uma sessão token-based |
 | `POST` | `/api/auth/token/logout` | Revoga refresh token |
+| `GET` | `/api/auth/external/google` | Inicia login com Google |
+| `GET` | `/api/auth/external/google/callback` | Recebe callback tecnico do Google |
+| `GET` | `/api/auth/external/google/complete` | Conclui login Google e redireciona com sessao autenticada |
 | `GET` | `/api/users/profile` | Consulta perfil autenticado |
 | `PUT` | `/api/users/profile` | Atualiza perfil autenticado |
 | `PUT` | `/api/users/change-password` | Altera senha |

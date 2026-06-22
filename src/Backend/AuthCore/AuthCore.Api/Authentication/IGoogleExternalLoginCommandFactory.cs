@@ -7,7 +7,7 @@ namespace AuthCore.Api.Authentication;
 /// <summary>
 /// Define operacao para criar comando de conclusao do login externo com Google.
 /// </summary>
-public interface IGoogleExternalLoginCommandFactory
+internal interface IGoogleExternalLoginCommandFactory
 {
     /// <summary>
     /// Operacao para criar comando a partir da identidade Google autenticada.

@@ -219,7 +219,9 @@ public sealed class PostgreSqlIntegrationFixture : IAsyncLifetime
                 ["ConnectionStrings:PostgreSql"] = DatabaseConnectionString,
                 ["Database:Migrations:AutoMigrateOnStartup"] = "true",
                 ["Database:Migrations:EnsureDatabaseCreated"] = "true",
-                ["Database:Migrations:AdminDatabase"] = GetAdminDatabaseName()
+                ["Database:Migrations:AdminDatabase"] = GetAdminDatabaseName(),
+                ["Redis:ConnectionString"] = "localhost:6379,abortConnect=false",
+                ["Redis:KeyPrefix"] = "authcore:integration"
             })
             .Build();
 

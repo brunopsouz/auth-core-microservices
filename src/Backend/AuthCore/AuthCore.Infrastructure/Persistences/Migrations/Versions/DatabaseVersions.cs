@@ -69,4 +69,9 @@ internal static class DatabaseVersions
     /// Versao de inclusao do controle monotonicamente crescente das sessoes.
     /// </summary>
     public const long AUTH_SESSIONS_VERSION = 13;
+
+    /// <summary>
+    /// Versao de garantia de um unico login por usuario e provedor.
+    /// </summary>
+    public const long EXTERNAL_LOGINS_USER_PROVIDER_UNIQUENESS = 14;
 }

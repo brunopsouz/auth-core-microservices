@@ -5,7 +5,7 @@ namespace AuthCore.Api.Observability;
 /// <summary>
 /// Representa metricas do fluxo de autenticacao externa.
 /// </summary>
-public sealed class ExternalAuthenticationMetrics
+internal sealed class ExternalAuthenticationMetrics
 {
     private static readonly Meter Meter = new("AuthCore.ExternalAuthentication", "1.0.0");
     private static readonly Counter<long> StartedLogins = Meter.CreateCounter<long>(

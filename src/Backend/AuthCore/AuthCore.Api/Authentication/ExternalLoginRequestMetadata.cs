@@ -5,6 +5,6 @@ namespace AuthCore.Api.Authentication;
 /// </summary>
 /// <param name="IpAddress">Endereco IP de origem da requisicao.</param>
 /// <param name="UserAgent">Identificacao do agente que iniciou a requisicao.</param>
-public sealed record ExternalLoginRequestMetadata(
+internal sealed record ExternalLoginRequestMetadata(
     string? IpAddress,
     string? UserAgent);

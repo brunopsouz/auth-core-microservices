@@ -168,6 +168,44 @@ public sealed class ExternalLoginPersistenceIntegrationTests : IClassFixture<Pos
     }
 
     /// <summary>
+    /// Verifica se o banco impede mais de um vinculo do mesmo provedor por usuario.
+    /// </summary>
+    [Fact]
+    public async Task AddAsync_WhenUserAlreadyHasProvider_ShouldRejectDuplicate()
+    {
+        if (!_fixture.IsAvailable)
+            return;
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var databaseSession = scope.ServiceProvider.GetRequiredService<IDatabaseSession>();
+        var externalLoginRepository = new ExternalLoginRepository(databaseSession);
+        var user = CreateVerifiedUser("external.duplicate.provider@example.com");
+        var linkedAtUtc = new DateTime(2026, 6, 21, 10, 0, 0, DateTimeKind.Utc);
+        var firstExternalLogin = ExternalLogin.LinkGoogle(
+            user.Id,
+            "google-sub-duplicate-provider-1",
+            user.Email.Value,
+            emailVerified: true,
+            linkedAtUtc);
+        var secondExternalLogin = ExternalLogin.LinkGoogle(
+            user.Id,
+            "google-sub-duplicate-provider-2",
+            user.Email.Value,
+            emailVerified: true,
+            linkedAtUtc.AddMinutes(1));
+
+        await userRepository.AddAsync(user);
+        await externalLoginRepository.AddAsync(firstExternalLogin);
+
+        var exception = await Assert.ThrowsAsync<PostgresException>(
+            () => externalLoginRepository.AddAsync(secondExternalLogin));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, exception.SqlState);
+        Assert.Equal("UX_external_logins_user_id_provider", exception.ConstraintName);
+    }
+
+    /// <summary>
     /// Verifica se a leitura por usuário e provedor materializa o login externo.
     /// </summary>
     [Fact]
