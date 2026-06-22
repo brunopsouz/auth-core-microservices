@@ -199,6 +199,14 @@ public static class ApiDependencyInjection
             options.Scope.Add("openid");
             options.Scope.Add("profile");
             options.Scope.Add("email");
+            options.ClaimActions.MapJsonKey(
+                "urn:google:email_verified",
+                "verified_email",
+                ClaimValueTypes.Boolean);
+            options.ClaimActions.MapJsonKey(
+                "urn:google:email_verified",
+                "email_verified",
+                ClaimValueTypes.Boolean);
         });
     }
 

@@ -431,6 +431,7 @@ src/.env
 # Ignore
 docs/explain
 docs/specs
+docs/features
 .env.*
 !src/Backend/.env.development.example
 AGENTS.md
@@ -438,5 +439,6 @@ AGENTS.md
 .codex
 
 docs/refactor/
-d o c s / f e a t u r e s /  
+d o c s / f e a t u r e s / 
+ 
  

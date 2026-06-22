@@ -11,6 +11,7 @@ internal sealed class GoogleExternalLoginCommandFactory : IGoogleExternalLoginCo
 {
     private const string GoogleEmailVerifiedClaimType = "email_verified";
     private const string GooglePictureClaimType = "picture";
+    private const string GoogleUserInfoEmailVerifiedClaimType = "verified_email";
     private const string GoogleUrnEmailVerifiedClaimType = "urn:google:email_verified";
     private const string GoogleUrnPictureClaimType = "urn:google:picture";
     private const string SubjectClaimType = "sub";
@@ -31,6 +32,7 @@ internal sealed class GoogleExternalLoginCommandFactory : IGoogleExternalLoginCo
             EmailVerified = GetBooleanClaimValue(
                 principal,
                 GoogleEmailVerifiedClaimType,
+                GoogleUserInfoEmailVerifiedClaimType,
                 GoogleUrnEmailVerifiedClaimType),
             FullName = GetOptionalClaimValue(principal, ClaimTypes.Name, "name"),
             PictureUrl = GetOptionalClaimValue(

@@ -127,6 +127,23 @@
       }
     },
     {
+      "Key": "auth-external-google-complete",
+      "UpstreamPathTemplate": "/api/auth/external/google/complete",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/api/auth/external/google/complete",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "authcore-api", "Port": 8080 }
+      ],
+      "Priority": 2,
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 60
+      }
+    },
+    {
       "Key": "authcore-auth",
       "UpstreamPathTemplate": "/api/auth/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ],

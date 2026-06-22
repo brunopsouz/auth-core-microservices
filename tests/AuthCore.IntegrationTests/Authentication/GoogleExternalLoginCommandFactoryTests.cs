@@ -65,6 +65,23 @@ public sealed class GoogleExternalLoginCommandFactoryTests
     }
 
     [Fact]
+    public void Create_WhenGoogleUserInfoVerifiedEmailClaimExists_ShouldMapEmailAsVerified()
+    {
+        var principal = CreatePrincipal(
+            new Claim(ClaimTypes.NameIdentifier, "google-sub-789"),
+            new Claim(ClaimTypes.Email, "userinfo@authcore.dev"),
+            new Claim("verified_email", "true"));
+        var factory = new GoogleExternalLoginCommandFactory();
+
+        var command = factory.Create(
+            principal,
+            authenticationProperties: null,
+            new ExternalLoginRequestMetadata(IpAddress: null, UserAgent: null));
+
+        Assert.True(command.EmailVerified);
+    }
+
+    [Fact]
     public void Create_WhenRequiredClaimsAreMissing_ShouldReturnEmptyRequiredValues()
     {
         var factory = new GoogleExternalLoginCommandFactory();

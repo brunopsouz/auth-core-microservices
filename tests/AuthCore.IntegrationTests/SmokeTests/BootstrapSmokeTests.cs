@@ -1,7 +1,12 @@
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
 using AuthCore.Api;
+using AuthCore.Api.Authentication;
 using AuthCore.Api.Controllers;
 using AuthCore.Application;
 using AuthCore.Domain.Common.Repositories;
@@ -11,8 +16,11 @@ using AuthCore.Infrastructure;
 using AuthCore.Infrastructure.Abstractions.Data;
 using AuthCore.Infrastructure.Configurations;
 using AuthCore.Infrastructure.Services.Messaging;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authentication.OAuth.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -30,7 +38,10 @@ public sealed class BootstrapSmokeTests
     [Fact]
     public async Task Build_WhenApiDependenciesAreRegistered_ShouldCreateServiceProvider()
     {
-        var builder = WebApplication.CreateBuilder();
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Development
+        });
 
         builder.Configuration.AddInMemoryCollection(CreateConfigurationValues());
 
@@ -38,7 +49,7 @@ public sealed class BootstrapSmokeTests
             .AddApplicationPart(typeof(UserController).Assembly);
 
         builder.Services.AddApi(builder.Configuration);
-        builder.Services.AddInfrastructure(builder.Configuration);
+        builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
         builder.Services.AddApplication();
 
         await using var app = builder.Build();
@@ -57,6 +68,13 @@ public sealed class BootstrapSmokeTests
         var healthCheckService = scope.ServiceProvider.GetService<HealthCheckService>();
         var outboxProcessor = scope.ServiceProvider.GetService<IOutboxProcessor>();
         var notificationRequestPublisher = scope.ServiceProvider.GetService<INotificationRequestPublisher>();
+        var dataProtectionProvider = scope.ServiceProvider.GetService<IDataProtectionProvider>();
+        var dataProtectionOptions = scope.ServiceProvider
+            .GetRequiredService<IOptions<DataProtectionKeyRingOptions>>()
+            .Value;
+        var keyManagementOptions = scope.ServiceProvider
+            .GetRequiredService<IOptions<KeyManagementOptions>>()
+            .Value;
         var hostedServices = app.Services.GetServices<IHostedService>();
 
         Assert.Equal("authcore-tests", jwtOptions.Issuer);
@@ -74,10 +92,123 @@ public sealed class BootstrapSmokeTests
         Assert.Contains("openid", googleAuthenticationOptions.Scope);
         Assert.Contains("profile", googleAuthenticationOptions.Scope);
         Assert.Contains("email", googleAuthenticationOptions.Scope);
+        var emailVerifiedClaimActions = googleAuthenticationOptions.ClaimActions
+            .OfType<JsonKeyClaimAction>()
+            .Where(action => action.ClaimType == "urn:google:email_verified")
+            .ToArray();
+        Assert.Collection(
+            emailVerifiedClaimActions.OrderBy(action => action.JsonKey),
+            action => AssertGoogleEmailVerifiedClaimAction(action, "email_verified"),
+            action => AssertGoogleEmailVerifiedClaimAction(action, "verified_email"));
+        AssertGoogleEmailVerifiedClaimIsMapped(
+            googleAuthenticationOptions,
+            """{"email_verified":true}""");
+        AssertGoogleEmailVerifiedClaimIsMapped(
+            googleAuthenticationOptions,
+            """{"verified_email":true}""");
         Assert.NotNull(healthCheckService);
         Assert.NotNull(outboxProcessor);
         Assert.NotNull(notificationRequestPublisher);
+        Assert.NotNull(dataProtectionProvider);
+        Assert.Equal("AuthCore", dataProtectionOptions.ApplicationName);
+        Assert.Equal("data-protection-keys", dataProtectionOptions.KeyName);
+        Assert.False(dataProtectionOptions.RequireCertificate);
+        Assert.Equal(
+            "RedisXmlRepository",
+            keyManagementOptions.XmlRepository?.GetType().Name);
         Assert.Contains(hostedServices, service => service.GetType().Name == "OutboxHostedService");
+    }
+
+    [Fact]
+    public void AddInfrastructure_WhenDataProtectionCertificateIsRequired_ShouldRejectMissingCertificate()
+    {
+        var configurationValues = CreateConfigurationValues();
+        configurationValues["DataProtection:RequireCertificate"] = "true";
+        configurationValues["DataProtection:CertificatePath"] = string.Empty;
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configurationValues)
+            .Build();
+        var services = new ServiceCollection();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            services.AddInfrastructure(configuration));
+
+        Assert.Equal(
+            "O certificado de protecao das chaves do Data Protection e obrigatorio.",
+            exception.Message);
+    }
+
+    [Fact]
+    public void AddInfrastructure_WhenEnvironmentIsProduction_ShouldRequireCertificateProtection()
+    {
+        var configurationValues = CreateConfigurationValues();
+        configurationValues["DataProtection:RequireCertificate"] = "false";
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Production
+        });
+        builder.Configuration.AddInMemoryCollection(configurationValues);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            builder.Services.AddInfrastructure(
+                builder.Configuration,
+                builder.Environment));
+
+        Assert.Equal(
+            "A protecao das chaves do Data Protection por certificado e obrigatoria em Production.",
+            exception.Message);
+    }
+
+    [Fact]
+    public void AddInfrastructure_WhenProductionCertificateIsConfigured_ShouldProtectKeyRing()
+    {
+        const string certificatePassword = "AuthCore-Tests-Certificate-2026!";
+        var certificatePath = Path.Combine(
+            Path.GetTempPath(),
+            $"authcore-data-protection-{Guid.NewGuid():N}.pfx");
+
+        try
+        {
+            using var rsa = RSA.Create(2048);
+            var request = new CertificateRequest(
+                "CN=AuthCore Integration Tests",
+                rsa,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            using var certificate = request.CreateSelfSigned(
+                DateTimeOffset.UtcNow.AddMinutes(-1),
+                DateTimeOffset.UtcNow.AddDays(1));
+
+            File.WriteAllBytes(
+                certificatePath,
+                certificate.Export(X509ContentType.Pfx, certificatePassword));
+
+            var configurationValues = CreateConfigurationValues();
+            configurationValues["ASPNETCORE_ENVIRONMENT"] = Environments.Production;
+            configurationValues["DataProtection:RequireCertificate"] = "true";
+            configurationValues["DataProtection:CertificatePath"] = certificatePath;
+            configurationValues["DataProtection:CertificatePassword"] = certificatePassword;
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(configurationValues)
+                .Build();
+            var services = new ServiceCollection();
+
+            services.AddInfrastructure(configuration);
+
+            using var serviceProvider = services.BuildServiceProvider();
+            var keyManagementOptions = serviceProvider
+                .GetRequiredService<IOptions<KeyManagementOptions>>()
+                .Value;
+
+            Assert.Equal(
+                "CertificateXmlEncryptor",
+                keyManagementOptions.XmlEncryptor?.GetType().Name);
+        }
+        finally
+        {
+            if (File.Exists(certificatePath))
+                File.Delete(certificatePath);
+        }
     }
 
     [Fact]
@@ -90,7 +221,7 @@ public sealed class BootstrapSmokeTests
 
         builder.Configuration.AddInMemoryCollection(CreateConfigurationValues());
         builder.Services.AddApi(builder.Configuration);
-        builder.Services.AddInfrastructure(builder.Configuration);
+        builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
         builder.Services.AddApplication();
         builder.Services.AddScoped<IDbConnectionFactory, FakeDbConnectionFactory>();
 
@@ -151,6 +282,9 @@ public sealed class BootstrapSmokeTests
             ["Auth:Csrf:SigningKey"] = "tests-csrf-signing-key-2026",
             ["Redis:ConnectionString"] = "localhost:6379",
             ["Redis:KeyPrefix"] = "authcore-tests",
+            ["DataProtection:ApplicationName"] = "AuthCore",
+            ["DataProtection:KeyName"] = "data-protection-keys",
+            ["DataProtection:RequireCertificate"] = "false",
             ["RabbitMq:Host"] = "localhost",
             ["RabbitMq:Port"] = "5672",
             ["RabbitMq:VirtualHost"] = "/",
@@ -165,6 +299,35 @@ public sealed class BootstrapSmokeTests
             ["Outbox:PollingIntervalSeconds"] = "10",
             ["Outbox:MaxAttempts"] = "5"
         };
+    }
+
+    private static void AssertGoogleEmailVerifiedClaimAction(
+        JsonKeyClaimAction action,
+        string expectedJsonKey)
+    {
+        Assert.Equal(expectedJsonKey, action.JsonKey);
+        Assert.Equal(ClaimValueTypes.Boolean, action.ValueType);
+    }
+
+    private static void AssertGoogleEmailVerifiedClaimIsMapped(
+        GoogleOptions options,
+        string userInformationJson)
+    {
+        using var userInformation = JsonDocument.Parse(userInformationJson);
+        var identity = new ClaimsIdentity();
+
+        foreach (var claimAction in options.ClaimActions)
+        {
+            claimAction.Run(
+                userInformation.RootElement,
+                identity,
+                ExternalAuthenticationDefaults.GoogleScheme);
+        }
+
+        var claimValue = identity.FindFirst("urn:google:email_verified")?.Value;
+
+        Assert.True(bool.TryParse(claimValue, out var emailVerified));
+        Assert.True(emailVerified);
     }
 
     private sealed class FakeDbConnectionFactory : IDbConnectionFactory

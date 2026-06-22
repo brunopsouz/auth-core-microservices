@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Security.Cryptography;
@@ -17,8 +18,10 @@ using AuthCore.Infrastructure.Security.Tokens;
 using AuthCore.Infrastructure.Services.Caching;
 using AuthCore.Infrastructure.Services.Messaging;
 using FluentMigrator.Runner;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using StackExchange.Redis;
@@ -36,15 +39,17 @@ public static class InfrastructureDependencyInjection
     /// <param name="services">Coleção de serviços da aplicação.</param>
     /// <param name="configuration">Configuração da aplicação.</param>
     /// <returns>Coleção de serviços atualizada.</returns>
+    /// <param name="hostEnvironment">Ambiente atual da aplicacao.</param>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment? hostEnvironment = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
         AddOptions(services, configuration);
-        AddPersistence(services);
+        AddPersistence(services, configuration, hostEnvironment);
         AddSecurity(services);
         AddRepositories(services);
         AddMigrations(services, configuration);
@@ -63,6 +68,7 @@ public static class InfrastructureDependencyInjection
         AddDatabaseMigrationOptions(services, configuration);
         AddJwtOptions(services, configuration);
         AddRedisOptions(services, configuration);
+        AddDataProtectionOptions(services, configuration);
         AddRabbitMqOptions(services, configuration);
         AddSessionOptions(services, configuration);
         AddCookieOptions(services, configuration);
@@ -76,8 +82,16 @@ public static class InfrastructureDependencyInjection
     /// Operação para adicionar as dependências de persistência.
     /// </summary>
     /// <param name="services">Coleção de serviços da aplicação.</param>
-    private static void AddPersistence(IServiceCollection services)
+    private static void AddPersistence(
+        IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment? hostEnvironment)
     {
+        var redisOptions = GetRedisOptions(configuration);
+        var connectionMultiplexer = new Lazy<IConnectionMultiplexer>(
+            () => ConnectionMultiplexer.Connect(redisOptions.ConnectionString),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
         services.AddSingleton<DatabaseMetrics>();
         services.AddSingleton(serviceProvider =>
         {
@@ -88,11 +102,71 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<NpgsqlUnitOfWork>();
         services.AddScoped<IUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<NpgsqlUnitOfWork>());
         services.AddScoped<IDatabaseSession>(serviceProvider => serviceProvider.GetRequiredService<NpgsqlUnitOfWork>());
-        services.AddSingleton<IConnectionMultiplexer>(serviceProvider =>
+        services.AddSingleton<IConnectionMultiplexer>(_ => connectionMultiplexer.Value);
+
+        AddDataProtection(
+            services,
+            configuration,
+            redisOptions,
+            connectionMultiplexer,
+            hostEnvironment);
+    }
+
+    /// <summary>
+    /// Operacao para configurar o key ring compartilhado do Data Protection.
+    /// </summary>
+    private static void AddDataProtection(
+        IServiceCollection services,
+        IConfiguration configuration,
+        RedisOptions redisOptions,
+        Lazy<IConnectionMultiplexer> connectionMultiplexer,
+        IHostEnvironment? hostEnvironment)
+    {
+        var options = GetDataProtectionOptions(configuration);
+        var environmentName = hostEnvironment?.EnvironmentName
+            ?? configuration["ASPNETCORE_ENVIRONMENT"]
+            ?? configuration["DOTNET_ENVIRONMENT"];
+
+        if (string.Equals(environmentName, "Production", StringComparison.OrdinalIgnoreCase)
+            && !options.RequireCertificate)
         {
-            var redisOptions = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RedisOptions>>().Value;
-            return ConnectionMultiplexer.Connect(redisOptions.ConnectionString);
-        });
+            throw new InvalidOperationException(
+                "A protecao das chaves do Data Protection por certificado e obrigatoria em Production.");
+        }
+
+        var redisKey = $"{redisOptions.KeyPrefix.Trim()}:{options.KeyName.Trim()}";
+        var dataProtectionBuilder = services
+            .AddDataProtection()
+            .SetApplicationName(options.ApplicationName.Trim())
+            .PersistKeysToStackExchangeRedis(
+                () => connectionMultiplexer.Value.GetDatabase(),
+                redisKey);
+
+        var certificatePath = options.CertificatePath?.Trim();
+
+        if (string.IsNullOrWhiteSpace(certificatePath))
+        {
+            if (options.RequireCertificate)
+            {
+                throw new InvalidOperationException(
+                    "O certificado de protecao das chaves do Data Protection e obrigatorio.");
+            }
+
+            return;
+        }
+
+        if (!File.Exists(certificatePath))
+        {
+            throw new InvalidOperationException(
+                $"O certificado do Data Protection nao foi encontrado em '{certificatePath}'.");
+        }
+
+        var certificate = X509CertificateLoader.LoadPkcs12FromFile(
+            certificatePath,
+            options.CertificatePassword,
+            X509KeyStorageFlags.EphemeralKeySet);
+
+        dataProtectionBuilder.ProtectKeysWithCertificate(certificate);
     }
 
     /// <summary>
@@ -204,6 +278,19 @@ public static class InfrastructureDependencyInjection
     }
 
     /// <summary>
+    /// Operacao para adicionar as opcoes do Data Protection.
+    /// </summary>
+    private static void AddDataProtectionOptions(
+        IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<DataProtectionKeyRingOptions>()
+            .Bind(configuration.GetSection(DataProtectionKeyRingOptions.SectionName))
+            .ValidateDataAnnotations();
+    }
+
+    /// <summary>
     /// Operação para adicionar as opções de RabbitMQ.
     /// </summary>
     /// <param name="services">Coleção de serviços da aplicação.</param>
@@ -303,6 +390,39 @@ public static class InfrastructureDependencyInjection
         return configuration.GetConnectionString("PostgreSql")
             ?? configuration.GetSection(DatabaseOptions.SectionName).GetValue<string>(nameof(DatabaseOptions.PostgreSql))
             ?? string.Empty;
+    }
+
+    private static RedisOptions GetRedisOptions(IConfiguration configuration)
+    {
+        var options = configuration
+            .GetSection(RedisOptions.SectionName)
+            .Get<RedisOptions>()
+            ?? new RedisOptions();
+
+        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+            throw new InvalidOperationException("A connection string do Redis nao foi configurada.");
+
+        if (string.IsNullOrWhiteSpace(options.KeyPrefix))
+            throw new InvalidOperationException("O prefixo das chaves Redis nao foi configurado.");
+
+        return options;
+    }
+
+    private static DataProtectionKeyRingOptions GetDataProtectionOptions(
+        IConfiguration configuration)
+    {
+        var options = configuration
+            .GetSection(DataProtectionKeyRingOptions.SectionName)
+            .Get<DataProtectionKeyRingOptions>()
+            ?? new DataProtectionKeyRingOptions();
+
+        if (string.IsNullOrWhiteSpace(options.ApplicationName))
+            throw new InvalidOperationException("O nome da aplicacao do Data Protection nao foi configurado.");
+
+        if (string.IsNullOrWhiteSpace(options.KeyName))
+            throw new InvalidOperationException("O nome da chave Redis do Data Protection nao foi configurado.");
+
+        return options;
     }
 
     private static string BuildConnectionString(string connectionString, string applicationName)

@@ -19,6 +19,7 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 app.UseForwardedHeaders();
+app.UseGatewayDownstreamForwardedHeaders();
 app.UseRouting();
 app.UseAuthentication();
 app.UseGatewayCookieAccessToken();

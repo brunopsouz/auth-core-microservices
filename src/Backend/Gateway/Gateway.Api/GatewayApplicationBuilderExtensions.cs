@@ -45,6 +45,19 @@ public static class GatewayApplicationBuilderExtensions
         return app.UseMiddleware<CookieAccessTokenGatewayMiddleware>();
     }
 
+    /// <summary>
+    /// Operacao para encaminhar host e protocolo publicos aos servicos downstream.
+    /// </summary>
+    /// <param name="app">Construtor do pipeline HTTP.</param>
+    /// <returns>Construtor do pipeline HTTP atualizado.</returns>
+    public static IApplicationBuilder UseGatewayDownstreamForwardedHeaders(
+        this IApplicationBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        return app.UseMiddleware<DownstreamForwardedHeadersMiddleware>();
+    }
+
     private static string GetClientId(HttpContext context)
     {
         var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);

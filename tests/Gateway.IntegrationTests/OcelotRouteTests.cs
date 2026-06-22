@@ -35,6 +35,7 @@ public sealed class OcelotRouteTests
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/session/login", "POST", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/external/google", "GET", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/external/google/callback", "GET", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/api/auth/external/google/complete", "GET", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/{everything}", "GET", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/{everything}", "POST", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/api/auth/{everything}", "PUT", requiresAuthentication: false));
@@ -93,9 +94,11 @@ public sealed class OcelotRouteTests
         AssertRouteKey(routes, "/api/auth/session/login", "auth-session-login");
         AssertRouteKey(routes, "/api/auth/external/google", "auth-external-google");
         AssertRouteKey(routes, "/api/auth/external/google/callback", "auth-external-google-callback");
+        AssertRouteKey(routes, "/api/auth/external/google/complete", "auth-external-google-complete");
         AssertRouteKey(routes, "/api/auth/{everything}", "authcore-auth");
         AssertRoutePriority(routes, "/api/auth/external/google", 2);
         AssertRoutePriority(routes, "/api/auth/external/google/callback", 2);
+        AssertRoutePriority(routes, "/api/auth/external/google/complete", 2);
         AssertRoutePriority(routes, "/api/auth/{everything}", 0);
         AssertRouteKey(routes, "/api/users/{everything}", "authcore-users");
         AssertRouteKey(routes, "/api/users/change-password", "users-change-password");
@@ -111,6 +114,7 @@ public sealed class OcelotRouteTests
         AssertRouteRateLimit(routes, "/api/auth/session/login", 10, "1m", 60);
         AssertRouteRateLimit(routes, "/api/auth/external/google", 20, "1m", 60);
         AssertRouteRateLimit(routes, "/api/auth/external/google/callback", 60, "1m", 60);
+        AssertRouteRateLimit(routes, "/api/auth/external/google/complete", 60, "1m", 60);
         AssertRouteRateLimit(routes, "/api/auth/{everything}", 120, "1m", 60);
         AssertRouteRateLimit(routes, "/api/users/change-password", 20, "1m", 60);
         AssertRouteRateLimit(routes, "/api/users", 10, "1m", 60);
@@ -129,6 +133,13 @@ public sealed class OcelotRouteTests
         Assert.Contains("${AUTHENTICATION__GOOGLE__CLIENTSECRET}", compose, StringComparison.Ordinal);
         Assert.Contains("${AUTHENTICATION__GOOGLE__CALLBACKPATH}", compose, StringComparison.Ordinal);
         Assert.Contains("${AUTHENTICATION__ALLOWEDRETURNURLS__0}", compose, StringComparison.Ordinal);
+        Assert.Contains("${DATAPROTECTION__APPLICATIONNAME:-AuthCore}", compose, StringComparison.Ordinal);
+        Assert.Contains("${DATAPROTECTION__KEYNAME:-data-protection-keys}", compose, StringComparison.Ordinal);
+        Assert.Contains("${DATAPROTECTION__REQUIRECERTIFICATE:-false}", compose, StringComparison.Ordinal);
+        Assert.Contains("${REVERSEPROXY__KNOWNNETWORKS__0:-172.28.0.0/16}", compose, StringComparison.Ordinal);
+        Assert.Contains("subnet: 172.28.0.0/16", compose, StringComparison.Ordinal);
+        Assert.Contains("--appendonly yes", compose, StringComparison.Ordinal);
+        Assert.Contains("redis-data:/data", compose, StringComparison.Ordinal);
         Assert.DoesNotContain("${AUTHENTICATION_GOOGLE_CLIENTID}", compose, StringComparison.Ordinal);
         Assert.DoesNotContain("${AUTHENTICATION_ALLOWEDRETURNURL_0}", compose, StringComparison.Ordinal);
     }
@@ -359,6 +370,180 @@ public sealed class OcelotRouteTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal($"{path}?returnUrl=http%3A%2F%2Flocalhost%3A5173", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task GoogleCallback_WhenStateAndCodeAreProvided_ShouldForwardQueryAndCorrelationCookie()
+    {
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/auth/external/google/callback", (HttpContext context) =>
+            {
+                return Results.Json(new
+                {
+                    query = context.Request.QueryString.Value,
+                    cookie = context.Request.Headers.Cookie.ToString()
+                });
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/auth/external/google/callback",
+                "/api/auth/external/google/callback",
+                "GET",
+                authCore)
+        ]));
+
+        using var httpClient = new HttpClient();
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{GetAddress(gateway)}/api/auth/external/google/callback?code=google-code&state=protected-state");
+        request.Headers.TryAddWithoutValidation(
+            "Cookie",
+            ".AspNetCore.Correlation.Google=correlation-value");
+
+        using var response = await httpClient.SendAsync(request);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            "?code=google-code&state=protected-state",
+            payload.RootElement.GetProperty("query").GetString());
+        Assert.Contains(
+            ".AspNetCore.Correlation.Google=correlation-value",
+            payload.RootElement.GetProperty("cookie").GetString(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GoogleCallback_WhenExternalCookieIsIssued_ShouldForwardRedirectAndSetCookie()
+    {
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/auth/external/google/callback", (HttpContext context) =>
+            {
+                context.Response.Cookies.Append(
+                    "__Host-auth.external",
+                    "protected-external-ticket",
+                    new CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = true,
+                        SameSite = SameSiteMode.Lax,
+                        Path = "/"
+                    });
+
+                return Results.Redirect("/api/auth/external/google/complete");
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/auth/external/google/callback",
+                "/api/auth/external/google/callback",
+                "GET",
+                authCore)
+        ]));
+
+        using var httpClient = new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        });
+        using var response = await httpClient.GetAsync(
+            $"{GetAddress(gateway)}/api/auth/external/google/callback?code=google-code&state=protected-state");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(
+            "/api/auth/external/google/complete",
+            response.Headers.Location?.OriginalString);
+        Assert.Contains(
+            response.Headers.GetValues("Set-Cookie"),
+            value => value.Contains(
+                "__Host-auth.external=protected-external-ticket",
+                StringComparison.Ordinal)
+                && value.Contains("httponly", StringComparison.OrdinalIgnoreCase)
+                && value.Contains("secure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task GoogleComplete_WhenExternalCookieIsProvided_ShouldForwardCookie()
+    {
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/auth/external/google/complete", (HttpContext context) =>
+                Results.Text(context.Request.Headers.Cookie.ToString()));
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/auth/external/google/complete",
+                "/api/auth/external/google/complete",
+                "GET",
+                authCore)
+        ]));
+
+        using var httpClient = new HttpClient();
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{GetAddress(gateway)}/api/auth/external/google/complete");
+        request.Headers.TryAddWithoutValidation(
+            "Cookie",
+            "__Host-auth.external=protected-external-ticket");
+
+        using var response = await httpClient.SendAsync(request);
+        var forwardedCookie = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(
+            "__Host-auth.external=protected-external-ticket",
+            forwardedCookie,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GoogleStart_WhenPublicHostUsesHttps_ShouldForwardOriginalHostAndScheme()
+    {
+        await using var authCore = await StartDownstreamAsync(app =>
+        {
+            app.MapGet("/api/auth/external/google", (HttpContext context) =>
+            {
+                return Results.Json(new
+                {
+                    forwardedHost = context.Request.Headers["X-Forwarded-Host"].ToString(),
+                    forwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString()
+                });
+            });
+        });
+
+        await using var gateway = await StartGatewayAsync(CreateConfiguration([
+            CreateRoute(
+                "/api/auth/external/google",
+                "/api/auth/external/google",
+                "GET",
+                authCore)
+        ]));
+
+        using var httpClient = new HttpClient();
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{GetAddress(gateway)}/api/auth/external/google");
+        request.Headers.Host = "login.authcore.dev";
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Host", "login.authcore.dev");
+
+        using var response = await httpClient.SendAsync(request);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(
+            "login.authcore.dev",
+            payload.RootElement.GetProperty("forwardedHost").GetString(),
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "https",
+            payload.RootElement.GetProperty("forwardedProto").GetString(),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -979,6 +1164,7 @@ public sealed class OcelotRouteTests
         var app = builder.Build();
 
         app.UseForwardedHeaders();
+        app.UseGatewayDownstreamForwardedHeaders();
         app.UseAuthentication();
         app.UseGatewayCookieAccessToken();
         app.UseAuthorization();

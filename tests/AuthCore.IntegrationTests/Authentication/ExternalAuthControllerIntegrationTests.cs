@@ -331,6 +331,7 @@ public sealed class ExternalAuthControllerIntegrationTests
         Assert.True(string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientSecret"]));
         Assert.True(string.IsNullOrWhiteSpace(configuration["Redis:ConnectionString"]));
         Assert.True(string.IsNullOrWhiteSpace(configuration["Auth:Csrf:SigningKey"]));
+        Assert.True(string.IsNullOrWhiteSpace(configuration["DataProtection:CertificatePassword"]));
         Assert.True(string.IsNullOrWhiteSpace(configuration["RabbitMq:Username"]));
         Assert.True(string.IsNullOrWhiteSpace(configuration["RabbitMq:Password"]));
         Assert.Equal(
