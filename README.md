@@ -259,11 +259,6 @@ Serviços padrão em desenvolvimento:
 | Redis | `localhost` | `6379` |
 | RabbitMQ | `localhost` | `5672` |
 | RabbitMQ Management | `localhost` | `15672` |
-Credenciais, senhas e chave de assinatura JWT devem ficar no `.env.development` local ou no mecanismo de segredos do ambiente de deploy. O `docker-compose.yml` apenas referencia essas variáveis.
-
-Os arquivos `appsettings.Development.json` sao versionados e nao devem conter valores secretos. Connection strings com senha, JWT/CSRF signing keys, credenciais PostgreSQL/Redis/RabbitMQ/SMTP e Google OAuth `ClientId`/`ClientSecret` devem ficar somente no `.env.development` ignorado pelo Git ou no secret manager do ambiente.
-
-Como o Google Client Secret chegou a ser salvo em um arquivo rastreado, ele deve ser revogado no Google Cloud antes da configuracao de um novo valor no `.env.development`.
 
 ## Autenticação
 
