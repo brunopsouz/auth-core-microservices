@@ -66,24 +66,11 @@ Responsabilidades atuais:
 
 ## Autenticacao na borda
 
-O backend suporta dois fluxos principais:
+O backend suporta autenticacao web por sessao, autenticacao token-based para API e mobile e login com Google no AuthCore.
 
-- Browser/PWA: `POST /api/auth/session/login` cria uma sessao server-side no AuthCore e emite cookies `sid`, `at` e `XSRF-TOKEN`. O Gateway aceita o JWT curto do cookie `at`, valida o token de forma stateless e encaminha `Authorization: Bearer` para o servico downstream.
-- API/mobile: `POST /api/auth/token/login` retorna access token e refresh token no corpo da resposta. O cliente envia `Authorization: Bearer <access-token>` nas rotas protegidas.
+As rotas publicas de autenticacao permanecem sob responsabilidade do AuthCore e sao expostas conforme a configuracao do ambiente. Credenciais Google OAuth devem permanecer fora de arquivos versionados.
 
-Quando `Authorization: Bearer` esta presente, ele tem prioridade sobre o cookie `at`. Mutacoes autenticadas via cookie (`POST`, `PUT`, `PATCH`, `DELETE`) exigem `X-CSRF-TOKEN` valido. Requisicoes autenticadas por Bearer nao exigem CSRF.
-
-As rotas `/api/auth/...` permanecem sob responsabilidade do AuthCore, inclusive login, refresh, logout, sessao por cookie e validacao CSRF propria dessas operacoes.
-
-### Login com Google
-
-O AuthCore ja suporta login com Google no fluxo browser com sessao interna. O fluxo exposto atualmente inclui:
-
-- `GET /api/auth/external/google` para iniciar o challenge;
-- `GET /api/auth/external/google/callback` como callback tecnico do middleware externo;
-- `GET /api/auth/external/google/complete` para concluir o login e emitir a autenticacao interna do AuthCore.
-
-Essas rotas tambem estao publicadas no Gateway. `ClientId` e `ClientSecret` continuam obrigatorios por ambiente e devem permanecer fora de arquivos versionados.
+Para detalhes operacionais do login com Google, consulte `docs/features/google-login/`.
 
 ## Solucoes
 

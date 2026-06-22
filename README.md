@@ -262,93 +262,13 @@ Serviços padrão em desenvolvimento:
 
 ## Autenticação
 
-O projeto possui dois fluxos de autenticação para desenvolvimento e validação local.
+O projeto suporta três modalidades principais de autenticação:
 
-### Browser/PWA: sessão server-side + JWT curto em cookie
+- login web com sessão autenticada;
+- login token-based para clientes API e mobile;
+- login com Google para o fluxo web.
 
-Esse é o fluxo recomendado para aplicações browser. O login em `POST /api/auth/session/login` cria uma sessão server-side no AuthCore e emite cookies de autenticação:
-
-| Cookie | HttpOnly | Uso |
-| --- | --- | --- |
-| `sid` | Sim | Identificador opaco da sessão server-side |
-| `at` | Sim | JWT curto usado pelo Gateway para autenticar rotas protegidas |
-| `XSRF-TOKEN` | Não | Token CSRF que o frontend lê e envia no header `X-CSRF-TOKEN` |
-
-O JWT do cookie `at` não é retornado no corpo da resposta e não precisa ser lido por JavaScript. Em requisições para rotas protegidas via Gateway, o navegador envia os cookies automaticamente com `credentials: "include"`. O Gateway valida o JWT de forma stateless e encaminha internamente `Authorization: Bearer <jwt>` para o serviço downstream.
-
-Para métodos mutáveis autenticados por cookie, o Gateway exige CSRF válido:
-
-- exige CSRF: `POST`, `PUT`, `PATCH`, `DELETE`
-- não exige CSRF: `GET`, `HEAD`, `OPTIONS`
-
-O token CSRF é assinado e vinculado ao `sid`. A validação não é apenas comparação simples entre cookie e header.
-
-As rotas `/api/auth/...` continuam sob responsabilidade do AuthCore. Isso permite que login, refresh, logout e rotas públicas de autenticação usem as validações próprias do AuthCore, incluindo sessão por cookie e CSRF.
-
-### API/mobile: Authorization Bearer
-
-Clientes API, mobile ou integrações podem usar o fluxo token-based em `POST /api/auth/token/login`. Nesse caso, o access token é retornado no corpo da resposta e deve ser enviado como:
-
-```http
-Authorization: Bearer <access-token>
-```
-
-Quando `Authorization: Bearer` está presente, ele tem prioridade sobre qualquer cookie `at` enviado junto na requisição. Esse fluxo não exige CSRF.
-
-### Login com Google
-
-O suporte a login com Google esta disponivel no AuthCore para o fluxo browser com sessao interna. A implementacao cobre:
-
-- representar vinculo externo por `provider + providerUserId`;
-- concluir login Google a partir de dados externos ja validados pela borda;
-- vincular Google a usuario autenticado;
-- desvincular Google sem deixar o usuario sem metodo de autenticacao utilizavel.
-
-O fluxo HTTP publicado atualmente e este:
-
-- `GET /api/auth/external/google`: inicia o challenge com Google.
-- `GET /api/auth/external/google/callback`: callback tecnico do middleware OAuth/OIDC.
-- `GET /api/auth/external/google/complete`: conclui o login, emite a autenticacao interna do AuthCore e redireciona para uma `returnUrl` validada por allowlist.
-
-As rotas publicas do Google tambem estao publicadas no Gateway quando a aplicacao completa roda em Docker Compose. `ClientId` e `ClientSecret` devem ser fornecidos por ambiente, nunca em arquivos versionados.
-
-### Teste manual do fluxo Browser/PWA
-
-1. Suba a aplicação completa com Docker Compose.
-2. Acesse o Swagger do AuthCore em `http://localhost:8081/swagger`.
-3. Registre e verifique um usuário.
-4. Faça login em `POST /api/auth/session/login`.
-5. No navegador, abra DevTools > Application > Cookies e confirme `sid`, `at` e `XSRF-TOKEN`.
-6. Confirme que `sid` e `at` estão com `HttpOnly`.
-7. Chame `GET http://localhost:8080/api/users/profile` com `credentials: "include"`.
-8. Para `POST`, `PUT`, `PATCH` ou `DELETE` via Gateway, envie também o header `X-CSRF-TOKEN` com o valor do cookie `XSRF-TOKEN`.
-
-Exemplo no console do navegador:
-
-```javascript
-const csrf = document.cookie
-  .split("; ")
-  .find(value => value.startsWith("XSRF-TOKEN="))
-  ?.split("=")[1];
-
-await fetch("http://localhost:8080/api/users/profile", {
-  method: "GET",
-  credentials: "include"
-});
-
-await fetch("http://localhost:8080/api/users/change-password", {
-  method: "PUT",
-  credentials: "include",
-  headers: {
-    "Content-Type": "application/json",
-    "X-CSRF-TOKEN": csrf
-  },
-  body: JSON.stringify({
-    currentPassword: "Senha@123456",
-    newPassword: "NovaSenha@123456"
-  })
-});
-```
+As credenciais OAuth do Google devem ser fornecidas por ambiente e nunca versionadas. Para detalhes operacionais, fluxo manual e validações da feature, consulte a documentação em `docs/features/google-login/`.
 
 ## Endpoints principais
 
