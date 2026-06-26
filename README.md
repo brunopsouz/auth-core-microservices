@@ -5,12 +5,16 @@
   <img alt="PostgreSQL 17" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white">
   <img alt="Redis 7" src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white">
   <img alt="RabbitMQ 3" src="https://img.shields.io/badge/RabbitMQ-3-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white">
+  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white">
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=20232A">
+  <img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white">
+  <img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white">
   <img alt="Docker Compose" src="https://img.shields.io/badge/Docker_Compose-local-2496ED?style=for-the-badge&logo=docker&logoColor=white">
 </p>
 
-AuthCore é uma solução backend em .NET 10 para autenticação, gestão de usuários e notificações transacionais. A base está organizada por serviços backend, API Gateway, mensageria assíncrona e camadas internas com influência de Clean Architecture e DDD tático.
+AuthCore é uma solução full-stack para autenticação, gestão de usuários e notificações transacionais. A base combina backend em .NET 10, API Gateway, mensageria assíncrona, frontend web em Next.js e camadas internas com influência de Clean Architecture e DDD tático.
 
-O objetivo é oferecer um núcleo de autenticação robusto para aplicações backend, mantendo regras de negócio no domínio, casos de uso na aplicação, detalhes técnicos na infraestrutura e comunicação entre serviços por contratos explícitos.
+O objetivo é oferecer um núcleo de autenticação robusto para aplicações web e backend, mantendo regras de negócio no domínio, casos de uso na aplicação, detalhes técnicos na infraestrutura, comunicação entre serviços por contratos explícitos e uma experiência frontend alinhada ao fluxo real do AuthCore.
 
 ## Sumário
 
@@ -48,12 +52,14 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 - Publicação assíncrona de solicitações de notificação pelo AuthCore.
 - Consumo, registro, renderização e despacho de notificações transacionais pelo NotificationCore.
 - SMTP configurável para envio de e-mail em desenvolvimento.
+- Frontend web com Next.js App Router, sessão por cookie `HttpOnly`, route handlers locais para rotas de autenticação e telas iniciais de login, registro e dashboard privado.
 
 ## Serviços
 
 - `Gateway.Api`: API Gateway com Ocelot, autenticação JWT, suporte a JWT via cookie `HttpOnly`, proteção CSRF para mutações por cookie e roteamento para os serviços internos.
 - `AuthCore.Api`: serviço de autenticação e usuários.
 - `NotificationCore.Api`: serviço de notificações transacionais, templates e envio de e-mail.
+- `AuthCore.Web`: frontend web em Next.js para login, registro, sessão por cookie e área autenticada.
 - `Shared.Messaging.Contracts`: contratos compartilhados de mensageria e utilitários de payload sensível.
 
 ## Tecnologias
@@ -61,6 +67,13 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações ba
 - .NET 10
 - ASP.NET Core Web API
 - Ocelot
+- Next.js 16
+- React 19
+- TypeScript 5
+- Tailwind CSS v4
+- shadcn/ui
+- lucide-react
+- pnpm
 - PostgreSQL 17
 - Redis 7
 - RabbitMQ 3
@@ -79,7 +92,10 @@ A solução organiza serviços backend com separação de responsabilidades e ca
 
 ```mermaid
 flowchart TD
-    Client[Cliente HTTP] -->|HTTP| Gateway[Gateway.Api]
+    Browser[Browser] -->|HTTP| Web[AuthCore.Web]
+    Web -->|/api/auth route handler| AuthApi
+    Web -->|rotas protegidas fora de /api/auth devem usar Gateway| Gateway
+    Client[Cliente HTTP/API] -->|HTTP| Gateway[Gateway.Api]
     Gateway -->|HTTP/Ocelot| AuthApi[AuthCore.Api]
     Gateway -->|HTTP/Ocelot| NotificationApi[NotificationCore.Api]
 
@@ -112,6 +128,7 @@ flowchart TD
 Responsabilidades principais:
 
 - `Gateway.Api`: borda pública em Docker Compose, roteamento, rate limiting, validação JWT para rotas protegidas e suporte ao fluxo Browser/PWA com JWT em cookie `HttpOnly`.
+- `AuthCore.Web`: frontend Next.js com App Router, telas de autenticação, dashboard privado, proxy de navegação por cookie e route handlers locais para chamadas ao AuthCore.
 - `AuthCore.Api`: controllers HTTP, contratos JSON, autenticação, autorização, Swagger e health checks.
 - `AuthCore.Application`: orquestração dos casos de uso de autenticação e usuários.
 - `AuthCore.Domain`: agregados, entidades, value objects, invariantes, eventos e contratos centrais de autenticação.
@@ -142,6 +159,8 @@ O guia completo fica em `docs/agents/solid-guidelines.md`. Ele complementa os pa
 Para executar localmente:
 
 - [.NET SDK 10](https://dotnet.microsoft.com/download/dotnet/10.0)
+- Node.js compatível com Next.js 16
+- pnpm
 - Docker
 - Docker Compose ou plugin `docker compose`
 - Bash, para usar o script `run.sh`
@@ -165,6 +184,13 @@ Compile a solução:
 
 ```bash
 dotnet build AuthCore.sln
+```
+
+Instale as dependências do frontend:
+
+```bash
+cd src/Frontend/AuthCore.Web
+pnpm install
 ```
 
 ## Uso
@@ -225,6 +251,27 @@ http://localhost:8081
 
 O NotificationCore roda dentro da rede Docker e é acessado pelo Gateway.
 
+### Executar o frontend AuthCore.Web
+
+Em outro terminal, execute:
+
+```bash
+cd src/Frontend/AuthCore.Web
+pnpm dev --hostname 127.0.0.1 --port 3000
+```
+
+O frontend fica disponível em:
+
+```text
+http://127.0.0.1:3000
+```
+
+Por padrão, o route handler local do frontend encaminha `/api/auth/...` para:
+
+```text
+http://localhost:5012
+```
+
 ### Encerrar containers
 
 ```bash
@@ -240,6 +287,8 @@ As configurações de desenvolvimento estão em:
 - `src/Backend/AuthCore/AuthCore.Api/appsettings.Development.json`
 - `src/Backend/NotificationCore/NotificationCore.Api/appsettings.Development.json`
 - `src/Backend/Gateway/Gateway.Api/ocelot.json`
+- `src/Frontend/AuthCore.Web/.env.example`
+- `src/Frontend/AuthCore.Web/.env.local`, arquivo local ignorado pelo Git
 
 Antes de executar o projeto pela primeira vez, crie o arquivo local a partir do modelo e preencha os valores vazios quando necessário:
 
@@ -247,10 +296,24 @@ Antes de executar o projeto pela primeira vez, crie o arquivo local a partir do 
 cp src/Backend/.env.development.example src/Backend/.env.development
 ```
 
+Para alterar o destino das chamadas do frontend, crie o `.env.local` a partir do exemplo:
+
+```bash
+cp src/Frontend/AuthCore.Web/.env.example src/Frontend/AuthCore.Web/.env.local
+```
+
+Variáveis principais do frontend:
+
+| Variável | Padrão | Descrição |
+| --- | --- | --- |
+| `AUTHCORE_API_BASE_URL` | `http://localhost:5012` | Base server-side usada pelos route handlers locais para encaminhar `/api/auth/...` |
+| `AUTHCORE_SESSION_COOKIE_NAME` | `sid` em desenvolvimento | Nome do cookie usado pelo `src/proxy.ts` apenas como sinal rápido de sessão; em produção deve acompanhar `Auth:Cookie:SessionCookieName`, por exemplo `__Host-auth.sid` |
+
 Serviços padrão em desenvolvimento:
 
 | Serviço | Host | Porta |
 | --- | --- | --- |
+| AuthCore.Web | `127.0.0.1` | `3000` |
 | Gateway Docker | `localhost` | `8080` |
 | AuthCore Docker | `localhost` | `8081` |
 | AuthCore local | `localhost` | `5012` |
@@ -269,6 +332,8 @@ O projeto suporta três modalidades principais de autenticação:
 - login com Google para o fluxo web.
 
 As credenciais OAuth do Google devem ser fornecidas por ambiente e nunca versionadas. Para detalhes operacionais, fluxo manual e validações da feature, consulte a documentação em `docs/features/google-login/`.
+
+O frontend `AuthCore.Web` usa o fluxo web por cookie `HttpOnly`. O `src/proxy.ts` faz apenas redirecionamento rápido por presença do cookie de sessão; a validação real de autenticação, autorização, CSRF e sessão permanece no AuthCore e no Gateway.
 
 ## Endpoints principais
 
@@ -415,6 +480,14 @@ dotnet test tests/NotificationCore.IntegrationTests/NotificationCore.Integration
 dotnet test tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj
 ```
 
+Para validar o frontend:
+
+```bash
+cd src/Frontend/AuthCore.Web
+pnpm lint
+pnpm build
+```
+
 ## Estrutura do projeto
 
 ```text
@@ -439,6 +512,7 @@ dotnet test tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj
 │   ├── Shared
 │   │   └── Messaging.Contracts
 │   └── Frontend
+│       └── AuthCore.Web
 └── tests
     ├── AuthCore.Application.UnitTests
     ├── AuthCore.Domain.UnitTests

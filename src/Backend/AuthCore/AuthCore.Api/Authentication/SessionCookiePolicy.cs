@@ -65,7 +65,6 @@ internal static class SessionCookiePolicy
         return CreateCookieOptions(authCookieOptions, expiresAtUtc: null, httpOnly);
     }
 
-
     /// <summary>
     /// Operacao para criar as opcoes padronizadas dos cookies de autenticacao.
     /// </summary>

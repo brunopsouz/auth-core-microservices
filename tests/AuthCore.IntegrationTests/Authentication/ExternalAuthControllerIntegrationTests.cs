@@ -13,6 +13,7 @@ using AuthCore.Application.UseCases.Authentication.Models;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
@@ -356,8 +357,7 @@ public sealed class ExternalAuthControllerIntegrationTests
             .AddSingleton(authenticationService ?? new StubAuthenticationService(AuthenticateResult.NoResult()))
             .BuildServiceProvider();
 
-        var flow = new GoogleExternalAuthenticationFlow(
-            new AuthenticationCookieWriter(
+        var authenticationCookieWriter = new AuthenticationCookieWriter(
                 new StubCsrfTokenService(),
                 CreateAuthCookieOptions(),
                 Options.Create(new CsrfOptions
@@ -365,15 +365,23 @@ public sealed class ExternalAuthControllerIntegrationTests
                     CookieName = "XSRF-TOKEN",
                     HeaderName = "X-CSRF-TOKEN",
                     SigningKey = "tests-csrf-signing-key-2026"
-                })),
+                }));
+        var googleOnboardingTicketStore = new SpyGoogleOnboardingTicketStore();
+        var flow = new GoogleExternalAuthenticationFlow(
+            authenticationCookieWriter,
             useCase ?? new SpyCompleteGoogleLoginUseCase(),
             returnUrlValidator ?? new StubExternalReturnUrlValidator(),
             new GoogleExternalLoginCommandFactory(),
+            googleOnboardingTicketStore,
             new ExternalAuthenticationMetrics(),
             timeProvider ?? TimeProvider.System,
             logger ?? new SpyLogger<GoogleExternalAuthenticationFlow>());
 
-        return new ExternalAuthController(flow)
+        return new ExternalAuthController(
+            flow,
+            googleOnboardingTicketStore,
+            authenticationCookieWriter,
+            new StubTrustedOriginValidator())
         {
             ControllerContext = new ControllerContext
             {
@@ -385,12 +393,15 @@ public sealed class ExternalAuthControllerIntegrationTests
     private static WebApplication BuildHttpApplication(bool googleConfigured)
     {
         var builder = WebApplication.CreateBuilder();
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole();
 
         builder.Configuration.AddInMemoryCollection(CreateHttpConfiguration(googleConfigured));
         builder.Services
             .AddControllers()
             .AddApplicationPart(typeof(ExternalAuthController).Assembly);
         builder.Services.AddApi(builder.Configuration);
+        builder.Services.AddSingleton<IDataProtectionProvider, EphemeralDataProtectionProvider>();
         builder.Services.AddApplication();
         builder.Services.AddSingleton(Options.Create(new AuthCookieOptions
         {
@@ -572,6 +583,30 @@ public sealed class ExternalAuthControllerIntegrationTests
         }
     }
 
+    private sealed class SpyGoogleOnboardingTicketStore : IGoogleOnboardingTicketStore
+    {
+        public CompleteGoogleOnboardingTicketCommand? LastCommand { get; private set; }
+
+        public bool Deleted { get; private set; }
+
+        public GoogleOnboardingTicket? Ticket { get; init; }
+
+        public void Append(HttpResponse response, CompleteGoogleOnboardingTicketCommand command)
+        {
+            LastCommand = command;
+        }
+
+        public GoogleOnboardingTicket? Read(HttpRequest request)
+        {
+            return Ticket;
+        }
+
+        public void Delete(HttpResponse response)
+        {
+            Deleted = true;
+        }
+    }
+
     private sealed class StubCsrfTokenService : ICsrfTokenService
     {
         public string Generate(string sessionId)
@@ -582,6 +617,13 @@ public sealed class ExternalAuthControllerIntegrationTests
         public bool IsValid(string sessionId, string token)
         {
             return true;
+        }
+    }
+
+    private sealed class StubTrustedOriginValidator : ITrustedOriginValidator
+    {
+        public void Validate(HttpRequest request)
+        {
         }
     }
 

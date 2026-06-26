@@ -193,6 +193,41 @@ public sealed class User : AggregateRoot
     }
 
     /// <summary>
+    /// Operacao para registrar um novo usuario por provedor externo verificado.
+    /// </summary>
+    /// <param name="firstName">Primeiro nome do usuario.</param>
+    /// <param name="lastName">Sobrenome do usuario.</param>
+    /// <param name="email">E-mail confirmado pelo provedor externo.</param>
+    /// <param name="contact">Numero de contato do usuario.</param>
+    /// <param name="role">Perfil do usuario.</param>
+    /// <param name="verifiedAt">Data da verificacao externa do e-mail.</param>
+    /// <returns>Instancia de <see cref="User"/> registrada.</returns>
+    public static User RegisterExternal(
+        string firstName,
+        string lastName,
+        string email,
+        string contact,
+        Role role,
+        DateTime verifiedAt)
+    {
+        DomainException.When(verifiedAt == default, "A data de verificacao externa do e-mail e obrigatoria.");
+
+        var normalizedFirstName = firstName.Trim();
+        var normalizedLastName = lastName.Trim();
+
+        return new User(
+            normalizedFirstName,
+            normalizedLastName,
+            BuildFullName(normalizedFirstName, normalizedLastName),
+            Email.Create(email),
+            contact,
+            role,
+            UserStatus.Active,
+            Guid.NewGuid(),
+            verifiedAt);
+    }
+
+    /// <summary>
     /// Operação para criar um novo usuário.
     /// </summary>
     /// <param name="firstName">Primeiro nome do usuário.</param>

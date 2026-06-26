@@ -20,6 +20,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
     private readonly ICompleteGoogleLoginUseCase _completeGoogleLoginUseCase;
     private readonly IExternalReturnUrlValidator _externalReturnUrlValidator;
     private readonly IGoogleExternalLoginCommandFactory _googleExternalLoginCommandFactory;
+    private readonly IGoogleOnboardingTicketStore _googleOnboardingTicketStore;
     private readonly ILogger<GoogleExternalAuthenticationFlow> _logger;
     private readonly ExternalAuthenticationMetrics _metrics;
     private readonly TimeProvider _timeProvider;
@@ -31,6 +32,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
     /// <param name="completeGoogleLoginUseCase">Caso de uso de conclusao do login Google.</param>
     /// <param name="externalReturnUrlValidator">Validador da URL de retorno.</param>
     /// <param name="googleExternalLoginCommandFactory">Fabrica do comando de login Google.</param>
+    /// <param name="googleOnboardingTicketStore">Store do ticket temporario de onboarding Google.</param>
     /// <param name="metrics">Metricas do fluxo de autenticacao externa.</param>
     /// <param name="timeProvider">Provedor de tempo do fluxo.</param>
     /// <param name="logger">Logger do fluxo de autenticacao externa.</param>
@@ -39,6 +41,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         ICompleteGoogleLoginUseCase completeGoogleLoginUseCase,
         IExternalReturnUrlValidator externalReturnUrlValidator,
         IGoogleExternalLoginCommandFactory googleExternalLoginCommandFactory,
+        IGoogleOnboardingTicketStore googleOnboardingTicketStore,
         ExternalAuthenticationMetrics metrics,
         TimeProvider timeProvider,
         ILogger<GoogleExternalAuthenticationFlow> logger)
@@ -47,6 +50,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         ArgumentNullException.ThrowIfNull(completeGoogleLoginUseCase);
         ArgumentNullException.ThrowIfNull(externalReturnUrlValidator);
         ArgumentNullException.ThrowIfNull(googleExternalLoginCommandFactory);
+        ArgumentNullException.ThrowIfNull(googleOnboardingTicketStore);
         ArgumentNullException.ThrowIfNull(metrics);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
@@ -55,6 +59,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         _completeGoogleLoginUseCase = completeGoogleLoginUseCase;
         _externalReturnUrlValidator = externalReturnUrlValidator;
         _googleExternalLoginCommandFactory = googleExternalLoginCommandFactory;
+        _googleOnboardingTicketStore = googleOnboardingTicketStore;
         _metrics = metrics;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -66,6 +71,8 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         string? returnUrl)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
+
+        _googleOnboardingTicketStore.Delete(httpContext.Response);
 
         var safeReturnUrl = _externalReturnUrlValidator.Validate(returnUrl);
         _metrics.RecordGoogleLoginStarted();
@@ -128,7 +135,21 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         var result = await _completeGoogleLoginUseCase.Execute(command, cancellationToken);
 
         if (result.Session is not null)
+        {
             _authenticationCookieWriter.AppendAuthenticatedSession(httpContext.Response, result.Session);
+            _googleOnboardingTicketStore.Delete(httpContext.Response);
+        }
+        else if (result.RequiresOnboarding)
+        {
+            _googleOnboardingTicketStore.Append(
+                httpContext.Response,
+                new CompleteGoogleOnboardingTicketCommand(
+                    command.ProviderUserId,
+                    command.Email,
+                    command.EmailVerified,
+                    command.FullName,
+                    command.PictureUrl));
+        }
 
         _metrics.RecordGoogleLoginSucceeded(result.RequiresOnboarding);
         RecordDuration(startedAtUtc);

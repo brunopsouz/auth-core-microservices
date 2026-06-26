@@ -38,6 +38,7 @@ public static class ApplicationDependencyInjection
         services.TryAddScoped<IExternalAuthenticationOptionsProvider, DefaultExternalAuthenticationOptionsProvider>();
         services.TryAddScoped<IExternalReturnUrlValidator, ExternalReturnUrlValidator>();
         services.AddScoped<ICompleteGoogleLoginUseCase, CompleteGoogleLoginUseCase>();
+        services.AddScoped<ICompleteGoogleOnboardingUseCase, CompleteGoogleOnboardingUseCase>();
         services.AddScoped<ILinkGoogleLoginUseCase, LinkGoogleLoginUseCase>();
         services.AddScoped<IUnlinkGoogleLoginUseCase, UnlinkGoogleLoginUseCase>();
         services.AddScoped<ILoginSessionUseCase, LoginSessionUseCase>();

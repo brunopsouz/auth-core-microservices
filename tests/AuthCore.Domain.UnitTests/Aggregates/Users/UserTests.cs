@@ -53,6 +53,44 @@ public class UserTests
     }
 
     [Fact]
+    public void RegisterExternal_WhenInputIsValid_ShouldCreateActiveVerifiedUser()
+    {
+        var verifiedAt = new DateTime(2026, 4, 3, 14, 30, 0, DateTimeKind.Utc);
+
+        var user = User.RegisterExternal(
+            " Bruno ",
+            " Silva ",
+            "Bruno@Example.com",
+            "  +55 11 99999-9999 ",
+            Role.User,
+            verifiedAt);
+
+        Assert.Equal("Bruno", user.FirstName);
+        Assert.Equal("Silva", user.LastName);
+        Assert.Equal("Bruno Silva", user.FullName);
+        Assert.Equal("bruno@example.com", user.Email.Value);
+        Assert.Equal("+55 11 99999-9999", user.Contact);
+        Assert.Equal(Role.User, user.Role);
+        Assert.Equal(UserStatus.Active, user.Status);
+        Assert.Equal(verifiedAt, user.EmailVerifiedAt);
+        Assert.True(user.IsEmailVerified);
+        Assert.True(user.CanSignIn);
+    }
+
+    [Fact]
+    public void RegisterExternal_WhenVerifiedAtIsMissing_ShouldThrowDomainException()
+    {
+        Assert.Throws<DomainException>(() =>
+            User.RegisterExternal(
+                "Bruno",
+                "Silva",
+                "bruno@example.com",
+                "+55 11 99999-9999",
+                Role.User,
+                default));
+    }
+
+    [Fact]
     public void VerifyEmail_WhenCalled_ShouldMarkUserAsAbleToSignIn()
     {
         var user = User.Register(

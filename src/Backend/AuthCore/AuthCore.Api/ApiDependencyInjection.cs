@@ -52,7 +52,9 @@ public static class ApiDependencyInjection
         services.AddSingleton<ILoginRateLimiter, RedisLoginRateLimiter>();
         services.AddScoped<ICsrfTokenService, CookieCsrfTokenService>();
         services.AddScoped<ICsrfRequestValidator, CookieCsrfRequestValidator>();
+        services.AddScoped<ITrustedOriginValidator, TrustedOriginValidator>();
         services.AddScoped<IAuthenticationCookieWriter, AuthenticationCookieWriter>();
+        services.AddScoped<IGoogleOnboardingTicketStore, GoogleOnboardingTicketStore>();
         services.AddScoped<IAuthenticatedUserAccessValidator, AuthenticatedUserAccessValidator>();
         services.AddSingleton<IGoogleExternalLoginCommandFactory, GoogleExternalLoginCommandFactory>();
         services.AddScoped<IGoogleExternalAuthenticationFlow, GoogleExternalAuthenticationFlow>();
