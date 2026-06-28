@@ -1,4 +1,16 @@
-# Backend
+<div align="center">
+
+# Back-end
+
+<p>
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white">
+  <img alt="PostgreSQL 17" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white">
+  <img alt="Redis 7" src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white">
+  <img alt="RabbitMQ 3" src="https://img.shields.io/badge/RabbitMQ-3-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white">
+  <img alt="Docker Compose" src="https://img.shields.io/badge/Docker_Compose-local-2496ED?style=for-the-badge&logo=docker&logoColor=white">
+</p>
+
+</div>
 
 Este diretorio concentra os servicos backend do projeto. A raiz do repositorio pode conter outros clientes ou aplicacoes, como um frontend Angular, sem misturar o ciclo de build do backend.
 
@@ -145,46 +157,6 @@ Encerrar containers:
 ```bash
 ./run.sh down
 ```
-
-Comandos equivalentes sem Bash para Docker Compose:
-
-```bash
-docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml up -d authcore-postgres notificationcore-postgres redis rabbitmq smtp
-docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml up --build
-docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml down --remove-orphans
-```
-
-No Windows com VS Code:
-
-1. Suba a infraestrutura com o primeiro comando Docker Compose acima.
-2. Selecione o perfil `AuthCore.Api Launch`.
-3. Pressione `F5`.
-
-O perfil carrega diretamente `src/Backend/.env.development`; nao e necessario Bash nem um segundo arquivo `.env`.
-
-Para migrar um arquivo criado antes desta padronizacao, use os seguintes renomes:
-
-| Nome anterior | Nome atual |
-| --- | --- |
-| `AUTHENTICATION_JWT_*` | `AUTHENTICATION__JWT__*` |
-| `AUTH_COOKIE_SESSION_COOKIE_NAME` | `AUTH__COOKIE__SESSIONCOOKIENAME` |
-| `AUTH_COOKIE_ACCESS_TOKEN_COOKIE_NAME` | `AUTH__COOKIE__ACCESSTOKENCOOKIENAME` |
-| `AUTH_CSRF_SIGNING_KEY` | `AUTH__CSRF__SIGNINGKEY` |
-| `AUTH_CSRF_ALLOWED_ORIGIN_N` | `AUTH__CSRF__ALLOWEDORIGINS__N` |
-| `AUTHCORE_REDIS_KEYPREFIX` | `REDIS__KEYPREFIX` |
-| `AUTHCORE_OUTBOX_ENABLED` | `OUTBOX__ENABLED` |
-| `AUTHCORE_OUTBOX_BATCH_SIZE` | `OUTBOX__BATCHSIZE` |
-| `AUTHCORE_OUTBOX_POLLING_INTERVAL_SECONDS` | `OUTBOX__POLLINGINTERVALSECONDS` |
-| `AUTHCORE_OUTBOX_MAX_ATTEMPTS` | `OUTBOX__MAXATTEMPTS` |
-| `RABBITMQ_USERNAME` | `RABBITMQ__USERNAME` |
-| `RABBITMQ_PASSWORD` | `RABBITMQ__PASSWORD` |
-| `RABBITMQ_EXCHANGE` | `RABBITMQ__EXCHANGE` |
-| `RABBITMQ_ROUTING_KEY` | `RABBITMQ__ROUTINGKEY` |
-| `RABBITMQ_QUEUE` | `RABBITMQ__QUEUE` |
-| `RABBITMQ_DEAD_LETTER_QUEUE` | `RABBITMQ__DEADLETTERQUEUE` |
-
-O arquivo tambem precisa conter `CONNECTIONSTRINGS__POSTGRESQL` e `REDIS__CONNECTIONSTRING` com os endpoints locais usados pelo VS Code.
-
 ## Builds separados
 
 O build padrao compila apenas os projetos de producao dos servicos. Esse e o comando recomendado para pipeline de build quando o objetivo e validar se as APIs compilam:
@@ -259,26 +231,3 @@ Executar a validacao completa por projetos de teste dos servicos:
 ```
 
 Observacao: `test-all` e intencionalmente mais amplo e pode revelar pendencias em suites que ainda estao sendo ajustadas. Para um gate estavel de CI, use `build` e `test`.
-
-## Convencao para crescimento
-
-Ao adicionar um novo servico:
-
-1. Crie uma pasta em `src/Backend/<NomeDoServico>`.
-2. Mantenha projetos separados por camada quando o servico tiver dominio proprio: `Api`, `Application`, `Domain` e `Infrastructure`.
-3. Crie uma solucao local `NomeDoServico.Service.sln`.
-4. Adicione a solucao local apenas os projetos de producao do servico e dependencias compartilhadas necessarias.
-5. Adicione comandos proprios no `run.sh` para build e teste do novo servico.
-6. Inclua o servico em `src/Backend/Backend.sln` para manter a visao agregada do backend.
-7. So inclua o servico na solucao agregadora da raiz quando fizer sentido validar o repositorio inteiro.
-
-## Direcao arquitetural
-
-Os servicos devem preservar a separacao de responsabilidades:
-
-- `Api` adapta HTTP e chama casos de uso.
-- `Application` orquestra casos de uso.
-- `Domain` concentra regras de negocio e invariantes.
-- `Infrastructure` implementa persistencia, mensageria, cache, migracoes e integracoes tecnicas.
-
-Evite dependencias diretas entre servicos. A integracao entre servicos deve ser feita por contratos explicitos, mensageria ou chamadas HTTP atraves de uma borda bem definida. Ao evoluir um servico, aplique o checklist SOLID de `../../docs/agents/solid-guidelines.md` para evitar responsabilidades misturadas, interfaces infladas e dependencia direta de detalhes tecnicos em codigo de alto nivel.

@@ -1,126 +1,31 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
+import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { usePathname } from "next/navigation";
-import {
-  Code2,
-  LockKeyhole,
-  ShieldCheck,
-  ShieldPlus,
-  UsersRound,
-  Zap,
-} from "lucide-react";
 import type { ReactNode } from "react";
 
 type AuthShellProps = {
   children: ReactNode;
 };
 
-const featureSets = {
+const shellContent = {
   signIn: {
     eyebrow: "Autenticacao moderna e segura",
-    title: (
-      <>
-        Autenticacao segura
-        <br />
-        para aplicacoes
-        <br />
-        modernas
-      </>
-    ),
+    title: "Autenticacao segura para aplicacoes modernas",
     description:
       "Login, sessoes protegidas, controle de acesso e protecao de contas prontos para o seu projeto desde o primeiro dia.",
-    features: [
-      {
-        icon: ShieldCheck,
-        title: "Autenticacao segura",
-        description:
-          "Protecao avancada de contas com senhas fortes, hashing moderno e verificacao opcional em duas etapas.",
-      },
-      {
-        icon: UsersRound,
-        title: "Sessoes protegidas",
-        description:
-          "Gerenciamento de sessoes com expiracao inteligente, revogacao e protecao contra acessos indevidos.",
-      },
-      {
-        icon: Code2,
-        title: "Pronto para producao",
-        description:
-          "Boilerplate completo, escalavel e bem estruturado para acelerar seu desenvolvimento com seguranca.",
-      },
-    ],
-    footer: "Seguro por padrao - Privacidade respeitada",
   },
   register: {
     eyebrow: "Autenticacao segura e escalavel",
-    title: (
-      <>
-        Crie sua conta e
-        <br />
-        comece com
-        <br />
-        <span className="text-primary">autenticacao segura</span>
-      </>
-    ),
+    title: "Crie sua conta e comece com autenticacao segura",
     description:
       "Gerencie usuarios, autenticacoes e permissoes com uma base solida, pronta para proteger seu produto desde o primeiro dia.",
-    features: [
-      {
-        icon: Zap,
-        title: "Setup rapido",
-        description:
-          "Integre autenticacao completa em minutos e foque no que importa.",
-      },
-      {
-        icon: UsersRound,
-        title: "Controle de acesso",
-        description:
-          "Permissoes granulares, papeis e politicas para proteger dados e recursos.",
-      },
-      {
-        icon: ShieldPlus,
-        title: "Base pronta para producao",
-        description:
-          "Boas praticas, seguranca e escalabilidade para aplicacoes modernas.",
-      },
-    ],
-    footer: "Seguro por padrao - Privacidade em primeiro lugar - Escalavel",
   },
   onboarding: {
     eyebrow: "Cadastro Google com onboarding seguro",
-    title: (
-      <>
-        Complete sua conta
-        <br />
-        com dados
-        <br />
-        <span className="text-primary">verificados pelo Google</span>
-      </>
-    ),
+    title: "Complete sua conta com dados verificados pelo Google",
     description:
       "O backend valida sua conta Google, protege o ticket temporario e solicita apenas os dados finais do cadastro.",
-    features: [
-      {
-        icon: ShieldCheck,
-        title: "Google verificado",
-        description:
-          "O e-mail confirmado pelo Google e usado pelo AuthCore sem expor tokens ao navegador.",
-      },
-      {
-        icon: UsersRound,
-        title: "Cadastro completo",
-        description:
-          "Nome, sobrenome e contato completam o perfil necessario para criar a conta.",
-      },
-      {
-        icon: Zap,
-        title: "Sessao imediata",
-        description:
-          "Depois do onboarding, a sessao segura e emitida por cookies HttpOnly.",
-      },
-    ],
-    footer: "Google validado - Ticket temporario - Sessao segura",
   },
 } as const;
 
@@ -131,96 +36,56 @@ export function AuthShell({ children }: AuthShellProps) {
     : pathname === "/onboarding"
       ? "onboarding"
       : "signIn";
-  const content = featureSets[mode];
+  const content = shellContent[mode];
 
   return (
-    <main className="dark min-h-screen overflow-hidden bg-background text-foreground">
-      <div className="auth-grid relative isolate min-h-screen">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_42%_50%,hsl(174_92%_38%/0.18),transparent_28%),radial-gradient(circle_at_86%_14%,hsl(196_80%_46%/0.1),transparent_22%),linear-gradient(115deg,hsl(180_60%_4%),hsl(210_42%_5%)_48%,hsl(190_60%_4%))]" />
-        <div className="absolute inset-y-0 left-[28%] -z-10 hidden w-[38rem] rounded-full border border-primary/10 opacity-70 lg:block" />
-        <div className="absolute left-[32%] top-[16%] -z-10 hidden size-[32rem] rounded-full border border-primary/10 opacity-50 lg:block" />
-        <div className="absolute left-[36%] top-[24%] -z-10 hidden size-[20rem] rounded-full border border-primary/10 opacity-40 lg:block" />
+    <main className="flex min-h-svh items-center justify-center overflow-x-hidden overflow-y-auto bg-[#eef1f5] px-3 py-6 text-[#101318] sm:px-4 sm:py-8 lg:py-4">
+      <div className="grid w-full max-w-[70rem] overflow-hidden rounded-[1.75rem] border border-[#d8dee8] bg-[#fbfcfd] shadow-[0_22px_70px_rgba(15,23,42,0.12)] lg:min-h-[min(44rem,calc(100svh-2rem))] lg:grid-cols-[minmax(22rem,0.9fr)_minmax(27rem,1fr)]">
+        <section className="relative hidden min-h-0 overflow-hidden bg-[#111317] text-white lg:flex lg:flex-col">
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.04)_18%,rgba(0,0,0,0.72)),radial-gradient(circle_at_80%_18%,rgba(255,255,255,0.16),transparent_25%)]" />
+          <div className="absolute inset-x-[-16%] bottom-[-8%] h-[58%] rotate-[-5deg] rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.14),transparent_58%),linear-gradient(180deg,#37393d,#090a0c)]" />
+          <div className="absolute inset-x-[-18%] bottom-[12%] h-[38%] rotate-[4deg] rounded-[50%] bg-[linear-gradient(180deg,#202226,#07080a)] opacity-95" />
+          <div className="absolute inset-x-[-18%] bottom-[30%] h-[28%] rotate-[-7deg] rounded-[50%] bg-[linear-gradient(180deg,#47494d,#101114)] opacity-70" />
 
-        <div className="mx-auto grid min-h-screen w-full max-w-[112rem] gap-10 px-6 py-8 sm:px-10 lg:grid-cols-[minmax(28rem,38rem)_minmax(34rem,52rem)] lg:items-center lg:justify-between lg:px-16">
-          <section className="flex min-h-[calc(100vh-4rem)] flex-col justify-between gap-10 py-4">
-            <div className="space-y-14">
-              <BrandMark split={mode === "signIn"} />
+          <div className="relative z-10 p-7 pb-0">
+            <BrandMark />
+          </div>
 
-              <div className="space-y-8">
-                <div className="inline-flex items-center gap-3 rounded-lg border border-border/70 bg-card/45 px-4 py-3 text-base text-muted-foreground shadow-lg backdrop-blur">
-                  <span className="size-3 rounded-full bg-primary shadow-[0_0_18px_hsl(170_90%_48%/0.9)]" />
-                  {content.eyebrow}
-                </div>
-
-                <div className="max-w-[36rem] space-y-6">
-                  <h1 className="text-4xl font-bold leading-[1.18] text-foreground sm:text-5xl xl:text-6xl">
-                    {content.title}
-                  </h1>
-                  <p className="max-w-[34rem] text-lg leading-8 text-muted-foreground sm:text-xl">
-                    {content.description}
-                  </p>
-                </div>
-
-                <div className="grid max-w-[36rem] gap-3">
-                  {content.features.map((feature) => (
-                    <FeatureCard key={feature.title} {...feature} />
-                  ))}
-                </div>
+          <div className="relative z-10 flex flex-1 flex-col justify-between px-7 pb-7 pt-14">
+            <div className="max-w-[25rem] space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-md border border-white/12 bg-white/8 px-3 py-2 text-sm text-white/72 backdrop-blur">
+                <span className="size-2 rounded-full bg-[#9aa3b2]" />
+                {content.eyebrow}
+              </div>
+              <div className="space-y-3">
+                <h1 className="max-w-[23rem] text-[2rem] font-bold leading-[1.08] text-white">
+                  {content.title}
+                </h1>
+                <p className="text-sm leading-6 text-white/68">{content.description}</p>
               </div>
             </div>
-
-            <div className="flex items-center gap-3 text-sm text-muted-foreground sm:text-base">
-              <LockKeyhole className="size-5 text-primary" aria-hidden="true" />
-              <span>{content.footer}</span>
+            <div className="flex items-center gap-2 text-xs text-white/58">
+              <LockKeyhole className="size-4 text-[#c4cad3]" aria-hidden="true" />
+              <span>Seguro por padrao - Privacidade respeitada</span>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section className="flex items-center justify-center lg:justify-end">
-            {children}
-          </section>
-        </div>
+        <section className="flex min-h-0 items-center justify-center px-5 py-6 sm:px-8 lg:px-8 lg:py-8">
+          {children}
+        </section>
       </div>
     </main>
   );
 }
 
-function BrandMark({ split }: { split: boolean }) {
+function BrandMark() {
   return (
-    <div className="flex items-center gap-4">
-      <div className="relative flex size-12 items-center justify-center text-primary">
-        <ShieldCheck className="size-12" strokeWidth={1.8} aria-hidden="true" />
-        <LockKeyhole
-          className="absolute size-4"
-          strokeWidth={2.2}
-          aria-hidden="true"
-        />
+    <div className="flex items-center gap-3">
+      <div className="relative grid size-10 place-items-center rounded-lg border border-white/16 bg-white/10 text-white">
+        <ShieldCheck className="size-6" strokeWidth={1.8} aria-hidden="true" />
       </div>
-      <span className="text-3xl font-bold text-foreground sm:text-4xl">
-        Auth{split ? <span className="text-primary">Core</span> : "Core"}
-      </span>
+      <span className="text-2xl font-bold text-white">AuthCore</span>
     </div>
-  );
-}
-
-function FeatureCard({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-}) {
-  return (
-    <article className="group relative flex gap-5 rounded-lg border border-border/60 bg-card/45 p-5 shadow-xl backdrop-blur transition-colors hover:border-primary/45">
-      <div className="relative flex size-16 shrink-0 items-center justify-center rounded-lg border border-primary/35 bg-primary/10 text-primary shadow-[inset_0_0_24px_hsl(170_80%_45%/0.12)]">
-        <Icon className="size-8" strokeWidth={1.8} aria-hidden="true" />
-        <span className="absolute -right-1 -top-1 size-4 rounded-full bg-primary shadow-[0_0_16px_hsl(170_90%_48%/0.9)]" />
-      </div>
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-        <p className="text-base leading-6 text-muted-foreground">{description}</p>
-      </div>
-    </article>
   );
 }

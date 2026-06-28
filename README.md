@@ -1,16 +1,18 @@
+<div align="center">
+
 # AuthCore
 
 <p>
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white">
   <img alt="PostgreSQL 17" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white">
-  <img alt="Redis 7" src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white">
-  <img alt="RabbitMQ 3" src="https://img.shields.io/badge/RabbitMQ-3-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white">
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white">
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=20232A">
-  <img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white">
   <img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white">
-  <img alt="Docker Compose" src="https://img.shields.io/badge/Docker_Compose-local-2496ED?style=for-the-badge&logo=docker&logoColor=white">
 </p>
+
+### [Back-end](src/Backend/README.md) - [Front-end](src/Frontend/AuthCore.Web/README.md)
+
+</div>
 
 AuthCore é uma solução full-stack para autenticação, gestão de usuários e notificações transacionais. A base combina backend em .NET 10, API Gateway, mensageria assíncrona, frontend web em Next.js e camadas internas com influência de Clean Architecture e DDD tático.
 
@@ -20,7 +22,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações we
 
 - [Funcionalidades](#funcionalidades)
 - [Serviços](#serviços)
-- [Tecnologias](#tecnologias)
+- [Stack](#stack)
 - [Arquitetura](#arquitetura)
 - [Padrões de engenharia](#padrões-de-engenharia)
 - [Requisitos](#requisitos)
@@ -62,29 +64,23 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações we
 - `AuthCore.Web`: frontend web em Next.js para login, registro, sessão por cookie e área autenticada.
 - `Shared.Messaging.Contracts`: contratos compartilhados de mensageria e utilitários de payload sensível.
 
-## Tecnologias
+## Stack
 
-- .NET 10
-- ASP.NET Core Web API
-- Ocelot
-- Next.js 16
-- React 19
-- TypeScript 5
-- Tailwind CSS v4
-- shadcn/ui
-- lucide-react
-- pnpm
-- PostgreSQL 17
-- Redis 7
-- RabbitMQ 3
-- SMTP4Dev
-- Docker e Docker Compose
-- Npgsql
-- FluentMigrator
-- BCrypt.Net
-- JWT Bearer Authentication
-- xUnit
-- Swagger/OpenAPI
+| Camada | Tecnologia | Responsabilidade |
+| --- | --- | --- |
+| Frontend | Next.js 16 + React 19 + TypeScript 5 | Interface web, rotas locais de autenticação e experiência autenticada |
+| UI | Tailwind CSS v4 + shadcn/ui + lucide-react | Estilização, componentes visuais e ícones |
+| Backend | .NET 10 + ASP.NET Core Web API | APIs, autenticação, usuários, notificações e regras de negócio |
+| Gateway | Ocelot | Roteamento, borda pública, rate limiting e proteção de rotas |
+| Banco | PostgreSQL 17 + Npgsql | Persistência principal dos contextos AuthCore e NotificationCore |
+| Cache | Redis 7 | Armazenamento técnico para sessões e suporte à autenticação |
+| Mensageria | RabbitMQ 3 | Comunicação assíncrona entre AuthCore e NotificationCore |
+| E-mail local | SMTP4Dev | Simulação de envio SMTP em desenvolvimento |
+| Infra local | Docker + Docker Compose | Ambiente local de desenvolvimento e execução dos serviços |
+| Migrações | FluentMigrator | Versionamento e aplicação de mudanças no banco |
+| Segurança | BCrypt.Net + JWT Bearer Authentication | Hash de senhas e autenticação por token |
+| Testes e documentação | xUnit + Swagger/OpenAPI | Testes automatizados e documentação interativa das APIs |
+| Pacotes frontend | pnpm | Instalação e gerenciamento de dependências web |
 
 ## Arquitetura
 

@@ -58,6 +58,16 @@ function buildRequestHeaders(request: NextRequest) {
     }
   }
 
+  const forwardedHost = request.headers.get("host");
+
+  if (forwardedHost) {
+    headers.set("x-forwarded-host", forwardedHost);
+  }
+
+  if (!headers.has("x-forwarded-proto")) {
+    headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
+  }
+
   return headers;
 }
 
