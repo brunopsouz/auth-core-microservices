@@ -55,6 +55,65 @@ Na pratica:
 
 O guia completo de SOLID fica em `../../docs/agents/solid-guidelines.md` e complementa os documentos de padrao em `../../docs/agents/`.
 
+## Papel do Gateway
+
+O `Gateway.Api` e a borda HTTP recomendada quando a aplicacao roda completa via Docker Compose. Ele centraliza preocupacoes de entrada sem absorver regra de negocio dos servicos internos.
+
+| Responsabilidade | Papel |
+| --- | --- |
+| Roteamento | Encaminha chamadas externas para AuthCore e NotificationCore conforme `ocelot.json`. |
+| Autenticacao na borda | Valida JWT para rotas protegidas e aceita token via header `Authorization` ou cookie `HttpOnly` no fluxo web. |
+| Protecao HTTP | Aplica rate limiting e suporte a CSRF para mutacoes autenticadas por cookie. |
+| Composicao externa | Mantem uma entrada publica unica para clientes, preservando AuthCore e NotificationCore como servicos internos. |
+
+O Gateway deve permanecer fino: ele adapta a borda, valida preocupacoes transversais e roteia chamadas. Regras de autenticacao, usuario, sessao e notificacao continuam nos contextos proprietarios.
+
+## Padrao de camadas
+
+AuthCore e NotificationCore seguem o mesmo desenho em camadas. Cada camada tem um motivo principal para mudar e depende apenas das camadas permitidas pelo contexto.
+
+| Camada | Papel | Exemplos |
+| --- | --- | --- |
+| Api | Recebe HTTP, mapeia contratos JSON e chama casos de uso. | Controllers, requests, responses, autenticacao HTTP, Swagger e health checks. |
+| Application | Orquestra casos de uso, transacoes e consome contratos definidos nas camadas permitidas. | Commands, queries, use cases, results e interfaces consumidas pela aplicacao. |
+| Domain | Concentra regras de negocio, invariantes, entidades, agregados e value objects. | `User`, `Password`, `Notification`, eventos e contratos centrais. |
+| Infrastructure | Implementa detalhes tecnicos sem mover regra de negocio. | Repositorios Npgsql, migrations, Redis, RabbitMQ, SMTP, JWT e providers. |
+
+Fluxo de dependencia esperado por contexto:
+
+```text
+Api -> Application
+Api -> Infrastructure
+Application -> Domain
+Infrastructure -> Domain
+```
+
+## Workers e processamento assincrono
+
+Os workers ficam na composicao dos servicos e executam processamento de background sem transformar a API em lugar de regra de negocio.
+
+| Worker | Contexto | Papel |
+| --- | --- | --- |
+| `OutboxHostedService` | AuthCore | Publica mensagens pendentes geradas junto com transacoes de negocio. |
+| `RabbitMqNotificationConsumerHostedService` | NotificationCore | Consome mensagens do RabbitMQ, registra recebimento e evita processamento duplicado via Inbox. |
+| `NotificationDispatcherHostedService` | NotificationCore | Renderiza templates e envia notificacoes por provedores como SMTP. |
+
+O fluxo assincrono principal e: AuthCore grava o estado e a mensagem de Outbox na mesma transacao, o worker publica no RabbitMQ, NotificationCore consome a mensagem, persiste a notificacao e executa o envio.
+
+## Banco e infraestrutura
+
+Cada contexto possui seu proprio banco PostgreSQL em desenvolvimento, preservando isolamento entre AuthCore e NotificationCore. Redis, RabbitMQ e SMTP4Dev suportam execucao local e integracoes tecnicas.
+
+| Recurso | Uso |
+| --- | --- |
+| PostgreSQL AuthCore | Persistencia de usuarios, credenciais, sessoes, tokens, verificacoes e outbox. |
+| PostgreSQL NotificationCore | Persistencia de notificacoes, templates, inbox e historico de processamento. |
+| Redis | Armazenamento tecnico para sessoes, tokens ou controles de autenticacao quando configurado. |
+| RabbitMQ | Transporte de mensagens assincronas entre AuthCore e NotificationCore. |
+| SMTP4Dev | Caixa SMTP local para validar envio de e-mails em desenvolvimento. |
+| Docker Compose | Sobe bancos, Redis, RabbitMQ, SMTP4Dev, Gateway e APIs conforme o modo de execucao. |
+| FluentMigrator | Versiona e aplica mudancas de schema de cada contexto. |
+
 ## Servicos
 
 | Servico | Responsabilidade | Solucao |
@@ -84,9 +143,9 @@ As rotas publicas de autenticacao permanecem sob responsabilidade do AuthCore e 
 
 Para detalhes operacionais do login com Google, consulte `docs/features/google-login/`.
 
-## Solucoes
+## Soluções
 
-| Solucao | Uso recomendado |
+| Solução | Uso recomendado |
 | --- | --- |
 | `src/Backend/AuthCore/AuthCore.Service.sln` | Desenvolvimento, build e pipeline de producao do AuthCore. |
 | `src/Backend/NotificationCore/NotificationCore.Service.sln` | Desenvolvimento, build e pipeline de producao do NotificationCore. |
