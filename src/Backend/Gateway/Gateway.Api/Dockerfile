@@ -1,10 +1,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY . .
+COPY ["Backend/Gateway/Gateway.Api/Gateway.Api.csproj", "Backend/Gateway/Gateway.Api/"]
 
 RUN dotnet restore "Backend/Gateway/Gateway.Api/Gateway.Api.csproj"
-RUN dotnet publish "Backend/Gateway/Gateway.Api/Gateway.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+COPY . .
+
+RUN dotnet publish "Backend/Gateway/Gateway.Api/Gateway.Api.csproj" -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app

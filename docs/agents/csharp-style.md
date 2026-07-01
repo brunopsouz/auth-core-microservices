@@ -4,6 +4,12 @@
 
 Este documento oficializa o padrão dominante de escrita C# do projeto `auth_core` com base no estado atual do repositório.
 
+## Ortografia em Português
+
+Todo texto em português deve seguir a ortografia oficial, com acentuação, cedilha (`ç`) e demais caracteres Unicode necessários.
+
+Essa regra vale para documentação XML, comentários, mensagens de domínio, mensagens de aplicação, contratos HTTP, textos de UI e documentos do projeto. Não converta textos em português para ASCII, salvo pedido explícito. Identificadores técnicos, nomes de classes, métodos, propriedades, namespaces, arquivos, rotas e payloads JSON devem preservar as convenções técnicas do código.
+
 Ele existe para orientar criação, revisão e refatoração incremental de código, sem exigir modernização ampla e não relacionada ao trabalho em andamento.
 
 As regras aqui descritas seguem três premissas:

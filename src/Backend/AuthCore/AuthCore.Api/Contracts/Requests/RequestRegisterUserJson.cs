@@ -1,7 +1,7 @@
 namespace AuthCore.Api.Contracts.Requests;
 
 /// <summary>
-/// Representa requisição para registrar um usuário.
+/// Representa requisição para iniciar o registro de usuário.
 /// </summary>
 public sealed class RequestRegisterUserJson
 {
@@ -24,14 +24,4 @@ public sealed class RequestRegisterUserJson
     /// Número de contato do usuário.
     /// </summary>
     public string Contact { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Senha informada para cadastro.
-    /// </summary>
-    public string Password { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Confirmação da senha informada para cadastro.
-    /// </summary>
-    public string ConfirmPassword { get; set; } = string.Empty;
 }

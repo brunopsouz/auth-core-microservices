@@ -10,11 +10,10 @@ namespace AuthCore.Application.UnitTests.UseCases.Users.RegisterUser;
 public sealed class RegisterUserUseCaseTests
 {
     [Fact]
-    public async Task Execute_WhenUserDoesNotExist_ShouldPersistUserPasswordVerificationAndOutboxInTransaction()
+    public async Task Execute_WhenUserDoesNotExist_ShouldPersistUserVerificationAndOutboxInTransaction()
     {
         var userRepository = new FakeUserRepository();
         var userReadRepository = new FakeUserReadRepository();
-        var passwordRepository = new FakePasswordRepository();
         var emailVerificationRepository = new FakeEmailVerificationRepository();
         var emailVerificationService = new FakeEmailVerificationService
         {
@@ -29,17 +28,14 @@ public sealed class RegisterUserUseCaseTests
         };
         var outboxFactory = new FakeEmailVerificationNotificationOutboxFactory();
         var outboxRepository = new FakeOutboxRepository();
-        var passwordEncripter = new FakePasswordEncripter();
         var unitOfWork = new SpyUnitOfWork();
         var useCase = new RegisterUserUseCase(
             userRepository,
             userReadRepository,
-            passwordRepository,
             emailVerificationRepository,
             emailVerificationService,
             outboxFactory,
             outboxRepository,
-            passwordEncripter,
             unitOfWork);
 
         var result = await useCase.Execute(new RegisterUserCommand
@@ -47,13 +43,10 @@ public sealed class RegisterUserUseCaseTests
             FirstName = "Bruno",
             LastName = "Silva",
             Email = "bruno@authcore.dev",
-            Contact = "11999999999",
-            Password = "ValidPassword#2026",
-            ConfirmPassword = "ValidPassword#2026"
+            Contact = "11999999999"
         });
 
         var user = Assert.Single(userRepository.AddedUsers);
-        var password = Assert.Single(passwordRepository.AddedPasswords);
         var verification = Assert.Single(emailVerificationRepository.AddedVerifications);
         var outboxMessage = Assert.Single(outboxRepository.AddedMessages);
         var notificationRequest = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(outboxMessage.Content);
@@ -62,7 +55,6 @@ public sealed class RegisterUserUseCaseTests
         Assert.Equal(user.FullName, result.FullName);
         Assert.Equal(user.Email.Value, result.Email);
         Assert.Equal(Role.User, user.Role);
-        Assert.Equal(user.Id, password.UserId);
         Assert.Equal(user.Id, verification.UserId);
         Assert.Equal(emailVerificationService.Material.Hash, verification.CodeHash);
         Assert.Equal(emailVerificationService.MaxAttempts, verification.MaxAttempts);
@@ -90,23 +82,19 @@ public sealed class RegisterUserUseCaseTests
     {
         var userRepository = new FakeUserRepository();
         var userReadRepository = new FakeUserReadRepository();
-        var passwordRepository = new FakePasswordRepository();
         var emailVerificationRepository = new FakeEmailVerificationRepository();
         var emailVerificationService = new FakeEmailVerificationService();
         var outboxFactory = new FakeEmailVerificationNotificationOutboxFactory();
         var outboxRepository = new FakeOutboxRepository();
-        var passwordEncripter = new FakePasswordEncripter();
         var unitOfWork = new SpyUnitOfWork();
         var existingUser = AuthenticationFixtures.CreateVerifiedUser();
         var useCase = new RegisterUserUseCase(
             userRepository,
             userReadRepository,
-            passwordRepository,
             emailVerificationRepository,
             emailVerificationService,
             outboxFactory,
             outboxRepository,
-            passwordEncripter,
             unitOfWork);
 
         userReadRepository.Store(existingUser);
@@ -116,14 +104,11 @@ public sealed class RegisterUserUseCaseTests
             FirstName = "Bruno",
             LastName = "Silva",
             Email = existingUser.Email.Value,
-            Contact = "11999999999",
-            Password = "ValidPassword#2026",
-            ConfirmPassword = "ValidPassword#2026"
+            Contact = "11999999999"
         }));
 
-        Assert.Equal("Já existe um usuário cadastrado com o e-mail informado.", exception.Message);
+        Assert.Equal("JÃ¡ existe um usuÃ¡rio cadastrado com o e-mail informado.", exception.Message);
         Assert.Empty(userRepository.AddedUsers);
-        Assert.Empty(passwordRepository.AddedPasswords);
         Assert.Empty(emailVerificationRepository.AddedVerifications);
         Assert.Empty(outboxRepository.AddedMessages);
         Assert.Equal(0, unitOfWork.BegunTransactions);

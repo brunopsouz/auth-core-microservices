@@ -4,7 +4,7 @@ type ErrorPayload = {
 };
 
 export async function readApiError(response: Response) {
-  const fallbackMessage = "Nao foi possivel concluir a operacao.";
+  const fallbackMessage = "Não foi possível concluir a operação.";
 
   try {
     const payload = (await response.json()) as ErrorPayload;

@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  BriefcaseBusiness,
   CheckCircle2,
   Mail,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
+import { isValidPhoneNumber } from "react-phone-number-input";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PhoneNumberField } from "@/components/auth/phone-number-field";
 import {
   completeGoogleOnboarding,
   getGoogleOnboarding,
@@ -76,6 +77,12 @@ export function GoogleOnboardingForm() {
     event.preventDefault();
 
     setError(null);
+
+    if (!isValidPhoneNumber(contact)) {
+      setError("Informe um telefone válido com DDD.");
+      return;
+    }
+
     setIsPending(true);
 
     try {
@@ -175,16 +182,12 @@ export function GoogleOnboardingForm() {
               icon={Mail}
             />
 
-            <ControlledField
+            <PhoneNumberField
               id="contact"
-              name="contact"
-              label="Contato"
-              autoComplete="organization"
-              placeholder="Empresa ou contato principal"
+              label="Telefone"
               value={contact}
               onChange={setContact}
               disabled={isLoading || !onboarding}
-              icon={BriefcaseBusiness}
             />
 
             <Button

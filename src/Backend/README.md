@@ -102,7 +102,7 @@ O fluxo assincrono principal e: AuthCore grava o estado e a mensagem de Outbox n
 
 ## Banco e infraestrutura
 
-Cada contexto possui seu proprio banco PostgreSQL em desenvolvimento, preservando isolamento entre AuthCore e NotificationCore. Redis, RabbitMQ e SMTP4Dev suportam execucao local e integracoes tecnicas.
+Cada contexto possui seu proprio banco PostgreSQL em desenvolvimento, preservando isolamento entre AuthCore e NotificationCore. Redis, RabbitMQ e o servico SMTP configurado por ambiente suportam execucao local e integracoes tecnicas.
 
 | Recurso | Uso |
 | --- | --- |
@@ -110,8 +110,8 @@ Cada contexto possui seu proprio banco PostgreSQL em desenvolvimento, preservand
 | PostgreSQL NotificationCore | Persistencia de notificacoes, templates, inbox e historico de processamento. |
 | Redis | Armazenamento tecnico para sessoes, tokens ou controles de autenticacao quando configurado. |
 | RabbitMQ | Transporte de mensagens assincronas entre AuthCore e NotificationCore. |
-| SMTP4Dev | Caixa SMTP local para validar envio de e-mails em desenvolvimento. |
-| Docker Compose | Sobe bancos, Redis, RabbitMQ, SMTP4Dev, Gateway e APIs conforme o modo de execucao. |
+| Servico SMTP | Envio real de e-mails por provedor configurado via variaveis `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME` e demais chaves SMTP do `.env.development`. |
+| Docker Compose | Sobe bancos, Redis, RabbitMQ, Gateway e APIs conforme o modo de execucao. |
 | FluentMigrator | Versiona e aplica mudancas de schema de cada contexto. |
 
 ## Servicos

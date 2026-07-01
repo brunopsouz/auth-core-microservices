@@ -18,6 +18,7 @@ using AuthCore.Application.UseCases.Authentication.ResendVerification;
 using AuthCore.Application.UseCases.Authentication.RevokeUserSession;
 using AuthCore.Application.UseCases.Authentication.VerifyEmail;
 using AuthCore.Application.Common.Exceptions;
+using AuthCore.Application.UseCases.Users.CompleteRegistration;
 using AuthCore.Application.UseCases.Users.RegisterUser;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Infrastructure.Configurations;
@@ -60,9 +61,7 @@ public sealed class AuthControllerIntegrationTests
             FirstName = "Bruno",
             LastName = "Silva",
             Email = "bruno@authcore.dev",
-            Contact = "11999999999",
-            Password = "ValidPassword#2026",
-            ConfirmPassword = "ValidPassword#2026"
+            Contact = "11999999999"
         });
 
         var createdResult = Assert.IsType<CreatedResult>(result.Result);
@@ -90,6 +89,27 @@ public sealed class AuthControllerIntegrationTests
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("bruno@authcore.dev", useCase.LastCommand!.Email);
         Assert.Equal("123456", useCase.LastCommand.Code);
+    }
+
+    [Fact]
+    public async Task CompleteRegistration_WhenUseCaseSucceeds_ShouldReturnNoContentAndForwardCommand()
+    {
+        var useCase = new SpyCompleteRegistrationUseCase();
+        var controller = CreateAuthController();
+
+        var result = await controller.CompleteRegistration(useCase, new RequestCompleteRegistrationJson
+        {
+            Email = "bruno@authcore.dev",
+            Code = "123456",
+            Password = "ValidPassword#2026",
+            ConfirmPassword = "ValidPassword#2026"
+        });
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal("bruno@authcore.dev", useCase.LastCommand!.Email);
+        Assert.Equal("123456", useCase.LastCommand.Code);
+        Assert.Equal("ValidPassword#2026", useCase.LastCommand.Password);
+        Assert.Equal("ValidPassword#2026", useCase.LastCommand.ConfirmPassword);
     }
 
     [Fact]
@@ -939,6 +959,7 @@ public sealed class AuthControllerIntegrationTests
         Assert.Contains("api/auth/session/login", actions);
         Assert.Contains("api/auth/register", actions);
         Assert.Contains("api/auth/verify-email", actions);
+        Assert.Contains("api/auth/complete-registration", actions);
         Assert.Contains("api/auth/resend-verification", actions);
         Assert.Contains("api/auth/token/login", actions);
         Assert.Contains("api/auth/token/refresh", actions);
@@ -1144,6 +1165,17 @@ public sealed class AuthControllerIntegrationTests
         public VerifyEmailCommand? LastCommand { get; private set; }
 
         public Task Execute(VerifyEmailCommand command)
+        {
+            LastCommand = command;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class SpyCompleteRegistrationUseCase : ICompleteRegistrationUseCase
+    {
+        public CompleteRegistrationCommand? LastCommand { get; private set; }
+
+        public Task Execute(CompleteRegistrationCommand command)
         {
             LastCommand = command;
             return Task.CompletedTask;

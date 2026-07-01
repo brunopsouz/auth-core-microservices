@@ -53,7 +53,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações we
 - Health checks por serviço.
 - Publicação assíncrona de solicitações de notificação pelo AuthCore.
 - Consumo, registro, renderização e despacho de notificações transacionais pelo NotificationCore.
-- SMTP configurável para envio de e-mail em desenvolvimento.
+- Serviço de e-mail SMTP configurável para envio real de notificações.
 - Frontend web com Next.js App Router, sessão por cookie `HttpOnly`, route handlers locais para rotas de autenticação e telas iniciais de login, registro e dashboard privado.
 
 ## Serviços
@@ -64,7 +64,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações we
 - `AuthCore.Web`: frontend web em Next.js para login, registro, sessão por cookie e área autenticada.
 - `Shared.Messaging.Contracts`: contratos compartilhados de mensageria e utilitários de payload sensível.
 
-## Stack
+## Stacks
 
 | Camada | Tecnologia | Responsabilidade |
 | --- | --- | --- |
@@ -75,7 +75,7 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações we
 | Banco | PostgreSQL 17 + Npgsql | Persistência principal dos contextos AuthCore e NotificationCore |
 | Cache | Redis 7 | Armazenamento técnico para sessões e suporte à autenticação |
 | Mensageria | RabbitMQ 3 | Comunicação assíncrona entre AuthCore e NotificationCore |
-| E-mail local | SMTP4Dev | Simulação de envio SMTP em desenvolvimento |
+| E-mail | Serviço SMTP configurável | Envio real de notificações por provedor definido no ambiente |
 | Infra local | Docker + Docker Compose | Ambiente local de desenvolvimento e execução dos serviços |
 | Migrações | FluentMigrator | Versionamento e aplicação de mudanças no banco |
 | Segurança | BCrypt.Net + JWT Bearer Authentication | Hash de senhas e autenticação por token |
@@ -118,7 +118,7 @@ flowchart TD
     AuthInfrastructure --> Redis[(Redis)]
 
     NotificationInfrastructure --> NotificationPostgres[(NotificationCore PostgreSQL)]
-    NotificationInfrastructure --> SMTP[SMTP4Dev/SMTP]
+    NotificationInfrastructure --> SMTP[Serviço SMTP]
 ```
 
 Responsabilidades principais:
@@ -149,17 +149,6 @@ O projeto adota SOLID como padrão transversal de design e revisão técnica:
 Como regra de visibilidade, abstrações consumidas entre camadas podem ser públicas, enquanto implementações concretas devem ser `internal` por padrão, exceto contratos de entrada, tipos de domínio e exigências técnicas de frameworks.
 
 O guia completo fica em `docs/agents/solid-guidelines.md`. Ele complementa os padrões de arquitetura, estilo C#, contratos HTTP, persistência e testes em `docs/agents/`.
-
-## Requisitos
-
-Para executar localmente:
-
-- [.NET SDK 10](https://dotnet.microsoft.com/download/dotnet/10.0)
-- Node.js compatível com Next.js 16
-- pnpm
-- Docker
-- Docker Compose ou plugin `docker compose`
-- Bash, para usar o script `run.sh`
 
 ## Instalação
 
@@ -199,7 +188,7 @@ O projeto possui um script principal para facilitar a execução local.
 ./run.sh dev
 ```
 
-Esse comando sobe PostgreSQL, Redis, RabbitMQ e SMTP4Dev via Docker Compose e executa `AuthCore.Api` localmente com o profile `http`.
+Esse comando sobe PostgreSQL, Redis e RabbitMQ via Docker Compose e executa `AuthCore.Api` localmente com o profile `http`.
 
 O AuthCore local fica disponível em:
 
@@ -225,7 +214,7 @@ http://localhost:5012/swagger
 ./run.sh infra
 ```
 
-Esse comando sobe bancos, Redis, RabbitMQ e SMTP4Dev. Ele não executa as APIs.
+Esse comando sobe bancos, Redis e RabbitMQ. Ele não executa as APIs.
 
 ### Executar toda a aplicação com Docker Compose
 

@@ -1,10 +1,17 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY . .
+COPY ["Backend/NotificationCore/NotificationCore.Api/NotificationCore.Api.csproj", "Backend/NotificationCore/NotificationCore.Api/"]
+COPY ["Backend/NotificationCore/NotificationCore.Application/NotificationCore.Application.csproj", "Backend/NotificationCore/NotificationCore.Application/"]
+COPY ["Backend/NotificationCore/NotificationCore.Domain/NotificationCore.Domain.csproj", "Backend/NotificationCore/NotificationCore.Domain/"]
+COPY ["Backend/NotificationCore/NotificationCore.Infrastructure/NotificationCore.Infrastructure.csproj", "Backend/NotificationCore/NotificationCore.Infrastructure/"]
+COPY ["Shared/Messaging.Contracts/Messaging.Contracts.csproj", "Shared/Messaging.Contracts/"]
 
 RUN dotnet restore "Backend/NotificationCore/NotificationCore.Api/NotificationCore.Api.csproj"
-RUN dotnet publish "Backend/NotificationCore/NotificationCore.Api/NotificationCore.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+COPY . .
+
+RUN dotnet publish "Backend/NotificationCore/NotificationCore.Api/NotificationCore.Api.csproj" -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app

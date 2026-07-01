@@ -11,6 +11,7 @@ using AuthCore.Application.UseCases.Authentication.ResendVerification;
 using AuthCore.Application.UseCases.Authentication.RevokeUserSession;
 using AuthCore.Application.UseCases.Authentication.VerifyEmail;
 using AuthCore.Application.UseCases.Users.ChangePassword;
+using AuthCore.Application.UseCases.Users.CompleteRegistration;
 using AuthCore.Application.UseCases.Users.DeleteUser;
 using AuthCore.Application.UseCases.Users.GetUserProfile;
 using AuthCore.Application.UseCases.Users.RegisterUser;
@@ -52,6 +53,7 @@ public static class ApplicationDependencyInjection
         services.AddScoped<IVerifyEmailUseCase, VerifyEmailUseCase>();
         services.AddScoped<IResendVerificationUseCase, ResendVerificationUseCase>();
         services.AddScoped<IRegisterUserUseCase, RegisterUserUseCase>();
+        services.AddScoped<ICompleteRegistrationUseCase, CompleteRegistrationUseCase>();
         services.AddScoped<IGetUserProfileUseCase, GetUserProfileUseCase>();
         services.AddScoped<IUpdateUserUseCase, UpdateUserUseCase>();
         services.AddScoped<IChangePasswordUseCase, ChangePasswordUseCase>();

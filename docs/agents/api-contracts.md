@@ -4,6 +4,12 @@
 
 Este guia define o padrão para contratos HTTP da camada `AuthCore.Api`.
 
+## Ortografia em Português
+
+Todos os textos em português em contratos, controllers, Swagger, documentação XML, mensagens e documentos devem usar ortografia oficial, com acentuação, cedilha (`ç`) e demais caracteres Unicode necessários.
+
+Não converta textos em português para ASCII. Preserve diacríticos em palavras como `requisição`, `resposta`, `usuário`, `operação`, `verificação`, `código`, `conteúdo`, `validação` e `não`. Nomes de classes, propriedades, rotas, actions e payloads JSON devem manter a nomenclatura técnica definida pelo projeto.
+
 Use este documento ao criar ou revisar:
 
 - controllers
@@ -65,7 +71,7 @@ O padrão atual está bem representado em:
 
 Responsabilidade canônica dos controllers de autenticação e usuário:
 
-- `AuthController`: `POST /api/auth/register`, `POST /api/auth/verify-email` e `POST /api/auth/resend-verification`
+- `AuthController`: `POST /api/auth/register`, `POST /api/auth/verify-email`, `POST /api/auth/complete-registration` e `POST /api/auth/resend-verification`
 - `SessionAuthController`: rotas `api/auth/session/...` para login, usuário da sessão, logout e revogação de sessões por cookie
 - `TokenAuthController`: rotas `api/auth/token/...` para login JWT, refresh token e logout token-based
 - `UserController`: `GET /api/users/profile`, `PUT /api/users/profile`, `PUT /api/users/change-password` e `DELETE /api/users`
@@ -168,6 +174,7 @@ Padrões observados:
 
 - `api/auth/register`
 - `api/auth/verify-email`
+- `api/auth/complete-registration`
 - `api/auth/resend-verification`
 - `api/auth/session/login`
 - `api/auth/session/me`

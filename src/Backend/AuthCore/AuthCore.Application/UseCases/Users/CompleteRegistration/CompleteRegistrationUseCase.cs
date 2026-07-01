@@ -1,16 +1,19 @@
 using AuthCore.Application.Common.Exceptions;
+using AuthCore.Domain.Common.Enums;
 using AuthCore.Domain.Common.Exceptions;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
+using AuthCore.Domain.Security.Cryptography;
+using AuthCore.Domain.Users;
 using AuthCore.Domain.Users.Repositories;
 
-namespace AuthCore.Application.UseCases.Authentication.VerifyEmail;
+namespace AuthCore.Application.UseCases.Users.CompleteRegistration;
 
 /// <summary>
-/// Representa caso de uso para verificar o e-mail do usuário.
+/// Representa caso de uso para concluir o registro de usuário.
 /// </summary>
-internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
+internal sealed class CompleteRegistrationUseCase : ICompleteRegistrationUseCase
 {
     /// <summary>
     /// Campo que armazena email verification repository.
@@ -20,6 +23,10 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
     /// Campo que armazena email verification service.
     /// </summary>
     private readonly IEmailVerificationService _emailVerificationService;
+    /// <summary>
+    /// Campo que armazena password encripter.
+    /// </summary>
+    private readonly IPasswordEncripter _passwordEncripter;
     /// <summary>
     /// Campo que armazena password repository.
     /// </summary>
@@ -43,13 +50,15 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
     /// <param name="emailVerificationRepository">repositório de verificação de e-mail.</param>
     /// <param name="emailVerificationService">Serviço de verificação de e-mail.</param>
     /// <param name="passwordRepository">repositório de senha.</param>
+    /// <param name="passwordEncripter">Serviço de criptografia de senha.</param>
     /// <param name="userReadRepository">repositório de leitura de usuário.</param>
     /// <param name="userRepository">repositório de escrita de usuário.</param>
     /// <param name="unitOfWork">Unidade de trabalho transacional.</param>
-    public VerifyEmailUseCase(
+    public CompleteRegistrationUseCase(
         IEmailVerificationRepository emailVerificationRepository,
         IEmailVerificationService emailVerificationService,
         IPasswordRepository passwordRepository,
+        IPasswordEncripter passwordEncripter,
         IUserReadRepository userReadRepository,
         IUserRepository userRepository,
         IUnitOfWork unitOfWork)
@@ -57,18 +66,21 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
         _emailVerificationRepository = emailVerificationRepository;
         _emailVerificationService = emailVerificationService;
         _passwordRepository = passwordRepository;
+        _passwordEncripter = passwordEncripter;
         _userReadRepository = userReadRepository;
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;
     }
 
     /// <summary>
-    /// Operação para verificar o e-mail do usuário.
+    /// Operação para concluir o registro de usuário.
     /// </summary>
-    /// <param name="command">Comando com o e-mail e Código OTP.</param>
-    public async Task Execute(VerifyEmailCommand command)
+    /// <param name="command">Comando com e-mail, código OTP e senha.</param>
+    public async Task Execute(CompleteRegistrationCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
+
+        Password.ValidateWithConfirmation(command.Password, command.ConfirmPassword);
 
         var normalizedEmail = NormalizeEmail(command.Email);
         await _unitOfWork.BeginTransactionAsync();
@@ -84,26 +96,33 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
             if (emailVerification.UserId != user.Id)
                 throw CreateInvalidVerificationException();
 
-            var password = await _passwordRepository.GetByUserIdAsync(user.Id);
-
-            if (password is null)
+            if (user.Status != UserStatus.PendingEmailVerification)
                 throw CreateInvalidVerificationException();
+
+            var existingPassword = await _passwordRepository.GetByUserIdAsync(user.Id);
+
+            if (existingPassword is not null)
+                throw new ConflictException("O cadastro informado já possui senha definida.");
 
             var validatedVerification = ValidateCode(emailVerification, command.Code);
-
             await _emailVerificationRepository.UpdateAsync(validatedVerification);
 
-            if (validatedVerification.ConsumedAtUtc.HasValue)
+            if (!validatedVerification.ConsumedAtUtc.HasValue)
             {
-                user.VerifyEmail(validatedVerification.ConsumedAtUtc.Value);
-                await _userRepository.UpdateAsync(user);
+                await _unitOfWork.CommitAsync();
+                transactionCompleted = true;
+                throw CreateInvalidVerificationException();
             }
 
+            user.VerifyEmail(validatedVerification.ConsumedAtUtc.Value);
+
+            var passwordHash = _passwordEncripter.Encrypt(command.Password);
+            var password = Password.Create(user.Id, passwordHash, PasswordStatus.Active);
+
+            await _userRepository.UpdateAsync(user);
+            await _passwordRepository.AddAsync(password);
             await _unitOfWork.CommitAsync();
             transactionCompleted = true;
-
-            if (!validatedVerification.ConsumedAtUtc.HasValue)
-                throw CreateInvalidVerificationException();
         }
         catch
         {
@@ -115,7 +134,7 @@ internal sealed class VerifyEmailUseCase : IVerifyEmailUseCase
     }
 
     /// <summary>
-    /// Operação para validar o Código OTP e normalizar falhas previsíveis.
+    /// Operação para validar o código OTP e normalizar falhas previsíveis.
     /// </summary>
     /// <param name="emailVerification">verificação pendente do usuário.</param>
     /// <param name="code">código informado.</param>

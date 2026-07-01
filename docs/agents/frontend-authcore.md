@@ -2,11 +2,17 @@
 
 ## Objetivo
 
-Este documento padroniza o frontend `src/Frontend/AuthCore.Web` e registra como ele deve consumir o fluxo real de autenticacao do backend AuthCore.
+Este documento padroniza o frontend `src/Frontend/AuthCore.Web` e registra como ele deve consumir o fluxo real de autenticação do backend AuthCore.
+
+## Ortografia em Português
+
+Todos os textos em português exibidos na UI, mensagens de erro, toasts, documentação e comentários devem usar ortografia oficial, com acentuação, cedilha (`ç`) e demais caracteres Unicode necessários.
+
+Não converta textos em português para ASCII. Preserve diacríticos em palavras como `código`, `verificação`, `usuário`, `operação`, `requisição`, `autenticação`, `sessão`, `não` e `você`. Identificadores técnicos, nomes de classes, rotas e payloads JSON continuam seguindo suas convenções próprias.
 
 Use este guia ao criar ou revisar telas, rotas, integracoes HTTP, componentes React e proxies locais do frontend.
 
-O objetivo principal e evitar que o frontend crie uma feature de autenticacao que force mudanca desnecessaria no backend. O backend continua sendo a fonte de verdade para autenticacao, autorizacao, sessao, CSRF, login externo e regras de usuario.
+O objetivo principal e evitar que o frontend crie uma feature de autenticação que force mudanca desnecessaria no backend. O backend continua sendo a fonte de verdade para autenticação, autorizacao, sessao, CSRF, login externo e regras de usuário.
 
 ## Stack
 
@@ -19,7 +25,7 @@ O objetivo principal e evitar que o frontend crie uma feature de autenticacao qu
 
 ## Fonte de Verdade
 
-Ao implementar autenticacao no frontend, siga esta ordem:
+Ao implementar autenticação no frontend, siga esta ordem:
 
 1. contratos HTTP atuais em `src/Backend/AuthCore/AuthCore.Api/Contracts`;
 2. controllers atuais em `src/Backend/AuthCore/AuthCore.Api/Controllers`;
@@ -27,15 +33,15 @@ Ao implementar autenticacao no frontend, siga esta ordem:
 4. este documento;
 5. estrutura atual de `src/Frontend/AuthCore.Web`.
 
-O anexo original de estrutura frontend serve como referencia de organizacao, mas nao deve ser copiado literalmente quando entrar em conflito com o estado atual do projeto.
+O anexo original de estrutura frontend serve como referência de organização, mas não deve ser copiado literalmente quando entrar em conflito com o estado atual do projeto.
 
 ## Leitura do Backend Atual
 
-O AuthCore expoe tres grupos principais de autenticacao:
+O AuthCore expõe três grupos principais de autenticação:
 
-- autenticacao publica e verificacao de e-mail em `AuthController`;
-- autenticacao web por sessao/cookie em `SessionAuthController`;
-- autenticacao token-based em `TokenAuthController`.
+- autenticação pública e verificação de e-mail em `AuthController`;
+- autenticação web por sessão/cookie em `SessionAuthController`;
+- autenticação token-based em `TokenAuthController`.
 
 Para o frontend web, o fluxo principal deve ser a sessao por cookie:
 
@@ -47,7 +53,7 @@ Para o frontend web, o fluxo principal deve ser a sessao por cookie:
 - `DELETE /api/auth/session/sessions/{sid}`;
 - `POST /api/auth/session/logout-all`.
 
-O modo token em `/api/auth/token/...` existe para consumidores token-based e nao deve ser o caminho principal do browser AuthCore.Web.
+O modo token em `/api/auth/token/...` existe para consumidores token-based e não deve ser o caminho principal do browser AuthCore.Web.
 
 ## Rotas do Frontend
 
@@ -59,19 +65,19 @@ A estrutura atual do frontend usa:
 - registro em `/register`;
 - dashboard privado em `/`.
 
-No estado atual, `/` e uma rota privada. Nao mova o dashboard para `/dashboard` apenas porque o anexo sugeria essa rota. Se um dashboard publico ou uma landing page forem criados no futuro, isso deve ser uma decisao explicita de produto e roteamento.
+No estado atual, `/` é uma rota privada. Não mova o dashboard para `/dashboard` apenas porque o anexo sugeria essa rota. Se um dashboard público ou uma landing page forem criados no futuro, isso deve ser uma decisão explícita de produto e roteamento.
 
-Rotas publicas atuais:
+Rotas públicas atuais:
 
 - `/sign-in`;
 - `/register`.
 
-Rotas publicas planejadas conforme o backend atual permitir:
+Rotas públicas planejadas conforme o backend atual permitir:
 
 - `/verify-email`;
 - `/auth/error`;
-- `/onboarding?provider=google`, quando o login Google retornar um usuario que ainda precisa completar cadastro;
-- uma tela de conclusao ou fallback para login externo, se o fluxo de redirecionamento exigir experiencia intermediaria no frontend.
+- `/onboarding?provider=google`, quando o login Google retornar um usuário que ainda precisa completar cadastro;
+- uma tela de conclusão ou fallback para login externo, se o fluxo de redirecionamento exigir experiência intermediária no frontend.
 
 Rotas privadas planejadas:
 
@@ -80,24 +86,24 @@ Rotas privadas planejadas:
 - `/sessions`;
 - `/security`.
 
-Evite criar `/pricing`, `/help`, landing page ou rotas marketing no AuthCore.Web enquanto o objetivo for montar o produto de autenticacao.
+Evite criar `/pricing`, `/help`, landing page ou rotas marketing no AuthCore.Web enquanto o objetivo for montar o produto de autenticação.
 
-## Proxy de Navegacao
+## Proxy de navegação
 
 No Next.js 16, use `src/proxy.ts` no lugar de `middleware.ts`.
 
-O proxy de navegacao deve fazer apenas decisoes rapidas de UX:
+O proxy de navegação deve fazer apenas decisoes rapidas de UX:
 
 - verificar se existe cookie de sessao;
-- redirecionar usuario anonimo de rota privada para `/sign-in`;
-- redirecionar usuario autenticado de `/sign-in` e `/register` para `/`;
+- redirecionar usuário anônimo de rota privada para `/sign-in`;
+- redirecionar usuário autenticado de `/sign-in` e `/register` para `/`;
 - permitir rotas publicas futuras com `whenAuthenticated: "next"`.
 
 O cookie de sessao usado como sinal rapido deve acompanhar `Auth:Cookie:SessionCookieName` do backend.
 
 No ambiente de desenvolvimento atual, o backend usa `sid`. Em producao, a configuracao pode usar `__Host-auth.sid`. Defina o valor do frontend por `AUTHCORE_SESSION_COOKIE_NAME`.
 
-O proxy de navegacao nao deve:
+O proxy de navegação Não deve:
 
 - fazer chamada HTTP;
 - consultar banco;
@@ -105,23 +111,23 @@ O proxy de navegacao nao deve:
 - validar sessao no Redis;
 - renovar sessao;
 - executar refresh token;
-- decidir regra critica de seguranca.
+- decidir regra critica de segurança.
 
 Paginas privadas que exibem dados reais devem validar a sessao por chamada normal ao backend, por exemplo `GET /api/auth/session/me`, antes de renderizar dados autenticados.
 
-## Integracao HTTP
+## integração HTTP
 
-O browser deve chamar rotas locais do Next.js, nao espalhar chamadas diretas ao backend em componentes React.
+O browser deve chamar rotas locais do Next.js, Não espalhar chamadas diretas ao backend em componentes React.
 
-Para autenticacao web, use rotas locais em `/api/auth/...`.
+Para autenticação web, use rotas locais em `/api/auth/...`.
 
 As rotas locais encaminham para `AUTHCORE_API_BASE_URL`, com default atual `http://localhost:5012`.
 
 Em desenvolvimento local, `AUTHCORE_API_BASE_URL` pode apontar diretamente para o `AuthCore.Api` quando o frontend consumir apenas `/api/auth/...`.
 
-Quando o frontend consumir endpoints protegidos em `/api/users/...` usando cookies do browser, a borda recomendada e o Gateway. Motivo: `UserController` exige Bearer/JWT por `[AuthenticatedUser]`, enquanto o Gateway ja sabe transformar o access token recebido por cookie em `Authorization: Bearer ...` e aplicar CSRF nas mutacoes.
+Quando o frontend consumir endpoints protegidos em `/api/users/...` usando cookies do browser, a borda recomendada e o Gateway. Motivo: `UserController` exige Bearer/JWT por `[AuthenticatedUser]`, enquanto o Gateway Já sabe transformar o access token recebido por cookie em `Authorization: Bearer ...` e aplicar CSRF nas mutacoes.
 
-Se o frontend mantiver um route handler local para `/api/users/...`, ele deve encaminhar para o Gateway. Nao replique no frontend a logica sensivel de cookie-to-bearer, validacao CSRF, origem e assinatura.
+Se o frontend mantiver um route handler local para `/api/users/...`, ele deve encaminhar para o Gateway. Não replique no frontend a logica sensivel de cookie-to-bearer, validação CSRF, origem e assinatura.
 
 Headers minimos que o proxy local deve preservar:
 
@@ -136,7 +142,7 @@ Headers minimos que o proxy local deve preservar:
 - `Location`;
 - `Retry-After`.
 
-Nao espalhe `fetch` diretamente em componentes. Centralize a chamada em utilitarios de API ou em modulos por feature.
+Não espalhe `fetch` diretamente em componentes. Centralize a chamada em utilitarios de API ou em modulos por feature.
 
 ## Cookies e CSRF
 
@@ -146,9 +152,9 @@ No login por sessao, o backend emite:
 - cookie de access token, `at` em desenvolvimento;
 - cookie CSRF, `XSRF-TOKEN`.
 
-Em producao, os nomes padrao podem usar prefixo `__Host-`, como `__Host-auth.sid` e `__Host-auth.at`.
+Em producao, os nomes padrão podem usar prefixo `__Host-`, como `__Host-auth.sid` e `__Host-auth.at`.
 
-O frontend nao deve ler o cookie HttpOnly de sessao nem o cookie HttpOnly de access token.
+O frontend Não deve ler o cookie HttpOnly de sessao nem o cookie HttpOnly de access token.
 
 Para mutacoes autenticadas por cookie, envie o header `X-CSRF-TOKEN` com o valor do cookie `XSRF-TOKEN` quando a chamada passar por uma rota que exige CSRF.
 
@@ -163,24 +169,28 @@ Chamadas autenticadas devem usar `credentials: "include"` quando feitas pelo bro
 
 ### Cadastro
 
-1. Usuario acessa `/register`.
+1. usuário acessa `/register`.
 2. Frontend envia `POST /api/auth/register`.
-3. Payload segue `RequestRegisterUserJson`: `FirstName`, `LastName`, `Email`, `Contact`, `Password`, `ConfirmPassword`.
-4. Backend registra usuario pendente de verificacao.
-5. Frontend direciona para verificacao de e-mail ou orienta o usuario conforme a experiencia implementada.
+3. Payload segue `RequestRegisterUserJson`: `FirstName`, `LastName`, `Email`, `Contact`.
+4. Backend registra usuário pendente de verificação e envia o código OTP por e-mail.
+5. Frontend solicita o código OTP.
+6. Depois do código informado, frontend solicita a senha.
+7. Frontend envia `POST /api/auth/complete-registration`.
+8. Payload segue `RequestCompleteRegistrationJson`: `Email`, `Code`, `Password`, `ConfirmPassword`.
+9. Backend valida o OTP, confirma o e-mail e grava a primeira senha.
 
-### Verificacao de E-mail
+### verificação de E-mail
 
-1. Usuario informa e-mail e codigo OTP.
+1. usuário informa e-mail e código OTP.
 2. Frontend envia `POST /api/auth/verify-email`.
 3. Payload segue `RequestVerifyEmailJson`: `Email`, `Code`.
 4. Backend retorna `204 No Content`.
 
-Para reenviar codigo, use `POST /api/auth/resend-verification` com `Email`.
+Para reenviar código, use `POST /api/auth/resend-verification` com `Email`.
 
 ### Login por Sessao
 
-1. Usuario acessa `/sign-in`.
+1. usuário acessa `/sign-in`.
 2. Frontend envia `POST /api/auth/session/login`.
 3. Payload segue `RequestSessionLoginJson`: `Email`, `Password`.
 4. Backend valida credenciais, cria sessao, emite cookies e retorna `ResponseAuthenticatedUserJson`.
@@ -191,13 +201,13 @@ Para reenviar codigo, use `POST /api/auth/resend-verification` com `Email`.
 
 Use `POST /api/auth/session/refresh` para renovar o access token curto da sessao por cookie.
 
-Essa chamada exige sessao e validacao CSRF. Nao implemente refresh dentro de `src/proxy.ts`.
+Essa chamada exige sessao e validação CSRF. Não implemente refresh dentro de `src/proxy.ts`.
 
 ### Logout
 
 Use `POST /api/auth/session/logout` para encerrar a sessao atual.
 
-Essa chamada exige sessao e validacao CSRF. O backend remove os cookies de autenticacao.
+Essa chamada exige sessao e validação CSRF. O backend remove os cookies de autenticação.
 
 ### Gerenciamento de Sessoes
 
@@ -215,49 +225,50 @@ O login Google deve ser tratado como redirecionamento externo iniciado pelo back
 
 Fluxo esperado:
 
-1. usuario clica em entrar com Google;
+1. usuário clica em entrar com Google;
 2. frontend navega para `GET /api/auth/external/google`, opcionalmente com `returnUrl`;
 3. backend valida `returnUrl`, cria challenge e redireciona para Google;
 4. Google retorna para `/api/auth/external/google/callback`;
-5. middleware do backend conclui a autenticacao externa e encaminha para `/api/auth/external/google/complete`;
+5. middleware do backend conclui a autenticação externa e encaminha para `/api/auth/external/google/complete`;
 6. backend cria sessao, emite cookies e redireciona para a URL segura de retorno;
-7. frontend apenas recebe o usuario ja redirecionado, exibe tela de erro quando o backend redirecionar para `/auth/error?reason=external_callback_failed`, ou trata `/onboarding?provider=google` quando o login externo exigir completude cadastral.
+7. frontend apenas recebe o usuário Já redirecionado, exibe tela de erro quando o backend redirecionar para `/auth/error?reason=external_callback_failed`, ou trata `/onboarding?provider=google` quando o login externo exigir completude cadastral.
 
-O frontend nao deve processar `code` nem `state` do Google.
+O frontend Não deve processar `code` nem `state` do Google.
 
 ## Contratos Consumidos
 
-Contratos de autenticacao e sessao para o frontend web:
+Contratos de autenticação e sessao para o frontend web:
 
 | Metodo | Rota | Uso |
 | --- | --- | --- |
-| `POST` | `/api/auth/register` | Cadastro publico |
-| `POST` | `/api/auth/verify-email` | Confirmacao de e-mail por OTP |
-| `POST` | `/api/auth/resend-verification` | Reenvio de verificacao |
+| `POST` | `/api/auth/register` | Cadastro público |
+| `POST` | `/api/auth/verify-email` | confirmação de e-mail por OTP |
+| `POST` | `/api/auth/complete-registration` | conclusão do cadastro com OTP e senha |
+| `POST` | `/api/auth/resend-verification` | Reenvio de verificação |
 | `POST` | `/api/auth/session/login` | Login por cookie |
-| `GET` | `/api/auth/session/me` | Usuario da sessao atual |
+| `GET` | `/api/auth/session/me` | usuário da sessao atual |
 | `POST` | `/api/auth/session/refresh` | Renovacao browser/session |
 | `POST` | `/api/auth/session/logout` | Logout da sessao atual |
 | `GET` | `/api/auth/session/sessions` | Listagem de sessoes |
 | `DELETE` | `/api/auth/session/sessions/{sid}` | Revogacao de sessao |
 | `POST` | `/api/auth/session/logout-all` | Revogacao global |
-| `GET` | `/api/auth/external/google` | Inicio do login Google |
-| `GET` | `/api/auth/external/google/complete` | Conclusao backend do login Google |
+| `GET` | `/api/auth/external/google` | Início do login Google |
+| `GET` | `/api/auth/external/google/complete` | conclusão backend do login Google |
 
-Contratos de usuario protegidos:
+Contratos de usuário protegidos:
 
 | Metodo | Rota | Uso |
 | --- | --- | --- |
-| `GET` | `/api/users/profile` | Perfil do usuario autenticado |
+| `GET` | `/api/users/profile` | Perfil do usuário autenticado |
 | `PUT` | `/api/users/profile` | Atualizacao de perfil |
 | `PUT` | `/api/users/change-password` | Alteracao de senha |
-| `DELETE` | `/api/users` | Exclusao do usuario atual |
+| `DELETE` | `/api/users` | Exclusao do usuário atual |
 
-Para `/api/users/...`, considere a observacao da secao de integracao: o Gateway e parte relevante do fluxo quando a autenticacao vem por cookies.
+Para `/api/users/...`, considere a observacao da secao de integração: o Gateway e parte relevante do fluxo quando a autenticação vem por cookies.
 
 ## Estrutura Recomendada
 
-A estrutura atual e simples e deve evoluir incrementalmente. Nao crie camadas genericas de `core`, `domain` ou `application` no frontend.
+A estrutura atual e simples e deve evoluir incrementalmente. Não crie camadas genericas de `core`, `domain` ou `application` no frontend.
 
 Estrutura alvo para crescimento:
 
@@ -305,40 +316,40 @@ src/
   proxy.ts
 ```
 
-Use `components/ui` antes de criar componentes novos. Componentes de UI nao devem conhecer detalhes de API. Modulos de API nao devem conter regra visual.
+Use `components/ui` antes de criar componentes novos. Componentes de UI Não devem conhecer detalhes de API. Modulos de API Não devem conter regra visual.
 
 `features/` deve ser introduzido quando houver volume real por funcionalidade. Enquanto o frontend estiver pequeno, `components/auth`, `components/session`, `components/user` e `lib` sao aceitaveis.
 
 ## UI
 
-Use shadcn/ui como base. Nao recrie componentes ja existentes em `src/components/ui`.
+Use shadcn/ui como base. Não recrie componentes Já existentes em `src/components/ui`.
 
 Diretrizes:
 
 - telas de formulario usam `Card`, `Field`, `Input`, `Button` e `Alert`;
 - comandos usam icones do `lucide-react`;
 - mantenha cards com raio de 8px ou menor;
-- evite landing page para fluxos de autenticacao;
+- evite landing page para fluxos de autenticação;
 - mantenha formularios completos e responsivos;
-- nao crie regra de negocio no componente React;
+- Não crie regra de negocio no componente React;
 - mantenha texto curto, direto e orientado ao fluxo.
 
-## O Que Nao Fazer
+## O Que Não Fazer
 
-Nao crie:
+Não crie:
 
-- validacao real de sessao no frontend;
+- validação real de sessao no frontend;
 - chamada HTTP dentro de `src/proxy.ts`;
-- refresh token ou renovacao de sessao no proxy de navegacao;
+- refresh token ou renovacao de sessao no proxy de navegação;
 - leitura de cookie HttpOnly no JavaScript;
 - armazenamento de access token em `localStorage` ou estado global;
 - regra de negocio em componente React;
-- `POST /api/users` como cadastro publico;
+- `POST /api/users` como cadastro público;
 - fluxo administrativo ou convite reaproveitando `POST /api/auth/register`;
 - Redux/Zustand antes de haver necessidade real;
 - estrutura frontend espelhando Clean Architecture do backend.
 
-## Validacao
+## validação
 
 Antes de concluir mudancas no frontend, rode:
 
@@ -347,12 +358,12 @@ pnpm lint
 pnpm build
 ```
 
-Se a mudanca tocar somente documentacao, a validacao pode ser leitura local e `git diff`.
+Se a mudanca tocar somente documentação, a validação pode ser leitura local e `git diff`.
 
 ## Skill ou Agent
 
 Para padronizar o desenvolvimento frontend deste projeto, use Skill.
 
-Motivo: a necessidade recorrente e carregar convencoes, estrutura, comandos e limites de arquitetura. Um Agent faz sentido para revisao independente, especialmente quando a mudanca altera comportamento backend, seguranca ou contratos.
+Motivo: a necessidade recorrente e carregar convencoes, estrutura, comandos e limites de arquitetura. Um Agent faz sentido para revisao independente, especialmente quando a mudanca altera comportamento backend, segurança ou contratos.
 
 A skill local fica em `.agents/skills/authcore-frontend-nextjs/SKILL.md`.

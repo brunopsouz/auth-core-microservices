@@ -2,11 +2,11 @@
 
 ## Objetivo
 
-Este repositorio deve seguir os principios SOLID de forma rigorosa, pratica e sustentavel.
+Este repositório deve seguir os princípios SOLID de forma rigorosa, prática e sustentável.
 
-Estas diretrizes devem orientar criacao, revisao e refatoracao de codigo C#/.NET em todos os contextos do projeto. A prioridade nao e apenas fazer o codigo funcionar; a prioridade e manter o codigo simples, testavel, extensivel, desacoplado e coerente com a arquitetura em camadas do repositorio.
+Estas diretrizes devem orientar criação, revisão e refatoração de código C#/.NET em todos os contextos do projeto. A prioridade não é apenas fazer o código funcionar; a prioridade é manter o código simples, testável, extensível, desacoplado e coerente com a arquitetura em camadas do repositório.
 
-Os principios avaliados sao:
+Os princípios avaliados são:
 
 - Single Responsibility Principle
 - Open/Closed Principle
@@ -14,39 +14,39 @@ Os principios avaliados sao:
 - Interface Segregation Principle
 - Dependency Inversion Principle
 
-## Documento padrao ou skill
+## Documento padrão ou skill
 
-Este conteudo deve ser tratado como documento padrao do repositorio, e nao como `SKILL.md`.
+Este conteúdo deve ser tratado como documento padrão do repositório, e não como `SKILL.md`.
 
 Motivos:
 
-- define criterios arquiteturais permanentes, aplicaveis a qualquer mudanca;
+- define critérios arquiteturais permanentes, aplicáveis a qualquer mudança;
 - complementa `AGENTS.md`, `architecture-overview.md`, `csharp-style.md`, `api-contracts.md`, `testing.md` e os guias de camada;
-- deve ser lido como politica de engenharia antes de alterar ou revisar codigo;
-- nao descreve um workflow especializado e acionavel como as skills de `domain-modeling`, `application-use-cases` ou `npgsql-repository`.
+- deve ser lido como política de engenharia antes de alterar ou revisar código;
+- não descreve um workflow especializado e acionável como as skills de `domain-modeling`, `application-use-cases` ou `npgsql-repository`.
 
-Uma skill faria sentido apenas se o objetivo fosse criar um fluxo operacional especifico, por exemplo `solid-review`, com passos obrigatorios para auditoria e relatorio. Para este projeto, o uso principal e como padrao transversal.
+Uma skill faria sentido apenas se o objetivo fosse criar um fluxo operacional específico, por exemplo `solid-review`, com passos obrigatórios para auditoria e relatório. Para este projeto, o uso principal é como padrão transversal.
 
 ## Checklist geral
 
-Antes de criar, alterar ou revisar codigo, avalie:
+Antes de criar, alterar ou revisar código, avalie:
 
-1. Qual responsabilidade este codigo representa?
+1. Qual responsabilidade este código representa?
 2. Qual camada deve conter esta responsabilidade?
-3. A mudanca aumenta acoplamento?
-4. A mudanca cria dependencia direta de infraestrutura onde deveria existir abstracao?
-5. A mudanca mistura regra de negocio com detalhes tecnicos?
-6. A mudanca facilita ou dificulta testes unitarios?
-7. A mudanca exige modificar codigo existente estavel para adicionar novo comportamento?
-8. A mudanca cria interfaces grandes, genericas ou artificiais?
-9. A mudanca quebra contratos esperados por consumidores existentes?
+3. A mudança aumenta acoplamento?
+4. A mudança cria dependência direta de infraestrutura onde deveria existir abstração?
+5. A mudança mistura regra de negócio com detalhes técnicos?
+6. A mudança facilita ou dificulta testes unitários?
+7. A mudança exige modificar código existente estável para adicionar novo comportamento?
+8. A mudança cria interfaces grandes, genéricas ou artificiais?
+9. A mudança quebra contratos esperados por consumidores existentes?
 10. Existe uma alternativa mais simples sem violar SOLID?
 
-Se houver violacao clara de SOLID, proponha ou implemente a refatoracao adequada antes de expandir a funcionalidade.
+Se houver violação clara de SOLID, proponha ou implemente a refatoração adequada antes de expandir a funcionalidade.
 
 ## Arquitetura esperada
 
-O projeto deve respeitar a separacao entre:
+O projeto deve respeitar a separação entre:
 
 - `Api`
 - `Application`
@@ -55,12 +55,12 @@ O projeto deve respeitar a separacao entre:
 
 ### Api
 
-Responsavel por:
+Responsável por:
 
 - controllers;
 - requests e responses HTTP;
 - middlewares e filters;
-- configuracao de autenticacao e autorizacao;
+- configuração de autenticação e autorização;
 - Swagger/OpenAPI;
 - versionamento quando existir;
 - mapeamento entre HTTP e Application.
@@ -68,68 +68,68 @@ Responsavel por:
 Controllers devem ser finos. Eles podem:
 
 - receber request;
-- validar entrada superficial quando necessario;
+- validar entrada superficial quando necessário;
 - chamar um use case;
 - converter resultado em resposta HTTP.
 
-Controllers nao devem:
+Controllers não devem:
 
 - acessar banco diretamente;
 - usar `DbContext`, `MongoCollection`, `Dapper`, `Npgsql`, `HttpClient` ou SDK externo diretamente;
-- implementar regra de negocio;
+- implementar regra de negócio;
 - enviar e-mail diretamente;
 - publicar mensagem diretamente em fila;
-- montar queries complexas de dominio;
-- decidir fluxo de negocio relevante.
+- montar queries complexas de domínio;
+- decidir fluxo de negócio relevante.
 
 ### Application
 
-Responsavel por:
+Responsável por:
 
 - use cases;
-- orquestracao de fluxo;
-- contratos de entrada e saida da aplicacao;
-- abstracoes necessarias para persistencia, mensageria, cache, e-mail, storage e integracoes;
-- validacoes de aplicacao;
-- controle de transacao quando necessario.
+- orquestração de fluxo;
+- contratos de entrada e saída da aplicação;
+- abstrações necessárias para persistência, mensageria, cache, e-mail, storage e integrações;
+- validações de aplicação;
+- controle de transação quando necessário.
 
-A camada `Application` pode depender do `Domain`, mas nao deve depender de `Infrastructure`.
+A camada `Application` pode depender do `Domain`, mas não deve depender de `Infrastructure`.
 
-Use cases devem coordenar o fluxo, mas nao devem concentrar detalhes tecnicos.
+Use cases devem coordenar o fluxo, mas não devem concentrar detalhes técnicos.
 
-Como regra de visibilidade, a abstracao consumida por outra camada pode ser `public`, por exemplo `I...UseCase` ou contratos de portas. A implementacao concreta do caso de uso deve ser `internal` por padrao, registrada por injecao de dependencia e nao consumida diretamente pela API ou por outros assemblies.
+Como regra de visibilidade, a abstração consumida por outra camada pode ser `public`, por exemplo `I...UseCase` ou contratos de portas. A implementação concreta do caso de uso deve ser `internal` por padrão, registrada por injeção de dependência e não consumida diretamente pela API ou por outros assemblies.
 
 Um use case pode:
 
-- buscar entidades em repositorios;
-- chamar metodos do dominio;
-- persistir alteracoes por contratos;
-- publicar eventos por abstracao;
+- buscar entidades em repositórios;
+- chamar métodos do domínio;
+- persistir alterações por contratos;
+- publicar eventos por abstração;
 - retornar resultado para a API.
 
-Um use case nao deve:
+Um use case não deve:
 
 - conter SQL inline complexo;
 - instanciar providers concretos;
 - manipular SDK externo diretamente;
-- esconder regra de negocio em codigo procedural longo;
-- virar classe generica com varias operacoes diferentes.
+- esconder regra de negócio em código procedural longo;
+- virar classe genérica com várias operações diferentes.
 
 ### Domain
 
-Responsavel por:
+Responsável por:
 
 - entidades;
 - aggregates;
 - value objects;
-- domain services, quando realmente necessarios;
-- regras de negocio puras;
+- domain services, quando realmente necessários;
+- regras de negócio puras;
 - invariantes;
-- eventos de dominio;
-- excecoes de dominio;
+- eventos de domínio;
+- exceções de domínio;
 - contratos centrais consumidos por Application e Infrastructure.
 
-O dominio deve ser a camada mais estavel e independente. Ele nao deve depender de:
+O domínio deve ser a camada mais estável e independente. Ele não deve depender de:
 
 - `Infrastructure`;
 - `Application`;
@@ -139,12 +139,12 @@ O dominio deve ser a camada mais estavel e independente. Ele nao deve depender d
 - filas;
 - cache;
 - SDKs externos;
-- variaveis de ambiente;
+- variáveis de ambiente;
 - `HttpContext`;
 - `ClaimsPrincipal`;
-- relogio do sistema diretamente quando tempo afetar regra testavel.
+- relógio do sistema diretamente quando tempo afetar regra testável.
 
-O dominio deve expressar comportamento, nao apenas dados.
+O domínio deve expressar comportamento, não apenas dados.
 
 Prefira:
 
@@ -161,19 +161,19 @@ user.EmailVerifiedAt = DateTime.UtcNow;
 
 ### Infrastructure
 
-Responsavel por detalhes tecnicos:
+Responsável por detalhes técnicos:
 
-- repositorios concretos;
+- repositórios concretos;
 - banco de dados;
 - Redis;
 - RabbitMQ;
 - SMTP;
 - HttpClient e SDKs externos;
 - providers externos;
-- implementacoes de interfaces do dominio ou da aplicacao;
-- migrations e configuracoes tecnicas.
+- implementações de interfaces do domínio ou da aplicação;
+- migrations e configurações técnicas.
 
-`Infrastructure` implementa detalhes e nao deve definir regra de negocio.
+`Infrastructure` implementa detalhes e não deve definir regra de negócio.
 
 ## 1. Single Responsibility Principle
 
@@ -181,57 +181,57 @@ Cada classe deve ter apenas um motivo claro para mudar.
 
 Uma classe viola SRP quando muda por motivos diferentes, por exemplo:
 
-- regra de negocio;
-- persistencia;
-- formatacao HTTP;
+- regra de negócio;
+- persistência;
+- formatação HTTP;
 - envio de e-mail;
 - log;
 - cache;
-- validacao;
-- integracao externa.
+- validação;
+- integração externa.
 
-Sinais de violacao:
+Sinais de violação:
 
-- classe com muitos metodos publicos sem coesao;
+- classe com muitos métodos públicos sem coesão;
 - classe chamada `Manager`, `Helper`, `Utils`, `Service` generico ou `Processor`;
-- use case que faz validacao, regra, query, envio, log e publicacao de evento tudo junto;
-- controller com logica de negocio;
-- entidade anemica com regra espalhada fora do dominio;
-- metodo longo com etapas de negocio misturadas com detalhes tecnicos.
+- use case que faz validação, regra, query, envio, log e publicação de evento tudo junto;
+- controller com lógica de negócio;
+- entidade anêmica com regra espalhada fora do domínio;
+- método longo com etapas de negócio misturadas com detalhes técnicos.
 
-Regra pratica: se for necessario explicar uma classe usando "e", provavelmente ela tem mais de uma responsabilidade.
+Regra prática: se for necessário explicar uma classe usando "e", provavelmente ela tem mais de uma responsabilidade.
 
 Ruim:
 
 ```text
-UserService cadastra usuario e envia e-mail e gera token e salva sessao.
+UserService cadastra usuário e envia e-mail e gera token e salva sessão.
 ```
 
 Melhor:
 
 ```text
-RegisterUserUseCase cadastra usuario.
-IEmailVerificationSender envia verificacao.
+RegisterUserUseCase cadastra usuário.
+IEmailVerificationSender envia verificação.
 ITokenIssuer emite token.
-ISessionStore salva sessao.
+ISessionStore salva sessão.
 ```
 
 ## 2. Open/Closed Principle
 
-O codigo deve ser aberto para extensao e fechado para modificacao.
+O código deve ser aberto para extensão e fechado para modificação.
 
-Adicionar novo comportamento nao deve exigir alterar varias classes estaveis.
+Adicionar novo comportamento não deve exigir alterar várias classes estáveis.
 
-Sinais de violacao:
+Sinais de violação:
 
-- muitos `if/else` ou `switch` por tipo de operacao;
+- muitos `if/else` ou `switch` por tipo de operação;
 - enum controlando comportamento complexo;
 - toda nova regra exige alterar uma classe central;
-- classe conhece todos os tipos concretos possiveis;
-- fluxo de negocio depende de strings magicas;
-- provider unico com varios branches para SMTP, SES, SendGrid, Brevo etc.
+- classe conhece todos os tipos concretos possíveis;
+- fluxo de negócio depende de strings mágicas;
+- provider único com vários branches para SMTP, SES, SendGrid, Brevo etc.
 
-Quando houver variacao real de comportamento, prefira abstracoes, strategies, policies, factories ou providers.
+Quando houver variação real de comportamento, prefira abstrações, strategies, policies, factories ou providers.
 
 Ruim:
 
@@ -257,37 +257,37 @@ public interface IEmailProvider
 
 ## 3. Liskov Substitution Principle
 
-Implementacoes de uma abstracao devem poder substituir umas as outras sem quebrar o comportamento esperado.
+Implementações de uma abstração devem poder substituir umas as outras sem quebrar o comportamento esperado.
 
 Se uma classe implementa uma interface, ela deve cumprir o contrato completo dessa interface.
 
-Sinais de violacao:
+Sinais de violação:
 
-- metodo implementado com `throw new NotSupportedException()`;
-- implementacao que ignora parametros importantes;
-- implementacao que retorna `null` inesperadamente;
-- subclasse que enfraquece validacoes da classe base;
-- subclasse que muda o significado do metodo herdado;
-- interface generica demais forcando implementacoes artificiais.
+- método implementado com `throw new NotSupportedException()`;
+- implementação que ignora parâmetros importantes;
+- implementação que retorna `null` inesperadamente;
+- subclasse que enfraquece validações da classe base;
+- subclasse que muda o significado do método herdado;
+- interface genérica demais forçando implementações artificiais.
 
-Se uma implementacao nao consegue cumprir uma interface, a interface provavelmente esta errada ou grande demais.
+Se uma implementação não consegue cumprir uma interface, a interface provavelmente está errada ou grande demais.
 
 ## 4. Interface Segregation Principle
 
-Interfaces devem ser pequenas, especificas e orientadas ao consumidor.
+Interfaces devem ser pequenas, específicas e orientadas ao consumidor.
 
-Nao crie interfaces grandes apenas para representar uma classe concreta.
+Não crie interfaces grandes apenas para representar uma classe concreta.
 
-Sinais de violacao:
+Sinais de violação:
 
-- interfaces com muitos metodos;
-- interfaces chamadas `IUserService` ou `INotificationService` com varias operacoes sem coesao;
-- implementacoes com metodos vazios;
-- implementacoes lancando `NotSupportedException`;
-- use case recebendo uma interface com metodos que ele nao usa;
+- interfaces com muitos métodos;
+- interfaces chamadas `IUserService` ou `INotificationService` com várias operações sem coesão;
+- implementações com métodos vazios;
+- implementações lançando `NotSupportedException`;
+- use case recebendo uma interface com métodos que ele não usa;
 - interface criada automaticamente para toda classe sem necessidade real.
 
-A interface deve nascer da necessidade do consumidor, nao da implementacao concreta.
+A interface deve nascer da necessidade do consumidor, não da implementação concreta.
 
 Ruim:
 
@@ -316,11 +316,11 @@ public interface ISmsSender
 
 ## 5. Dependency Inversion Principle
 
-Codigo de alto nivel nao deve depender de detalhes de baixo nivel.
+Código de alto nível não deve depender de detalhes de baixo nível.
 
-`Application` e `Domain` nao devem depender de infraestrutura concreta.
+`Application` e `Domain` não devem depender de infraestrutura concreta.
 
-Use cases nao devem depender diretamente de:
+Use cases não devem depender diretamente de:
 
 - `DbContext`;
 - `IMongoCollection<T>`;
@@ -335,7 +335,7 @@ Use cases nao devem depender diretamente de:
 - RabbitMQ channel concreto;
 - file system diretamente.
 
-Use cases devem depender de abstracoes como:
+Use cases devem depender de abstrações como:
 
 ```csharp
 IUserRepository
@@ -347,11 +347,11 @@ IObjectStorage
 ICacheRepository
 ```
 
-As implementacoes concretas devem ficar em `Infrastructure`.
+As implementações concretas devem ficar em `Infrastructure`.
 
-A regra de encapsulamento acompanha o DIP: contratos e abstracoes que precisam atravessar camadas podem ser `public`; implementacoes concretas, repositorios, providers, clients, factories tecnicas, options e modelos auxiliares devem ser `internal` por padrao. Excecoes publicas precisam ser pontuais e justificadas, como classes de registro de DI, controllers/contratos HTTP e tipos exigidos por discovery/reflection de frameworks.
+A regra de encapsulamento acompanha o DIP: contratos e abstrações que precisam atravessar camadas podem ser `public`; implementações concretas, repositórios, providers, clients, factories técnicas, options e modelos auxiliares devem ser `internal` por padrão. Exceções públicas precisam ser pontuais e justificadas, como classes de registro de DI, controllers/contratos HTTP e tipos exigidos por discovery/reflection de frameworks.
 
-Se uma classe da `Application` tem `new AlgumaClasseDeInfraestrutura()`, provavelmente ha violacao de DIP.
+Se uma classe da `Application` tem `new AlgumaClasseDeInfraestrutura()`, provavelmente há violação de DIP.
 
 ## Regras para controllers
 
@@ -388,7 +388,7 @@ public async Task<IActionResult> Register(RegisterUserRequest request)
 
 Motivo:
 
-- mistura HTTP, dominio, banco e e-mail;
+- mistura HTTP, domínio, banco e e-mail;
 - viola SRP;
 - viola DIP;
 - dificulta teste;
@@ -396,7 +396,7 @@ Motivo:
 
 ## Regras para use cases
 
-Cada use case deve representar uma intencao clara do sistema.
+Cada use case deve representar uma intenção clara do sistema.
 
 Bons nomes:
 
@@ -430,7 +430,7 @@ Um use case deve ter uma responsabilidade principal. Se o fluxo crescer demais, 
 - validator;
 - mapper.
 
-## Regras para dominio
+## Regras para domínio
 
 Entidades devem proteger invariantes.
 
@@ -448,15 +448,15 @@ user.VerifyEmail(code, nowUtc);
 user.Activate();
 ```
 
-Value objects devem validar sua propria consistencia.
+Value objects devem validar sua própria consistência.
 
 Use value object quando houver:
 
-- validacao;
-- normalizacao;
-- comparacao por valor;
+- validação;
+- normalização;
+- comparação por valor;
 - regra de formato;
-- semantica de dominio importante.
+- semântica de domínio importante.
 
 ## Regras para infraestrutura
 
@@ -472,15 +472,15 @@ RabbitMqMessagePublisher : IMessagePublisher
 SystemClock : IClock
 ```
 
-Se uma regra de negocio aparece em `Infrastructure`, considere mover para:
+Se uma regra de negócio aparece em `Infrastructure`, considere mover para:
 
 - `Domain`, se for regra pura;
 - `Application`, se for regra de fluxo;
-- policy ou strategy, se for variacao de comportamento.
+- policy ou strategy, se for variação de comportamento.
 
-## Regras para injecao de dependencia
+## Regras para injeção de dependência
 
-Registre abstracoes no container.
+Registre abstrações no container.
 
 Exemplo:
 
@@ -490,7 +490,7 @@ services.AddScoped<IEmailProvider, SmtpEmailProvider>();
 services.AddSingleton<IClock, SystemClock>();
 ```
 
-Nao use service locator dentro de use cases.
+Não use service locator dentro de use cases.
 
 Proibido:
 
@@ -508,21 +508,21 @@ public sealed class CreateUserUseCase
 
 Motivo:
 
-- esconde dependencias;
+- esconde dependências;
 - dificulta testes;
-- viola dependencias explicitas;
+- viola dependências explícitas;
 - aumenta acoplamento indireto.
 
 ## Regras para testes
 
-Toda regra de negocio relevante deve ser testavel sem banco real, fila real ou servico externo real.
+Toda regra de negócio relevante deve ser testável sem banco real, fila real ou serviço externo real.
 
-Se uma classe nao pode ser testada sem subir infraestrutura, provavelmente ha violacao de DIP ou SRP.
+Se uma classe não pode ser testada sem subir infraestrutura, provavelmente há violação de DIP ou SRP.
 
-Ao criar codigo novo, considere testes para:
+Ao criar código novo, considere testes para:
 
 - caminho feliz;
-- validacoes de dominio;
+- validações de domínio;
 - erros esperados;
 - contratos de interface;
 - comportamento de policies e strategies;
@@ -533,51 +533,51 @@ Ao criar codigo novo, considere testes para:
 ### SRP
 
 - A classe tem apenas um motivo principal para mudar?
-- O metodo faz uma coisa clara?
-- Existe mistura de regra de negocio com infraestrutura?
+- O método faz uma coisa clara?
+- Existe mistura de regra de negócio com infraestrutura?
 
 ### OCP
 
 - Um novo comportamento exigiria alterar essa classe?
 - Existe `switch` ou `if/else` por tipo de regra?
-- Strategy, policy ou provider deixariam o codigo mais extensivel?
+- Strategy, policy ou provider deixariam o código mais extensível?
 
 ### LSP
 
-- Toda implementacao cumpre o contrato da interface?
-- Alguma implementacao lanca `NotSupportedException`?
-- Alguma implementacao muda o significado esperado do metodo?
+- Toda implementação cumpre o contrato da interface?
+- Alguma implementação lança `NotSupportedException`?
+- Alguma implementação muda o significado esperado do método?
 
 ### ISP
 
-- O consumidor usa todos os metodos da interface?
-- A interface esta grande demais?
+- O consumidor usa todos os métodos da interface?
+- A interface está grande demais?
 - Faz sentido quebrar a interface por caso de uso?
 
 ### DIP
 
-- `Application` depende apenas de abstracoes?
-- `Domain` esta livre de infraestrutura?
-- Alguma classe instancia dependencia concreta internamente?
-- Alguma dependencia tecnica vazou para camada errada?
-- A abstracao publica existe apenas quando necessaria e a implementacao concreta permanece `internal` por padrao?
+- `Application` depende apenas de abstrações?
+- `Domain` está livre de infraestrutura?
+- Alguma classe instancia dependência concreta internamente?
+- Alguma dependência técnica vazou para camada errada?
+- A abstração pública existe apenas quando necessária e a implementação concreta permanece `internal` por padrão?
 
-## Como reportar uma revisao SOLID
+## Como reportar uma revisão SOLID
 
-Ao revisar ou gerar codigo, explique:
+Ao revisar ou gerar código, explique:
 
-1. Qual principio SOLID esta envolvido.
-2. Se o codigo atual respeita ou viola o principio.
-3. Qual impacto pratico da decisao.
-4. Qual refatoracao recomenda.
+1. Qual princípio SOLID está envolvido.
+2. Se o código atual respeita ou viola o princípio.
+3. Qual impacto prático da decisão.
+4. Qual refatoração recomenda.
 5. Qual trade-off existe.
 
 Exemplo:
 
 ```text
-Aqui existe uma violacao de SRP e DIP.
+Aqui existe uma violação de SRP e DIP.
 
-O controller esta fazendo regra de negocio e acessando infraestrutura diretamente.
+O controller está fazendo regra de negócio e acessando infraestrutura diretamente.
 Isso dificulta teste, aumenta acoplamento e faz o endpoint mudar por motivos diferentes.
 
 Eu moveria o fluxo para um use case e deixaria o controller apenas converter request/response.
@@ -588,24 +588,24 @@ Trade-off: cria mais classes, mas reduz acoplamento e melhora testabilidade.
 
 ## Trade-offs permitidos
 
-SOLID deve ser seguido com rigor, mas sem abstracoes artificiais.
+SOLID deve ser seguido com rigor, mas sem abstrações artificiais.
 
-Nao crie interface para tudo automaticamente. Crie abstracao quando existir pelo menos um dos motivos:
+Não crie interface para tudo automaticamente. Crie abstração quando existir pelo menos um dos motivos:
 
-- dependencia externa;
+- dependência externa;
 - infraestrutura;
 - necessidade de teste;
-- variacao real ou prevista de implementacao;
-- regra de negocio intercambiavel;
-- protecao entre camadas;
-- reducao clara de acoplamento.
+- variação real ou prevista de implementação;
+- regra de negócio intercambiavel;
+- proteção entre camadas;
+- redução clara de acoplamento.
 
 Evite overengineering.
 
-Uma classe simples, estavel e interna pode nao precisar de interface.
+Uma classe simples, estável e interna pode não precisar de interface.
 
 ## Regra final
 
-Se houver conflito entre entregar rapido e preservar SOLID, preserve SOLID e explique o custo.
+Se houver conflito entre entregar rápido e preservar SOLID, preserve SOLID e explique o custo.
 
-O codigo deve ser simples, mas nao simplista. O objetivo e crescer o projeto sem transformar a base em codigo acoplado, dificil de testar e dificil de evoluir.
+O código deve ser simples, mas não simplista. O objetivo é crescer o projeto sem transformar a base em código acoplado, difícil de testar e difícil de evoluir.

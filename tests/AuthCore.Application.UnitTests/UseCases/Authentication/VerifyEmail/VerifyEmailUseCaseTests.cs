@@ -11,6 +11,7 @@ public sealed class VerifyEmailUseCaseTests
     {
         var emailVerificationRepository = new FakeEmailVerificationRepository();
         var emailVerificationService = new FakeEmailVerificationService();
+        var passwordRepository = new FakePasswordRepository();
         var userReadRepository = new FakeUserReadRepository();
         var userRepository = new FakeUserRepository();
         var unitOfWork = new SpyUnitOfWork();
@@ -26,11 +27,13 @@ public sealed class VerifyEmailUseCaseTests
         var useCase = new VerifyEmailUseCase(
             emailVerificationRepository,
             emailVerificationService,
+            passwordRepository,
             userReadRepository,
             userRepository,
             unitOfWork);
 
         userReadRepository.Store(user);
+        passwordRepository.Store(AuthenticationFixtures.CreatePassword(user.Id));
         emailVerificationRepository.Store(verification);
 
         await useCase.Execute(new VerifyEmailCommand
@@ -56,6 +59,7 @@ public sealed class VerifyEmailUseCaseTests
     {
         var emailVerificationRepository = new FakeEmailVerificationRepository();
         var emailVerificationService = new FakeEmailVerificationService();
+        var passwordRepository = new FakePasswordRepository();
         var userReadRepository = new FakeUserReadRepository();
         var userRepository = new FakeUserRepository();
         var unitOfWork = new SpyUnitOfWork();
@@ -71,11 +75,13 @@ public sealed class VerifyEmailUseCaseTests
         var useCase = new VerifyEmailUseCase(
             emailVerificationRepository,
             emailVerificationService,
+            passwordRepository,
             userReadRepository,
             userRepository,
             unitOfWork);
 
         userReadRepository.Store(user);
+        passwordRepository.Store(AuthenticationFixtures.CreatePassword(user.Id));
         emailVerificationRepository.Store(verification);
 
         var exception = await Assert.ThrowsAsync<InvalidEmailVerificationException>(() => useCase.Execute(new VerifyEmailCommand
@@ -93,5 +99,48 @@ public sealed class VerifyEmailUseCaseTests
         Assert.Equal(1, unitOfWork.BegunTransactions);
         Assert.Equal(1, unitOfWork.CommittedTransactions);
         Assert.Equal(0, unitOfWork.RolledBackTransactions);
+    }
+
+    [Fact]
+    public async Task Execute_WhenPasswordDoesNotExist_ShouldThrowInvalidEmailVerificationExceptionWithoutConsumingCode()
+    {
+        var emailVerificationRepository = new FakeEmailVerificationRepository();
+        var emailVerificationService = new FakeEmailVerificationService();
+        var passwordRepository = new FakePasswordRepository();
+        var userReadRepository = new FakeUserReadRepository();
+        var userRepository = new FakeUserRepository();
+        var unitOfWork = new SpyUnitOfWork();
+        var user = AuthenticationFixtures.CreateUnverifiedUser();
+        var verification = AuthCore.Domain.Passports.EmailVerification.Issue(
+            user.Id,
+            user.Email.Value,
+            emailVerificationService.ComputeHash(emailVerificationService.Material.Code),
+            DateTime.UtcNow.AddMinutes(10),
+            emailVerificationService.MaxAttempts,
+            DateTime.UtcNow.AddMinutes(1),
+            DateTime.UtcNow);
+        var useCase = new VerifyEmailUseCase(
+            emailVerificationRepository,
+            emailVerificationService,
+            passwordRepository,
+            userReadRepository,
+            userRepository,
+            unitOfWork);
+
+        userReadRepository.Store(user);
+        emailVerificationRepository.Store(verification);
+
+        var exception = await Assert.ThrowsAsync<InvalidEmailVerificationException>(() => useCase.Execute(new VerifyEmailCommand
+        {
+            Email = user.Email.Value,
+            Code = emailVerificationService.Material.Code
+        }));
+
+        Assert.Equal(InvalidEmailVerificationException.InvalidVerificationMessage, exception.Message);
+        Assert.Empty(emailVerificationRepository.UpdatedVerifications);
+        Assert.Empty(userRepository.UpdatedUsers);
+        Assert.Equal(1, unitOfWork.BegunTransactions);
+        Assert.Equal(0, unitOfWork.CommittedTransactions);
+        Assert.Equal(1, unitOfWork.RolledBackTransactions);
     }
 }
