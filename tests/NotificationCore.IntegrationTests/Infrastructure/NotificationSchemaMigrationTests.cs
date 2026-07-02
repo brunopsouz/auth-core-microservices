@@ -214,9 +214,14 @@ public sealed class NotificationSchemaMigrationTests : IClassFixture<PostgreSqlI
     private async Task AssertUniqueIndexesAsync(params string[] expectedIndexes)
     {
         const string sql = """
-            SELECT indexrelid::regclass::text
-            FROM pg_index
-            WHERE indisunique = true;
+            SELECT index_class.relname
+            FROM pg_index index_metadata
+            INNER JOIN pg_class index_class
+                ON index_class.oid = index_metadata.indexrelid
+            INNER JOIN pg_namespace index_namespace
+                ON index_namespace.oid = index_class.relnamespace
+            WHERE index_metadata.indisunique = true
+              AND index_namespace.nspname = 'public';
             """;
 
         await using var connection = new NpgsqlConnection(_fixture.DatabaseConnectionString);
