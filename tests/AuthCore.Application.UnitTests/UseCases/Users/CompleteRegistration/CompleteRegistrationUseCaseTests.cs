@@ -153,7 +153,7 @@ public sealed class CompleteRegistrationUseCaseTests
             ConfirmPassword = "ValidPassword#2026"
         }));
 
-        Assert.Equal("O cadastro informado jÃ¡ possui senha definida.", exception.Message);
+        Assert.Equal("O cadastro informado já possui senha definida.", exception.Message);
         Assert.Empty(emailVerificationRepository.UpdatedVerifications);
         Assert.Empty(userRepository.UpdatedUsers);
         Assert.Empty(passwordRepository.AddedPasswords);

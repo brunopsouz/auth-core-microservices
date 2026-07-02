@@ -1,0 +1,207 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+      - feat/**
+    paths:
+      - "src/Backend/**"
+      - "src/Shared/**"
+      - "tests/**"
+      - "AuthCore.sln"
+      - "global.json"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - "src/Backend/**"
+      - "src/Shared/**"
+      - "tests/**"
+      - "AuthCore.sln"
+      - "global.json"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-unit-tests:
+    name: Build and Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore AuthCore.sln
+
+      - name: Build
+        run: dotnet build AuthCore.sln -c Release --no-restore
+
+      - name: Test AuthCore domain
+        run: dotnet test tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj -c Release --no-build
+
+      - name: Test AuthCore application
+        run: dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.csproj -c Release --no-build
+
+      - name: Test NotificationCore domain
+        run: dotnet test tests/NotificationCore.Domain.UnitTests/NotificationCore.Domain.UnitTests.csproj -c Release --no-build
+
+      - name: Test NotificationCore application
+        run: dotnet test tests/NotificationCore.Application.UnitTests/NotificationCore.Application.UnitTests.csproj -c Release --no-build
+
+      - name: Publish AuthCore API
+        run: dotnet publish src/Backend/AuthCore/AuthCore.Api/AuthCore.Api.csproj -c Release -o artifacts/authcore-api --no-build
+
+      - name: Publish NotificationCore API
+        run: dotnet publish src/Backend/NotificationCore/NotificationCore.Api/NotificationCore.Api.csproj -c Release -o artifacts/notificationcore-api --no-build
+
+      - name: Publish Gateway API
+        run: dotnet publish src/Backend/Gateway/Gateway.Api/Gateway.Api.csproj -c Release -o artifacts/gateway-api --no-build
+
+      - name: Upload AuthCore API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: authcore-api
+          path: artifacts/authcore-api
+
+      - name: Upload NotificationCore API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notificationcore-api
+          path: artifacts/notificationcore-api
+
+      - name: Upload Gateway API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-api
+          path: artifacts/gateway-api
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: build-and-unit-tests
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3-management
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      AUTHCORE_TEST_POSTGRES: Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres;Pooling=false
+      NOTIFICATIONCORE_TEST_POSTGRES: Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres;Pooling=false
+      AUTHCORE_TEST_REDIS: localhost:6379,abortConnect=false
+      ConnectionStrings__PostgreSql: Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres;Pooling=false
+      Redis__ConnectionString: localhost:6379,abortConnect=false
+      RabbitMq__Host: localhost
+      RabbitMq__Port: 5672
+      RabbitMq__VirtualHost: /
+      RabbitMq__Username: guest
+      RabbitMq__Password: guest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore AuthCore.sln
+
+      - name: Build
+        run: dotnet build AuthCore.sln -c Release --no-restore
+
+      - name: Test AuthCore integration
+        run: dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj -c Release --no-build
+
+      - name: Test NotificationCore integration
+        run: dotnet test tests/NotificationCore.IntegrationTests/NotificationCore.IntegrationTests.csproj -c Release --no-build
+
+      - name: Test Gateway integration
+        run: dotnet test tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj -c Release --no-build
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build-and-unit-tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build AuthCore API image
+        run: docker build -f src/Backend/AuthCore/AuthCore.Api/Dockerfile -t authcore-api-ci src
+
+      - name: Build NotificationCore API image
+        run: docker build -f src/Backend/NotificationCore/NotificationCore.Api/Dockerfile -t notificationcore-api-ci src
+
+      - name: Build Gateway API image
+        run: docker build -f src/Backend/Gateway/Gateway.Api/Dockerfile -t gateway-api-ci src

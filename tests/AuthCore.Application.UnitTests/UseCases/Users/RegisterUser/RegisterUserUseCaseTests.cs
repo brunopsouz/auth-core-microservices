@@ -107,7 +107,7 @@ public sealed class RegisterUserUseCaseTests
             Contact = "11999999999"
         }));
 
-        Assert.Equal("JÃ¡ existe um usuÃ¡rio cadastrado com o e-mail informado.", exception.Message);
+        Assert.Equal("Já existe um usuário cadastrado com o e-mail informado.", exception.Message);
         Assert.Empty(userRepository.AddedUsers);
         Assert.Empty(emailVerificationRepository.AddedVerifications);
         Assert.Empty(outboxRepository.AddedMessages);
