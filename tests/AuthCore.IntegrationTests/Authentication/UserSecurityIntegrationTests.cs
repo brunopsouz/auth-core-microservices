@@ -61,7 +61,7 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         var refreshTokenRepository = scope.ServiceProvider.GetRequiredService<IRefreshTokenRepository>();
         var passwordEncripter = scope.ServiceProvider.GetRequiredService<IPasswordEncripter>();
         var useCase = scope.ServiceProvider.GetRequiredService<IChangePasswordUseCase>();
-        var nowUtc = new DateTime(2026, 4, 14, 12, 0, 0, DateTimeKind.Utc);
+        var nowUtc = DateTime.UtcNow;
         var currentPassword = "CurrentPassword#2026";
         var newPassword = "NewPassword#2026";
         var user = CreateVerifiedUser($"change-password.{Guid.NewGuid():N}@authcore.dev");
@@ -136,7 +136,7 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
         var refreshTokenRepository = scope.ServiceProvider.GetRequiredService<IRefreshTokenRepository>();
         var passwordEncripter = scope.ServiceProvider.GetRequiredService<IPasswordEncripter>();
         var useCase = scope.ServiceProvider.GetRequiredService<IDeleteUserUseCase>();
-        var nowUtc = new DateTime(2026, 4, 14, 15, 0, 0, DateTimeKind.Utc);
+        var nowUtc = DateTime.UtcNow;
         var user = CreateVerifiedUser($"delete-user.{Guid.NewGuid():N}@authcore.dev");
         var password = Password.Create(user.Id, passwordEncripter.Encrypt("CurrentPassword#2026"), PasswordStatus.Active);
         var activeToken = RefreshToken.IssueInitial(user.Id, $"delete-active-hash-{Guid.NewGuid():N}", nowUtc.AddDays(7));
