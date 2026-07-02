@@ -44,7 +44,7 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         var session = Session.Issue(
             user.Id,
             user.SecurityStamp,
-            new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc),
+            DateTime.UtcNow.AddHours(2),
             "127.0.0.1",
             "IntegrationTests/1.0");
 
@@ -60,8 +60,8 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         Assert.Equal(session.UserId, persistedSession.UserId);
         Assert.Equal(session.Version, persistedSession.Version);
         Assert.Equal(session.SecurityStamp, persistedSession.SecurityStamp);
-        Assert.Equal(session.CreatedAtUtc, persistedSession.CreatedAtUtc);
-        Assert.Equal(session.ExpiresAtUtc, persistedSession.ExpiresAtUtc);
+        AssertDateTimeNear(session.CreatedAtUtc, persistedSession.CreatedAtUtc);
+        AssertDateTimeNear(session.ExpiresAtUtc, persistedSession.ExpiresAtUtc);
     }
 
     /// <summary>
@@ -80,10 +80,10 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         var session = Session.Issue(
             user.Id,
             user.SecurityStamp,
-            new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc),
+            DateTime.UtcNow.AddHours(2),
             "127.0.0.2",
             "IntegrationTests/2.0");
-        var revokedAtUtc = new DateTime(2026, 6, 20, 12, 30, 0, DateTimeKind.Utc);
+        var revokedAtUtc = session.CreatedAtUtc.AddMinutes(30);
         var revokedSession = session.Revoke(SessionRevocationReason.UserRevokedDevice, revokedAtUtc);
 
         await userRepository.AddAsync(user);
@@ -94,10 +94,10 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
 
         Assert.NotNull(persistedSession);
         Assert.Equal(SessionStatus.Revoked, persistedSession!.Status);
-        Assert.Equal(revokedAtUtc, persistedSession.RevokedAtUtc);
+        AssertDateTimeNear(revokedAtUtc, persistedSession.RevokedAtUtc);
         Assert.Equal(SessionRevocationReason.UserRevokedDevice, persistedSession.RevocationReason);
         Assert.Equal(revokedSession.Version, persistedSession.Version);
-        Assert.Equal(session.ExpiresAtUtc, persistedSession.ExpiresAtUtc);
+        AssertDateTimeNear(session.ExpiresAtUtc, persistedSession.ExpiresAtUtc);
     }
 
     /// <summary>
@@ -124,12 +124,12 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         await userRepository.AddAsync(user);
         await durableSessionRepository.AddAsync(session);
         await durableSessionRepository.UpdateAsync(
-            session.Revoke(SessionRevocationReason.UserLogout, nowUtc));
+            session.Revoke(SessionRevocationReason.UserLogout, session.CreatedAtUtc.AddMinutes(1)));
 
-        var staleActiveSession = session.Touch(nowUtc.AddMinutes(1), nowUtc.AddHours(3));
+        var staleActiveSession = session.Touch(session.CreatedAtUtc.AddMinutes(2), session.ExpiresAtUtc.AddHours(1));
         var wasUpdated = await durableSessionRepository.TryUpdateActiveAsync(
             staleActiveSession,
-            nowUtc.AddMinutes(1));
+            session.CreatedAtUtc.AddMinutes(2));
         var persistedSession = await durableSessionRepository.GetByPublicSessionIdAsync(session.PublicSessionId);
 
         Assert.Null(wasUpdated);
@@ -176,7 +176,7 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
 
         Assert.Null(wasUpdated);
         Assert.NotNull(persistedSession);
-        Assert.Equal(expiredSession.ExpiresAtUtc, persistedSession!.ExpiresAtUtc);
+        AssertDateTimeNear(expiredSession.ExpiresAtUtc, persistedSession!.ExpiresAtUtc);
     }
 
     /// <summary>
@@ -206,8 +206,8 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
             persistedSession.Status,
             SecurityStamp.Create().Value,
             persistedSession.CreatedAtUtc,
-            nowUtc.AddHours(3),
-            nowUtc,
+            persistedSession.ExpiresAtUtc.AddHours(1),
+            persistedSession.CreatedAtUtc.AddMinutes(1),
             persistedSession.IpAddress,
             persistedSession.UserAgent,
             null,
@@ -216,14 +216,16 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         await userRepository.AddAsync(user);
         await durableSessionRepository.AddAsync(persistedSession);
 
-        var wasUpdated = await durableSessionRepository.TryUpdateActiveAsync(divergentSession, nowUtc);
+        var wasUpdated = await durableSessionRepository.TryUpdateActiveAsync(
+            divergentSession,
+            persistedSession.CreatedAtUtc.AddMinutes(1));
         var reloadedSession = await durableSessionRepository.GetByPublicSessionIdAsync(
             persistedSession.PublicSessionId);
 
         Assert.Null(wasUpdated);
         Assert.NotNull(reloadedSession);
         Assert.Equal(persistedSession.SecurityStamp, reloadedSession!.SecurityStamp);
-        Assert.Equal(persistedSession.ExpiresAtUtc, reloadedSession.ExpiresAtUtc);
+        AssertDateTimeNear(persistedSession.ExpiresAtUtc, reloadedSession.ExpiresAtUtc);
     }
 
     [Fact]
@@ -248,10 +250,10 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         await durableSessionRepository.AddAsync(session);
 
         var refreshedSession = await durableSessionRepository.TryUpdateActiveAsync(
-            session.Touch(nowUtc.AddMinutes(1), nowUtc.AddHours(3)),
-            nowUtc);
+            session.Touch(session.CreatedAtUtc.AddMinutes(1), session.ExpiresAtUtc.AddHours(1)),
+            session.CreatedAtUtc.AddMinutes(1));
         var revokedSession = await durableSessionRepository.TryRevokeAsync(
-            session.Revoke(SessionRevocationReason.UserLogout, nowUtc.AddMinutes(2)));
+            session.Revoke(SessionRevocationReason.UserLogout, session.CreatedAtUtc.AddMinutes(2)));
 
         Assert.NotNull(refreshedSession);
         Assert.NotNull(revokedSession);
@@ -298,7 +300,7 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
             nowUtc.AddHours(5),
             "127.0.0.6",
             "Browser D")
-            .Revoke(SessionRevocationReason.UserLogout, nowUtc);
+            .Revoke(SessionRevocationReason.UserLogout, nowUtc.AddMinutes(1));
         var expiredSession = Session.Restore(
             "expired-session",
             "sess_expired_list",
@@ -346,7 +348,7 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         var durableSessionRepository = scope.ServiceProvider.GetRequiredService<IDurableSessionRepository>();
         var user = CreateVerifiedUser($"durable-session.bulk.{Guid.NewGuid():N}@authcore.dev");
         var anotherUser = CreateVerifiedUser($"durable-session.bulk.other.{Guid.NewGuid():N}@authcore.dev");
-        var nowUtc = new DateTime(2026, 6, 25, 18, 0, 0, DateTimeKind.Utc);
+        var nowUtc = DateTime.UtcNow;
         var activeSession = Session.Issue(
             user.Id,
             user.SecurityStamp,
@@ -393,10 +395,11 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         await durableSessionRepository.AddAsync(revokedSession);
         await durableSessionRepository.AddAsync(foreignSession);
 
+        var revokedAtUtc = activeSession.CreatedAtUtc.AddMinutes(1);
         var revokedSessions = await durableSessionRepository.RevokeActiveByUserIdAsync(
             user.Id,
             SessionRevocationReason.PasswordChanged,
-            nowUtc);
+            revokedAtUtc);
 
         var persistedActiveSession = await durableSessionRepository.GetByPublicSessionIdAsync(activeSession.PublicSessionId);
         var persistedExpiredSession = await durableSessionRepository.GetByPublicSessionIdAsync(expiredSession.PublicSessionId);
@@ -405,7 +408,7 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
 
         Assert.NotNull(persistedActiveSession);
         Assert.Equal(SessionStatus.Revoked, persistedActiveSession!.Status);
-        Assert.Equal(nowUtc, persistedActiveSession.RevokedAtUtc);
+        AssertDateTimeNear(revokedAtUtc, persistedActiveSession.RevokedAtUtc);
         Assert.Equal(SessionRevocationReason.PasswordChanged, persistedActiveSession.RevocationReason);
         Assert.Equal(activeSession.Version + 1, persistedActiveSession.Version);
         Assert.Contains(revokedSessions, session => session.PublicSessionId == activeSession.PublicSessionId);
@@ -438,5 +441,17 @@ public sealed class DurableSessionPersistenceIntegrationTests : IClassFixture<Po
         user.VerifyEmail(new DateTime(2026, 6, 3, 10, 0, 0, DateTimeKind.Utc));
 
         return user;
+    }
+
+    /// <summary>
+    /// Operacao para comparar datas persistidas pelo PostgreSQL considerando precisao de microssegundos.
+    /// </summary>
+    private static void AssertDateTimeNear(DateTime expected, DateTime? actual)
+    {
+        Assert.NotNull(actual);
+        Assert.InRange(
+            (actual.Value - expected).Duration(),
+            TimeSpan.Zero,
+            TimeSpan.FromMilliseconds(1));
     }
 }

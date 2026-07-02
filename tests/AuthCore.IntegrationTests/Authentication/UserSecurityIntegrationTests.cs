@@ -347,6 +347,7 @@ public sealed class UserSecurityIntegrationTests : IClassFixture<PostgreSqlInteg
                 ["Authentication:Jwt:AccessTokenLifetimeMinutes"] = "5",
                 ["Authentication:Jwt:RefreshTokenLifetimeDays"] = "7",
                 ["Authentication:Jwt:ClockSkewSeconds"] = "60",
+                ["Auth:Csrf:SigningKey"] = "AuthCore-Tests-CsrfSigningKey-2026-Strong!",
                 ["Redis:ConnectionString"] = "localhost:6379",
                 ["Redis:KeyPrefix"] = "authcore-tests",
                 ["RabbitMq:Host"] = "localhost",
