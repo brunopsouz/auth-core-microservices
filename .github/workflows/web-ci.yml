@@ -66,19 +66,32 @@ jobs:
       - name: Write web lint summary
         if: always()
         run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+
           {
-            echo "# Web Lint Summary"
+            echo "# [CI] AuthCore.Web - Qualidade"
             echo ""
             echo "| Item | Valor |"
             echo "|---|---|"
-            echo "| Project | AuthCore.Web |"
-            echo "| Workflow | ${{ github.workflow }} |"
-            echo "| Job | ${{ github.job }} |"
-            echo "| Working Directory | src/Frontend/AuthCore.Web |"
-            echo "| Package Manager | pnpm 11.7.0 |"
-            echo "| Node | 22.x |"
-            echo "| Command | pnpm lint |"
-            echo "| Status | ${{ steps.lint.outcome }} |"
+            echo "| Ambiente | \`ci\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Job | \`${{ github.job }}\` |"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Commit | \`$SHORT_SHA\` |"
+            echo "| Projeto | \`AuthCore.Web\` |"
+            echo "| Diretório | \`src/Frontend/AuthCore.Web\` |"
+            echo "| Node | \`22.x\` |"
+            echo "| Package manager | \`pnpm 11.7.0\` |"
+            echo "| Cache | \`pnpm-lock.yaml\` |"
+            echo ""
+            echo "## Checks"
+            echo ""
+            echo "- Instalação de dependências: \`pnpm install --frozen-lockfile\` (\`${{ steps.install.outcome }}\`)"
+            echo "- ESLint: \`pnpm lint\` (\`${{ steps.lint.outcome }}\`)"
+            echo ""
+            echo "**Status:** \`${{ steps.lint.outcome }}\`"
+            echo ""
+            echo "_Job summary generated at run-time._"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build AuthCore.Web
@@ -95,6 +108,8 @@ jobs:
       - name: Write web build summary
         if: always()
         run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+
           if [ -d ".next" ]; then
             NEXT_OUTPUT="yes"
           else
@@ -102,19 +117,31 @@ jobs:
           fi
 
           {
-            echo "# Web Build Summary"
+            echo "# [CI] AuthCore.Web - Build"
             echo ""
             echo "| Item | Valor |"
             echo "|---|---|"
-            echo "| Project | AuthCore.Web |"
-            echo "| Framework | Next.js |"
-            echo "| Command | pnpm build |"
-            echo "| .next generated | $NEXT_OUTPUT |"
-            echo "| Docker build executed | separate job: docker-build |"
-            echo "| Docker Image | authcore-web-ci |"
-            echo "| Deploy | Not configured |"
-            echo "| Registry Publish | Disabled |"
-            echo "| Status | ${{ steps.build_web.outcome }} |"
+            echo "| Ambiente | \`ci\` |"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Commit | \`$SHORT_SHA\` |"
+            echo "| Projeto | \`AuthCore.Web\` |"
+            echo "| Framework | \`Next.js\` |"
+            echo "| Node | \`22.x\` |"
+            echo "| Package manager | \`pnpm 11.7.0\` |"
+            echo "| Build | \`pnpm build\` |"
+            echo "| Saída | \`.next\`: \`$NEXT_OUTPUT\` |"
+            echo "| Artifact | \`authcore-web-next-build\` (\`${{ steps.upload_next_artifact.outcome }}\`) |"
+            echo "| Docker | job separado: \`docker-build\` |"
+            echo "| Deploy | \`not configured\` |"
+            echo "| Registry publish | \`disabled\` |"
+            echo ""
+            echo "## Checks"
+            echo ""
+            echo "- Build Next.js SSR/Node: \`pnpm build\` (\`${{ steps.build_web.outcome }}\`)"
+            echo "- Upload do artifact \`.next\`: \`${{ steps.upload_next_artifact.outcome }}\`"
+            echo "- Imagem local prevista: \`authcore-web-ci\`"
+            echo ""
+            echo "**Status:** \`${{ steps.build_web.outcome }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   docker-build:
@@ -134,16 +161,28 @@ jobs:
       - name: Write web Docker build summary
         if: always()
         run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+
           {
-            echo "# Web Docker Build Summary"
+            echo "# [CI] AuthCore.Web - Docker"
             echo ""
             echo "| Item | Valor |"
             echo "|---|---|"
-            echo "| Project | AuthCore.Web |"
-            echo "| Image | authcore-web-ci |"
-            echo "| Dockerfile | src/Frontend/AuthCore.Web/Dockerfile |"
-            echo "| Context | src/Frontend/AuthCore.Web |"
-            echo "| Registry Publish | Disabled |"
-            echo "| Deploy | Not configured |"
-            echo "| Status | ${{ steps.docker_build_web.outcome }} |"
+            echo "| Ambiente | \`ci\` |"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Commit | \`$SHORT_SHA\` |"
+            echo "| Projeto | \`AuthCore.Web\` |"
+            echo "| Imagem | \`authcore-web-ci\` |"
+            echo "| Dockerfile | \`src/Frontend/AuthCore.Web/Dockerfile\` |"
+            echo "| Contexto | \`src/Frontend/AuthCore.Web\` |"
+            echo "| Publicação | \`disabled\` |"
+            echo "| Deploy | \`not configured\` |"
+            echo ""
+            echo "## Checks"
+            echo ""
+            echo "- Docker build local de validação: \`docker build -t authcore-web-ci src/Frontend/AuthCore.Web\`"
+            echo "- Registry publish: \`disabled\`"
+            echo "- Deploy: \`not configured\`"
+            echo ""
+            echo "**Status:** \`${{ steps.docker_build_web.outcome }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
