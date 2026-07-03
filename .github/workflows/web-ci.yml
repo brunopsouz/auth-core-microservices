@@ -55,20 +55,67 @@ jobs:
           cache: pnpm
           cache-dependency-path: src/Frontend/AuthCore.Web/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install AuthCore.Web dependencies
+        id: install
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
+      - name: Lint AuthCore.Web
+        id: lint
         run: pnpm lint
 
-      - name: Build
+      - name: Write web lint summary
+        if: always()
+        run: |
+          {
+            echo "# Web Lint Summary"
+            echo ""
+            echo "| Item | Valor |"
+            echo "|---|---|"
+            echo "| Project | AuthCore.Web |"
+            echo "| Workflow | ${{ github.workflow }} |"
+            echo "| Job | ${{ github.job }} |"
+            echo "| Working Directory | src/Frontend/AuthCore.Web |"
+            echo "| Package Manager | pnpm 11.7.0 |"
+            echo "| Node | 22.x |"
+            echo "| Command | pnpm lint |"
+            echo "| Status | ${{ steps.lint.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build AuthCore.Web
+        id: build_web
         run: pnpm build
 
       - name: Upload Next.js build artifact
+        id: upload_next_artifact
         uses: actions/upload-artifact@v4
         with:
           name: authcore-web-next-build
           path: src/Frontend/AuthCore.Web/.next
+
+      - name: Write web build summary
+        if: always()
+        run: |
+          if [ -d ".next" ]; then
+            NEXT_OUTPUT="yes"
+          else
+            NEXT_OUTPUT="no"
+          fi
+
+          {
+            echo "# Web Build Summary"
+            echo ""
+            echo "| Item | Valor |"
+            echo "|---|---|"
+            echo "| Project | AuthCore.Web |"
+            echo "| Framework | Next.js |"
+            echo "| Command | pnpm build |"
+            echo "| .next generated | $NEXT_OUTPUT |"
+            echo "| Docker build executed | separate job: docker-build |"
+            echo "| Docker Image | authcore-web-ci |"
+            echo "| Deploy | Not configured |"
+            echo "| Registry Publish | Disabled |"
+            echo "| Status | ${{ steps.build_web.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   docker-build:
     name: Docker Build
@@ -80,5 +127,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build AuthCore Web image
+      - name: Build AuthCore.Web Docker image
+        id: docker_build_web
         run: docker build -t authcore-web-ci src/Frontend/AuthCore.Web
+
+      - name: Write web Docker build summary
+        if: always()
+        run: |
+          {
+            echo "# Web Docker Build Summary"
+            echo ""
+            echo "| Item | Valor |"
+            echo "|---|---|"
+            echo "| Project | AuthCore.Web |"
+            echo "| Image | authcore-web-ci |"
+            echo "| Dockerfile | src/Frontend/AuthCore.Web/Dockerfile |"
+            echo "| Context | src/Frontend/AuthCore.Web |"
+            echo "| Registry Publish | Disabled |"
+            echo "| Deploy | Not configured |"
+            echo "| Status | ${{ steps.docker_build_web.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

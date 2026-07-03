@@ -56,50 +56,93 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Restore
+      - name: Restore .NET dependencies
+        id: restore
         run: dotnet restore AuthCore.sln
 
-      - name: Build
+      - name: Build backend solution
+        id: build_backend
         run: dotnet build AuthCore.sln -c Release --no-restore
 
-      - name: Test AuthCore domain
+      - name: Run AuthCore domain unit tests
+        id: test_authcore_domain
         run: dotnet test tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj -c Release --no-build
 
-      - name: Test AuthCore application
+      - name: Run AuthCore application unit tests
+        id: test_authcore_application
         run: dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.csproj -c Release --no-build
 
-      - name: Test NotificationCore domain
+      - name: Run NotificationCore domain unit tests
+        id: test_notificationcore_domain
         run: dotnet test tests/NotificationCore.Domain.UnitTests/NotificationCore.Domain.UnitTests.csproj -c Release --no-build
 
-      - name: Test NotificationCore application
+      - name: Run NotificationCore application unit tests
+        id: test_notificationcore_application
         run: dotnet test tests/NotificationCore.Application.UnitTests/NotificationCore.Application.UnitTests.csproj -c Release --no-build
 
-      - name: Publish AuthCore API
+      - name: Publish AuthCore API artifact
+        id: publish_authcore_api
         run: dotnet publish src/Backend/AuthCore/AuthCore.Api/AuthCore.Api.csproj -c Release -o artifacts/authcore-api --no-build
 
-      - name: Publish NotificationCore API
+      - name: Publish NotificationCore API artifact
+        id: publish_notificationcore_api
         run: dotnet publish src/Backend/NotificationCore/NotificationCore.Api/NotificationCore.Api.csproj -c Release -o artifacts/notificationcore-api --no-build
 
-      - name: Publish Gateway API
+      - name: Publish Gateway API artifact
+        id: publish_gateway_api
         run: dotnet publish src/Backend/Gateway/Gateway.Api/Gateway.Api.csproj -c Release -o artifacts/gateway-api --no-build
 
       - name: Upload AuthCore API artifact
+        id: upload_authcore_api
         uses: actions/upload-artifact@v4
         with:
           name: authcore-api
           path: artifacts/authcore-api
 
       - name: Upload NotificationCore API artifact
+        id: upload_notificationcore_api
         uses: actions/upload-artifact@v4
         with:
           name: notificationcore-api
           path: artifacts/notificationcore-api
 
       - name: Upload Gateway API artifact
+        id: upload_gateway_api
         uses: actions/upload-artifact@v4
         with:
           name: gateway-api
           path: artifacts/gateway-api
+
+      - name: Write backend build and unit test summary
+        if: always()
+        run: |
+          {
+            echo "# Backend Build Summary"
+            echo ""
+            echo "| Item | Valor |"
+            echo "|---|---|"
+            echo "| Solution | AuthCore.sln |"
+            echo "| .NET SDK | 10.0.x |"
+            echo "| Configuration | Release |"
+            echo "| Restore | dotnet restore AuthCore.sln |"
+            echo "| Restore Status | ${{ steps.restore.outcome }} |"
+            echo "| Build | dotnet build AuthCore.sln -c Release --no-restore |"
+            echo "| Build Status | ${{ steps.build_backend.outcome }} |"
+            echo "| Published Projects | AuthCore.Api, NotificationCore.Api, Gateway.Api |"
+            echo "| Artifacts | authcore-api, notificationcore-api, gateway-api |"
+            echo "| Artifact Upload Status | AuthCore=${{ steps.upload_authcore_api.outcome }}, NotificationCore=${{ steps.upload_notificationcore_api.outcome }}, Gateway=${{ steps.upload_gateway_api.outcome }} |"
+            echo ""
+            echo "# Backend Test Summary"
+            echo ""
+            echo "| Test Project | Command | Status |"
+            echo "|---|---|---|"
+            echo "| AuthCore.Domain.UnitTests | dotnet test tests/AuthCore.Domain.UnitTests/AuthCore.Domain.UnitTests.csproj -c Release --no-build | ${{ steps.test_authcore_domain.outcome }} |"
+            echo "| AuthCore.Application.UnitTests | dotnet test tests/AuthCore.Application.UnitTests/AuthCore.Application.UnitTests.csproj -c Release --no-build | ${{ steps.test_authcore_application.outcome }} |"
+            echo "| NotificationCore.Domain.UnitTests | dotnet test tests/NotificationCore.Domain.UnitTests/NotificationCore.Domain.UnitTests.csproj -c Release --no-build | ${{ steps.test_notificationcore_domain.outcome }} |"
+            echo "| NotificationCore.Application.UnitTests | dotnet test tests/NotificationCore.Application.UnitTests/NotificationCore.Application.UnitTests.csproj -c Release --no-build | ${{ steps.test_notificationcore_application.outcome }} |"
+            echo ""
+            echo "Integration tests run in the separate \`integration-tests\` job."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   integration-tests:
     name: Integration Tests
@@ -172,20 +215,45 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Restore
+      - name: Restore .NET dependencies
+        id: restore
         run: dotnet restore AuthCore.sln
 
-      - name: Build
+      - name: Build backend solution
+        id: build_backend
         run: dotnet build AuthCore.sln -c Release --no-restore
 
-      - name: Test AuthCore integration
+      - name: Run AuthCore integration tests
+        id: test_authcore_integration
         run: dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj -c Release --no-build
 
-      - name: Test NotificationCore integration
+      - name: Run NotificationCore integration tests
+        id: test_notificationcore_integration
         run: dotnet test tests/NotificationCore.IntegrationTests/NotificationCore.IntegrationTests.csproj -c Release --no-build
 
-      - name: Test Gateway integration
+      - name: Run Gateway integration tests
+        id: test_gateway_integration
         run: dotnet test tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj -c Release --no-build
+
+      - name: Write backend integration test summary
+        if: always()
+        run: |
+          {
+            echo "# Backend Test Summary"
+            echo ""
+            echo "| Item | Valor |"
+            echo "|---|---|"
+            echo "| Services | PostgreSQL, Redis, RabbitMQ |"
+            echo "| Restore Status | ${{ steps.restore.outcome }} |"
+            echo "| Build Status | ${{ steps.build_backend.outcome }} |"
+            echo "| Job Status | ${{ job.status }} |"
+            echo ""
+            echo "| Integration Test Project | Command | Status |"
+            echo "|---|---|---|"
+            echo "| AuthCore.IntegrationTests | dotnet test tests/AuthCore.IntegrationTests/AuthCore.IntegrationTests.csproj -c Release --no-build | ${{ steps.test_authcore_integration.outcome }} |"
+            echo "| NotificationCore.IntegrationTests | dotnet test tests/NotificationCore.IntegrationTests/NotificationCore.IntegrationTests.csproj -c Release --no-build | ${{ steps.test_notificationcore_integration.outcome }} |"
+            echo "| Gateway.IntegrationTests | dotnet test tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj -c Release --no-build | ${{ steps.test_gateway_integration.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   docker-build:
     name: Docker Build
@@ -197,11 +265,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build AuthCore API image
+      - name: Build AuthCore API Docker image
+        id: docker_build_authcore_api
         run: docker build -f src/Backend/AuthCore/AuthCore.Api/Dockerfile -t authcore-api-ci src
 
-      - name: Build NotificationCore API image
+      - name: Build NotificationCore API Docker image
+        id: docker_build_notificationcore_api
         run: docker build -f src/Backend/NotificationCore/NotificationCore.Api/Dockerfile -t notificationcore-api-ci src
 
-      - name: Build Gateway API image
+      - name: Build Gateway API Docker image
+        id: docker_build_gateway_api
         run: docker build -f src/Backend/Gateway/Gateway.Api/Dockerfile -t gateway-api-ci src
+
+      - name: Write backend Docker build summary
+        if: always()
+        run: |
+          {
+            echo "# Backend Docker Build Summary"
+            echo ""
+            echo "| Image | Dockerfile | Context | Status |"
+            echo "|---|---|---|---|"
+            echo "| authcore-api-ci | src/Backend/AuthCore/AuthCore.Api/Dockerfile | src | ${{ steps.docker_build_authcore_api.outcome }} |"
+            echo "| notificationcore-api-ci | src/Backend/NotificationCore/NotificationCore.Api/Dockerfile | src | ${{ steps.docker_build_notificationcore_api.outcome }} |"
+            echo "| gateway-api-ci | src/Backend/Gateway/Gateway.Api/Dockerfile | src | ${{ steps.docker_build_gateway_api.outcome }} |"
+            echo ""
+            echo "Registry publish: disabled."
+            echo ""
+            echo "Deploy: not configured."
+          } >> "$GITHUB_STEP_SUMMARY"
