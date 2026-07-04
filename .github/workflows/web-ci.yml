@@ -98,13 +98,6 @@ jobs:
         id: build_web
         run: pnpm build
 
-      - name: Upload Next.js build artifact
-        id: upload_next_artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: authcore-web-next-build
-          path: src/Frontend/AuthCore.Web/.next
-
       - name: Write web build summary
         if: always()
         run: |
@@ -130,16 +123,16 @@ jobs:
             echo "| Package manager | \`pnpm 11.7.0\` |"
             echo "| Build | \`pnpm build\` |"
             echo "| Saída | \`.next\`: \`$NEXT_OUTPUT\` |"
-            echo "| Artifact | \`authcore-web-next-build\` (\`${{ steps.upload_next_artifact.outcome }}\`) |"
-            echo "| Docker | job separado: \`docker-build\` |"
+            echo "| Artifact | \`removed\` |"
+            echo "| Docker | validação principal do runtime: job \`docker-build\` com imagem \`authcore-web-ci\` |"
             echo "| Deploy | \`not configured\` |"
             echo "| Registry publish | \`disabled\` |"
             echo ""
             echo "## Checks"
             echo ""
             echo "- Build Next.js SSR/Node: \`pnpm build\` (\`${{ steps.build_web.outcome }}\`)"
-            echo "- Upload do artifact \`.next\`: \`${{ steps.upload_next_artifact.outcome }}\`"
-            echo "- Imagem local prevista: \`authcore-web-ci\`"
+            echo "- Artifact \`.next\`: removido do workflow"
+            echo "- Validação principal do runtime SSR: Docker build da imagem \`authcore-web-ci\` no job \`docker-build\`"
             echo ""
             echo "**Status:** \`${{ steps.build_web.outcome }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
