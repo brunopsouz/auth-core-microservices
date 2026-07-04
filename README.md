@@ -177,65 +177,6 @@ Instale as dependências do frontend:
 cd src/Frontend/AuthCore.Web
 pnpm install
 ```
-
-## Uso
-
-O projeto possui um script principal para facilitar a execução local.
-
-### Executar AuthCore local com infraestrutura em Docker
-
-```bash
-./run.sh dev
-```
-
-Esse comando sobe PostgreSQL, Redis e RabbitMQ via Docker Compose e executa `AuthCore.Api` localmente com o profile `http`.
-
-O AuthCore local fica disponível em:
-
-```text
-http://localhost:5012
-```
-
-Em ambiente de desenvolvimento, o Swagger do AuthCore fica disponível em:
-
-```text
-http://localhost:5012/swagger
-```
-
-### Executar AuthCore com hot reload
-
-```bash
-./run.sh watch
-```
-
-### Subir apenas a infraestrutura
-
-```bash
-./run.sh infra
-```
-
-Esse comando sobe bancos, Redis e RabbitMQ. Ele não executa as APIs.
-
-### Executar toda a aplicação com Docker Compose
-
-```bash
-./run.sh docker
-```
-
-Nesse modo, o ponto de entrada público é o Gateway:
-
-```text
-http://localhost:8080
-```
-
-O AuthCore também fica exposto diretamente para depuração local:
-
-```text
-http://localhost:8081
-```
-
-O NotificationCore roda dentro da rede Docker e é acessado pelo Gateway.
-
 ### Executar o frontend AuthCore.Web
 
 Em outro terminal, execute:
@@ -255,44 +196,8 @@ Por padrão, o route handler local do frontend encaminha `/api/auth/...` para:
 
 ```text
 http://localhost:5012
+
 ```
-
-### Encerrar containers
-
-```bash
-./run.sh down
-```
-
-## Configuração
-
-As configurações de desenvolvimento estão em:
-
-- `src/Backend/.env.development.example`, modelo versionado sem segredos
-- `src/Backend/.env.development`, arquivo local ignorado pelo Git
-- `src/Backend/AuthCore/AuthCore.Api/appsettings.Development.json`
-- `src/Backend/NotificationCore/NotificationCore.Api/appsettings.Development.json`
-- `src/Backend/Gateway/Gateway.Api/ocelot.json`
-- `src/Frontend/AuthCore.Web/.env.example`
-- `src/Frontend/AuthCore.Web/.env.local`, arquivo local ignorado pelo Git
-
-Antes de executar o projeto pela primeira vez, crie o arquivo local a partir do modelo e preencha os valores vazios quando necessário:
-
-```bash
-cp src/Backend/.env.development.example src/Backend/.env.development
-```
-
-Para alterar o destino das chamadas do frontend, crie o `.env.local` a partir do exemplo:
-
-```bash
-cp src/Frontend/AuthCore.Web/.env.example src/Frontend/AuthCore.Web/.env.local
-```
-
-Variáveis principais do frontend:
-
-| Variável | Padrão | Descrição |
-| --- | --- | --- |
-| `AUTHCORE_API_BASE_URL` | `http://localhost:5012` | Base server-side usada pelos route handlers locais para encaminhar `/api/auth/...` |
-| `AUTHCORE_SESSION_COOKIE_NAME` | `sid` em desenvolvimento | Nome do cookie usado pelo `src/proxy.ts` apenas como sinal rápido de sessão; em produção deve acompanhar `Auth:Cookie:SessionCookieName`, por exemplo `__Host-auth.sid` |
 
 Serviços padrão em desenvolvimento:
 
