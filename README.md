@@ -22,16 +22,14 @@ O objetivo é oferecer um núcleo de autenticação robusto para aplicações we
 
 - [Funcionalidades](#funcionalidades)
 - [Serviços](#serviços)
-- [Stack](#stack)
+- [Stacks](#stacks)
 - [Arquitetura](#arquitetura)
 - [Padrões de engenharia](#padrões-de-engenharia)
-- [Requisitos](#requisitos)
 - [Instalação](#instalação)
-- [Uso](#uso)
-- [Configuração](#configuração)
 - [Autenticação](#autenticação)
 - [Endpoints principais](#endpoints-principais)
 - [Testes](#testes)
+- [CI/CD e publicação de imagens](#cicd-e-publicação-de-imagens)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Licença](#licença)
 
@@ -156,7 +154,7 @@ Clone o repositório e acesse a pasta do projeto:
 
 ```bash
 git clone <url-do-repositorio>
-cd auth_core
+cd auth-core-microservices
 ```
 
 Restaure as dependências:
@@ -229,120 +227,13 @@ O frontend `AuthCore.Web` usa o fluxo web por cookie `HttpOnly`. O `src/proxy.ts
 
 Quando a aplicação completa está em Docker, prefira acessar as rotas publicadas pelo Gateway em `http://localhost:8080`.
 
-### AuthCore
-
-| Método | Rota | Descrição |
+| Contexto | Rotas principais | Responsabilidade |
 | --- | --- | --- |
-| `POST` | `/api/auth/register` | Registra usuário pendente de verificação |
-| `POST` | `/api/auth/verify-email` | Valida código de verificação de e-mail |
-| `POST` | `/api/auth/resend-verification` | Reenvia código de verificação |
-| `POST` | `/api/auth/session/login` | Autentica por sessão com cookie |
-| `GET` | `/api/auth/session/me` | Retorna usuário da sessão atual |
-| `GET` | `/api/auth/session/sessions` | Lista sessões ativas |
-| `DELETE` | `/api/auth/session/sessions/{sid}` | Revoga uma sessão específica |
-| `POST` | `/api/auth/session/logout` | Encerra sessão atual |
-| `POST` | `/api/auth/session/logout-all` | Encerra todas as sessões |
-| `POST` | `/api/auth/token/login` | Autentica por JWT e refresh token |
-| `POST` | `/api/auth/token/refresh` | Renova uma sessão token-based |
-| `POST` | `/api/auth/token/logout` | Revoga refresh token |
-| `GET` | `/api/auth/external/google` | Inicia login com Google |
-| `GET` | `/api/auth/external/google/callback` | Recebe callback tecnico do Google |
-| `GET` | `/api/auth/external/google/complete` | Conclui login Google e redireciona com sessao autenticada |
-| `GET` | `/api/users/profile` | Consulta perfil autenticado |
-| `PUT` | `/api/users/profile` | Atualiza perfil autenticado |
-| `PUT` | `/api/users/change-password` | Altera senha |
-| `DELETE` | `/api/users` | Exclui usuário autenticado |
+| AuthCore | `/api/auth/*`, `/api/users/*` | Autenticação, sessões, tokens e perfil do usuário |
+| NotificationCore | `/api/notifications/*` | Consulta e envio de notificações transacionais |
+| Gateway | `/health`, `/authcore/health`, `/notificationcore/health` | Entrada pública, roteamento e health checks agregados |
 
-`POST /api/auth/register` é a única entrada pública de autocadastro. Esse endpoint pertence ao `AuthController` e usa `RegisterUserUseCase` para criar usuário pendente de verificação, senha, verificação de e-mail e mensagem de Outbox na mesma transação.
-
-`UserController` fica restrito às operações autenticadas de perfil, senha e exclusão. `POST /api/users` não é endpoint de registro público. Convite de usuário e criação administrativa multitenant estão fora do escopo atual e devem ser especificados futuramente como fluxos próprios.
-
-### NotificationCore
-
-| Método | Rota | Descrição |
-| --- | --- | --- |
-| `GET` | `/api/notifications/{id}` | Consulta uma notificação pelo identificador |
-| `POST` | `/api/notifications/test-email` | Envia uma notificação de teste |
-
-As rotas de `NotificationCore` publicadas pelo Gateway exigem autenticação. Clientes browser podem usar o cookie `at` emitido pelo fluxo de sessão; clientes API/mobile podem usar `Authorization: Bearer`.
-
-### Health checks
-
-| Método | Rota | Descrição |
-| --- | --- | --- |
-| `GET` | `/health` | Health check do Gateway |
-| `GET` | `/authcore/health` | Health check do AuthCore via Gateway |
-| `GET` | `/notificationcore/health` | Health check do NotificationCore via Gateway |
-| `GET` | `/health` | Health check direto de cada API quando acessada fora do Gateway |
-
-### Exemplo: registrar usuário via Gateway
-
-```bash
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstName": "Ana",
-    "lastName": "Silva",
-    "email": "ana.silva@example.com",
-    "contact": "+5511999999999",
-    "password": "Senha@123456",
-    "confirmPassword": "Senha@123456"
-  }'
-```
-
-Em desenvolvimento, a solicitação de verificação de e-mail é publicada pelo AuthCore e processada pelo NotificationCore quando a aplicação completa está em execução. O destino do envio depende do provedor SMTP configurado no ambiente, como Brevo.
-
-### Exemplo: verificar e-mail
-
-```bash
-curl -X POST http://localhost:8080/api/auth/verify-email \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "ana.silva@example.com",
-    "code": "<codigo-otp>"
-  }'
-```
-
-### Exemplo: login com token para API/mobile
-
-```bash
-curl -X POST http://localhost:8080/api/auth/token/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "ana.silva@example.com",
-    "password": "Senha@123456"
-  }'
-```
-
-### Exemplo: consultar perfil autenticado com Bearer
-
-```bash
-curl http://localhost:8080/api/users/profile \
-  -H "Authorization: Bearer <access-token>"
-```
-
-### Exemplo: consultar perfil autenticado com cookies do browser
-
-Depois do login em `POST /api/auth/session/login`, o navegador envia os cookies automaticamente quando a chamada usa credenciais:
-
-```javascript
-await fetch("http://localhost:8080/api/users/profile", {
-  method: "GET",
-  credentials: "include"
-});
-```
-
-### Exemplo: enviar e-mail de teste
-
-```bash
-curl -X POST http://localhost:8080/api/notifications/test-email \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <access-token>" \
-  -d '{
-    "recipient": "ana.silva@example.com",
-    "correlationId": "manual-test-001"
-  }'
-```
+Os exemplos de chamadas HTTP, rotas canônicas e detalhes dos controllers ficam no [README do Backend](src/Backend/README.md).
 
 ## Testes
 
@@ -377,6 +268,25 @@ cd src/Frontend/AuthCore.Web
 pnpm lint
 pnpm build
 ```
+
+## CI/CD e publicação de imagens
+
+O monorepo possui workflows para validação e publicação:
+
+- Backend CI: valida restore, build, testes, publish de artifacts e Docker build dos serviços backend.
+- Web CI: valida instalação, lint, build Next.js e Docker build do frontend.
+- Docker Publish: publica imagens Docker versionadas no GitHub Container Registry (GHCR).
+
+Imagens publicadas:
+
+- `ghcr.io/brunopsouz/authcore-api`
+- `ghcr.io/brunopsouz/notificationcore-api`
+- `ghcr.io/brunopsouz/gateway-api`
+- `ghcr.io/brunopsouz/authcore-web`
+
+O processo atual publica imagens para uso futuro, mas ainda não faz deploy automático, staging ou produção.
+
+Consulte o processo detalhado em [docs/ci-cd/release-process.md](docs/ci-cd/release-process.md).
 
 ## Estrutura do projeto
 

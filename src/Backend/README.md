@@ -12,7 +12,7 @@
 
 </div>
 
-Este diretorio concentra os servicos backend do projeto. A raiz do repositorio pode conter outros clientes ou aplicacoes, como um frontend Angular, sem misturar o ciclo de build do backend.
+Este diretório concentra os serviços backend do projeto. A raiz do repositório também contém outros módulos do monorepo, como o frontend `AuthCore.Web`, sem misturar o ciclo de build dos serviços .NET.
 
 ## Estrutura
 
@@ -122,18 +122,153 @@ Cada contexto possui seu proprio banco PostgreSQL em desenvolvimento, preservand
 | NotificationCore | Consumo de eventos, persistencia e envio de notificacoes. | `src/Backend/NotificationCore/NotificationCore.Service.sln` |
 | Gateway | Borda de entrada HTTP, validacao JWT, suporte a JWT via cookie HttpOnly e roteamento das APIs. | `src/Backend/Gateway/Gateway.Service.sln` |
 
+## CI do Backend
+
+O Backend CI executa restore de dependências, build, testes, publish de artifacts e Docker build das APIs. A publicação de imagens Docker fica no workflow Docker Publish.
+
+Imagens backend publicadas no GHCR:
+
+- `ghcr.io/brunopsouz/authcore-api`
+- `ghcr.io/brunopsouz/notificationcore-api`
+- `ghcr.io/brunopsouz/gateway-api`
+
+O processo atual publica imagens para uso futuro, mas ainda não configura deploy automático, staging ou produção. Consulte o processo detalhado em [../../docs/ci-cd/release-process.md](../../docs/ci-cd/release-process.md).
+
 ## Rotas canonicas do AuthCore
 
 Quando a aplicacao completa roda via Docker Compose, o Gateway em `http://localhost:8080` e a borda publica recomendada.
 
 Responsabilidades atuais:
 
-- `AuthController`: registro publico em `POST /api/auth/register`, verificacao em `POST /api/auth/verify-email` e reenvio em `POST /api/auth/resend-verification`.
+- `AuthController`: início de registro em `POST /api/auth/register`, conclusão com OTP e senha em `POST /api/auth/complete-registration`, verificação em `POST /api/auth/verify-email` e reenvio em `POST /api/auth/resend-verification`.
 - `SessionAuthController`: autenticacao e gerenciamento de sessao por cookie em `api/auth/session/...`.
 - `TokenAuthController`: login JWT, refresh token e logout token-based em `api/auth/token/...`.
 - `UserController`: operacoes autenticadas de perfil, senha e exclusao em `GET /api/users/profile`, `PUT /api/users/profile`, `PUT /api/users/change-password` e `DELETE /api/users`.
 
-`RegisterUserUseCase` representa o autocadastro publico usado por `POST /api/auth/register`. `POST /api/users` nao e contrato de registro publico. Convite de usuario e criacao administrativa multitenant estao fora do escopo atual e devem ser especificados futuramente em fluxos proprios.
+`RegisterUserUseCase` inicia o autocadastro público usado por `POST /api/auth/register`. `CompleteRegistrationUseCase` conclui o cadastro com OTP e senha em `POST /api/auth/complete-registration`. `POST /api/users` não é contrato de registro público. Convite de usuário e criação administrativa multitenant estão fora do escopo atual e devem ser especificados futuramente em fluxos próprios.
+
+### AuthCore
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `POST` | `/api/auth/register` | Inicia registro de usuário pendente de verificação |
+| `POST` | `/api/auth/complete-registration` | Conclui registro com código OTP e senha |
+| `POST` | `/api/auth/verify-email` | Valida código de verificação de e-mail |
+| `POST` | `/api/auth/resend-verification` | Reenvia código de verificação |
+| `POST` | `/api/auth/session/login` | Autentica por sessão com cookie |
+| `GET` | `/api/auth/session/me` | Retorna usuário da sessão atual |
+| `GET` | `/api/auth/session/sessions` | Lista sessões ativas |
+| `DELETE` | `/api/auth/session/sessions/{sid}` | Revoga uma sessão específica |
+| `POST` | `/api/auth/session/logout` | Encerra sessão atual |
+| `POST` | `/api/auth/session/logout-all` | Encerra todas as sessões |
+| `POST` | `/api/auth/token/login` | Autentica por JWT e refresh token |
+| `POST` | `/api/auth/token/refresh` | Renova uma sessão token-based |
+| `POST` | `/api/auth/token/logout` | Revoga refresh token |
+| `GET` | `/api/auth/external/google` | Inicia login com Google |
+| `GET` | `/api/auth/external/google/callback` | Recebe callback técnico do Google |
+| `GET` | `/api/auth/external/google/complete` | Conclui login Google e redireciona com sessão autenticada |
+| `GET` | `/api/users/profile` | Consulta perfil autenticado |
+| `PUT` | `/api/users/profile` | Atualiza perfil autenticado |
+| `PUT` | `/api/users/change-password` | Altera senha |
+| `DELETE` | `/api/users` | Exclui usuário autenticado |
+
+### NotificationCore
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `GET` | `/api/notifications/{id}` | Consulta uma notificação pelo identificador |
+| `POST` | `/api/notifications/test-email` | Envia uma notificação de teste |
+
+As rotas de `NotificationCore` publicadas pelo Gateway exigem autenticação. Clientes browser podem usar o cookie `at` emitido pelo fluxo de sessão; clientes API/mobile podem usar `Authorization: Bearer`.
+
+### Health checks
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `GET` | `/health` | Health check do Gateway |
+| `GET` | `/authcore/health` | Health check do AuthCore via Gateway |
+| `GET` | `/notificationcore/health` | Health check do NotificationCore via Gateway |
+| `GET` | `/health` | Health check direto de cada API quando acessada fora do Gateway |
+
+### Exemplos de chamadas
+
+Iniciar registro de usuário via Gateway:
+
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Ana",
+    "lastName": "Silva",
+    "email": "ana.silva@example.com",
+    "contact": "+5511999999999"
+  }'
+```
+
+Em desenvolvimento, a solicitação de verificação de e-mail é publicada pelo AuthCore e processada pelo NotificationCore quando a aplicação completa está em execução. O destino do envio depende do provedor SMTP configurado no ambiente, como Brevo.
+
+Concluir registro com OTP e senha:
+
+```bash
+curl -X POST http://localhost:8080/api/auth/complete-registration \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "ana.silva@example.com",
+    "code": "<codigo-otp>",
+    "password": "Senha@123456",
+    "confirmPassword": "Senha@123456"
+  }'
+```
+
+Verificar e-mail:
+
+```bash
+curl -X POST http://localhost:8080/api/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "ana.silva@example.com",
+    "code": "<codigo-otp>"
+  }'
+```
+
+Login com token para API/mobile:
+
+```bash
+curl -X POST http://localhost:8080/api/auth/token/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "ana.silva@example.com",
+    "password": "Senha@123456"
+  }'
+```
+
+Consultar perfil autenticado com Bearer:
+
+```bash
+curl http://localhost:8080/api/users/profile \
+  -H "Authorization: Bearer <access-token>"
+```
+
+Consultar perfil autenticado com cookies do browser:
+
+```javascript
+await fetch("http://localhost:8080/api/users/profile", {
+  method: "GET",
+  credentials: "include"
+});
+```
+
+Enviar e-mail de teste:
+
+```bash
+curl -X POST http://localhost:8080/api/notifications/test-email \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{
+    "recipient": "ana.silva@example.com",
+    "correlationId": "manual-test-001"
+  }'
+```
 
 ## Autenticacao na borda
 
@@ -141,17 +276,17 @@ O backend suporta autenticacao web por sessao, autenticacao token-based para API
 
 As rotas publicas de autenticacao permanecem sob responsabilidade do AuthCore e sao expostas conforme a configuracao do ambiente. Credenciais Google OAuth devem permanecer fora de arquivos versionados.
 
-Para detalhes operacionais do login com Google, consulte `docs/features/google-login/`.
+Para detalhes operacionais do login com Google, consulte `../../docs/features/google-login/`.
 
 ## Soluções
 
 | Solução | Uso recomendado |
 | --- | --- |
-| `src/Backend/AuthCore/AuthCore.Service.sln` | Desenvolvimento, build e pipeline de producao do AuthCore. |
-| `src/Backend/NotificationCore/NotificationCore.Service.sln` | Desenvolvimento, build e pipeline de producao do NotificationCore. |
-| `src/Backend/Gateway/Gateway.Service.sln` | Desenvolvimento, build e pipeline de producao do Gateway. |
-| `src/Backend/Backend.sln` | Visao agregada dos projetos de producao do backend para abrir todos os servicos ou validar mudancas transversais. |
-| `AuthCore.sln` | Visao global do repositorio quando for necessario validar o monorepo inteiro. |
+| `src/Backend/AuthCore/AuthCore.Service.sln` | Desenvolvimento e build isolado do AuthCore. |
+| `src/Backend/NotificationCore/NotificationCore.Service.sln` | Desenvolvimento e build isolado do NotificationCore. |
+| `src/Backend/Gateway/Gateway.Service.sln` | Desenvolvimento e build isolado do Gateway. |
+| `src/Backend/Backend.sln` | Visão agregada dos projetos de produção do backend para abrir todos os serviços ou validar mudanças transversais. |
+| `AuthCore.sln` | Visão global do repositório usada para validação global e pelo Backend CI atual. |
 
 ## Pre-requisitos
 
@@ -269,13 +404,13 @@ Use `build-backend` como diagnostico dos projetos de producao do backend e `buil
 
 ## Testes
 
-Executar apenas a suite atualmente estavel:
+Executar a suíte padrão:
 
 ```bash
 ./run.sh test
 ```
 
-Executar testes por servico. Estes comandos executam os projetos de teste diretamente, nao as `*.Service.sln`:
+Executar testes por serviço. Estes comandos executam os projetos de teste diretamente, não as `*.Service.sln`:
 
 ```bash
 ./run.sh test-authcore
@@ -283,10 +418,10 @@ Executar testes por servico. Estes comandos executam os projetos de teste direta
 ./run.sh test-gateway
 ```
 
-Executar a validacao completa por projetos de teste dos servicos:
+Executar a validação completa por projetos de teste dos serviços:
 
 ```bash
 ./run.sh test-all
 ```
 
-Observacao: `test-all` e intencionalmente mais amplo e pode revelar pendencias em suites que ainda estao sendo ajustadas. Para um gate estavel de CI, use `build` e `test`.
+Use `test` para a suíte padrão e `test-all` quando precisar validar todos os projetos de teste dos serviços.

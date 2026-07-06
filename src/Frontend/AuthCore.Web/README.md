@@ -14,9 +14,9 @@ Frontend web do AuthCore com Next.js, Tailwind CSS e shadcn/ui.
 
 ## Requisitos
 
-- Node.js compativel com Next.js 16.
-- pnpm.
-- AuthCore.Api em execucao.
+- Node.js 22, conforme `.nvmrc`.
+- pnpm 11.7.0, conforme `packageManager` no `package.json`.
+- AuthCore.Api em execução para chamadas `/api/auth/...`.
 
 ## Configuracao
 
@@ -29,16 +29,41 @@ AUTHCORE_SESSION_COOKIE_NAME=sid
 
 Em desenvolvimento, o backend usa `sid`. Em producao, alinhe este valor ao cookie configurado em `Auth:Cookie:SessionCookieName`, por exemplo `__Host-auth.sid`.
 
-## Comandos
+## Comandos de desenvolvimento
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev --hostname 127.0.0.1 --port 3000
+```
+
+## Comandos de validação
+
+Estes comandos equivalem à validação principal do Web CI:
+
+```bash
+pnpm install --frozen-lockfile
 pnpm lint
 pnpm build
 ```
 
-## Rotas
+## CI do Frontend
+
+O Web CI executa:
+
+- `pnpm install --frozen-lockfile`
+- `pnpm lint`
+- `pnpm build`
+- Docker build
+
+O projeto usa Next.js com `output: "standalone"` para gerar uma imagem Docker adequada ao runtime SSR/Node.
+
+Imagem frontend publicada no GHCR:
+
+- `ghcr.io/brunopsouz/authcore-web`
+
+O processo atual publica imagens para uso futuro, mas ainda não configura deploy automático, staging ou produção. Consulte o processo detalhado em [../../../docs/ci-cd/release-process.md](../../../docs/ci-cd/release-process.md).
+
+## Rotas e proxy local
 
 - `/sign-in`: login por sessao.
 - `/register`: registro publico.
