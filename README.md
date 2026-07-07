@@ -14,9 +14,9 @@
 
 </div>
 
-AuthCore é uma solução full-stack para autenticação, gestão de usuários e notificações transacionais. A base combina backend em .NET 10, API Gateway, mensageria assíncrona, frontend web em Next.js e camadas internas com influência de Clean Architecture e DDD tático.
+AuthCore é um boilerplate full-stack para autenticação, gestão de usuários e notificações transacionais. A ideia é adotar uma autenticação híbrida, combinando Sessão server-side de longa duração como fonte principal de controle, JWT de curta duração como token de acesso usado na maioria das requisições, e Cookies HttpOnly para transportar os identificadores/tokens no navegador sem expor o JWT diretamente ao JavaScript do frontend.
 
-O objetivo é oferecer um núcleo de autenticação robusto para aplicações web e backend, mantendo regras de negócio no domínio, casos de uso na aplicação, detalhes técnicos na infraestrutura, comunicação entre serviços por contratos explícitos e uma experiência frontend alinhada ao fluxo real do AuthCore.
+O objetivo é combinar controle de revogação e gestão de sessões, boa performance nas requisições comuns, compatibilidade com Gateway e microserviços, menor exposição do token no client-side e possibilidade de bloquear novas emissões de JWT quando a sessão principal for revogada.
 
 ## Sumário
 
