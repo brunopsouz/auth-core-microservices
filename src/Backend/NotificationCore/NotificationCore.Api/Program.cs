@@ -4,9 +4,18 @@ using NotificationCore.Infrastructure;
 using NotificationCore.Infrastructure.Persistences.Migrations;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Shared.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddObservability(
+    builder.Configuration,
+    builder.Environment,
+    new ObservabilityServiceDescriptor(meterNames:
+    [
+        "NotificationCore.Database",
+        "NotificationCore.Notifications"
+    ]));
 builder.Services.AddApi(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();

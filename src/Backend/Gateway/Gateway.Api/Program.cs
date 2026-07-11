@@ -2,9 +2,11 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Ocelot.Middleware;
+using Shared.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddObservability(builder.Configuration, builder.Environment);
 builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
 builder.Services.AddGateway(builder.Configuration);
 

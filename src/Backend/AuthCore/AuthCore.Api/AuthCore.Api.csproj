@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AuthCore.Application\AuthCore.Application.csproj" />
     <ProjectReference Include="..\AuthCore.Infrastructure\AuthCore.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Observability\Shared.Observability.csproj" />
   </ItemGroup>
 
 </Project>
