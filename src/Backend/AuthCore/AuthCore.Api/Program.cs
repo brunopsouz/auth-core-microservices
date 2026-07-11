@@ -4,9 +4,19 @@ using AuthCore.Infrastructure;
 using AuthCore.Infrastructure.Persistences.Migrations;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Shared.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddObservability(
+    builder.Configuration,
+    builder.Environment,
+    new ObservabilityServiceDescriptor(meterNames:
+    [
+        "AuthCore.Database",
+        "AuthCore.Outbox",
+        "AuthCore.ExternalAuthentication"
+    ]));
 builder.Services.AddApi(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddApplication();
