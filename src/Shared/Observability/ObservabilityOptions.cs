@@ -44,4 +44,9 @@ public sealed class ObservabilityOptions
     /// Indica se health checks deverão ser excluídos por instrumentações futuras.
     /// </summary>
     public bool ExcludeHealthChecks { get; set; } = true;
+
+    /// <summary>
+    /// Representa as opções de registro de conclusão de requisições HTTP.
+    /// </summary>
+    public RequestLoggingOptions RequestLogging { get; set; } = new();
 }

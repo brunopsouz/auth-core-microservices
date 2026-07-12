@@ -1,7 +1,9 @@
+using System.Diagnostics;
+using System.Net.Mime;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
-using System.Net.Mime;
+using Shared.Observability;
 
 namespace AuthCore.Api.Exceptions;
 
@@ -10,13 +12,12 @@ namespace AuthCore.Api.Exceptions;
 /// </summary>
 internal sealed class ApiExceptionHandler : IExceptionHandler
 {
-    private const string UNKNOWN_ERROR_MESSAGE = "Ocorreu um erro interno inesperado.";
+    private const string UnknownErrorMessage = "Ocorreu um erro interno inesperado.";
 
     /// <summary>
     /// Campo que armazena logger.
     /// </summary>
     private readonly ILogger<ApiExceptionHandler> _logger;
-
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -24,9 +25,10 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
     /// <param name="logger">Serviço de logging da aplicação.</param>
     public ApiExceptionHandler(ILogger<ApiExceptionHandler> logger)
     {
+        ArgumentNullException.ThrowIfNull(logger);
+
         _logger = logger;
     }
-
 
     /// <summary>
     /// Operação para tratar exceções não tratadas da requisição atual.
@@ -44,21 +46,21 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
         ArgumentNullException.ThrowIfNull(exception);
 
         if (exception is AuthCoreException authCoreException)
+        {
             await HandleProjectExceptionAsync(httpContext, authCoreException, cancellationToken);
+        }
         else
+        {
             await HandleUnknownExceptionAsync(httpContext, cancellationToken);
+        }
 
-        LogException(exception, httpContext.Response.StatusCode);
+        var statusCode = httpContext.Response.StatusCode;
+        httpContext.Items[RequestLoggingConstants.ErrorCategoryItemKey] = ResolveErrorCategory(statusCode);
+        LogUnexpectedException(exception, httpContext, statusCode);
 
         return true;
     }
 
-    /// <summary>
-    /// Operação para tratar exceção conhecida do projeto.
-    /// </summary>
-    /// <param name="httpContext">Contexto HTTP da requisição.</param>
-    /// <param name="authCoreException">Exceção conhecida do projeto.</param>
-    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
     private static async Task HandleProjectExceptionAsync(
         HttpContext httpContext,
         AuthCoreException authCoreException,
@@ -73,11 +75,6 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// Operação para tratar exceção desconhecida.
-    /// </summary>
-    /// <param name="httpContext">Contexto HTTP da requisição.</param>
-    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
     private static async Task HandleUnknownExceptionAsync(
         HttpContext httpContext,
         CancellationToken cancellationToken)
@@ -87,23 +84,48 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
 
         await httpContext.Response.WriteAsJsonAsync(new ResponseErrorJson
         {
-            Errors = [UNKNOWN_ERROR_MESSAGE]
+            Errors = [UnknownErrorMessage]
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// Operação para registrar a exceção tratada.
-    /// </summary>
-    /// <param name="exception">Exceção capturada no pipeline.</param>
-    /// <param name="statusCode">Status code mapeado para a resposta.</param>
-    private void LogException(Exception exception, int statusCode)
+    private void LogUnexpectedException(Exception exception, HttpContext httpContext, int statusCode)
     {
-        if (statusCode >= StatusCodes.Status500InternalServerError)
+        if (statusCode < StatusCodes.Status500InternalServerError)
         {
-            _logger.LogError(exception, "Erro interno não tratado durante o processamento da requisição.");
             return;
         }
 
-        _logger.LogWarning(exception, "Exceção tratada pela API com status code {StatusCode}.", statusCode);
+        var activity = Activity.Current;
+
+        _logger.LogError(
+            exception,
+            "Erro interno não tratado durante o processamento da requisição. ExceptionType={ExceptionType}, StatusCode={StatusCode}, CorrelationId={CorrelationId}, TraceId={TraceId}, SpanId={SpanId}.",
+            exception.GetType().Name,
+            statusCode,
+            GetCorrelationId(httpContext),
+            activity?.TraceId.ToString(),
+            activity?.SpanId.ToString());
+    }
+
+    private static string ResolveErrorCategory(int statusCode)
+    {
+        return statusCode switch
+        {
+            StatusCodes.Status400BadRequest => "validation",
+            StatusCodes.Status401Unauthorized => "authentication",
+            StatusCodes.Status403Forbidden => "authorization",
+            StatusCodes.Status404NotFound => "not_found",
+            StatusCodes.Status409Conflict => "conflict",
+            >= StatusCodes.Status500InternalServerError => "unexpected",
+            _ => "handled"
+        };
+    }
+
+    private static string? GetCorrelationId(HttpContext httpContext)
+    {
+        return httpContext.Items.TryGetValue(CorrelationIdConstants.HttpContextItemKey, out var value)
+            && value is string correlationId
+                ? correlationId
+                : null;
     }
 }

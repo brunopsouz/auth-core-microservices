@@ -15,6 +15,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Ocelot.Middleware;
+using Shared.Observability;
 
 namespace Gateway.IntegrationTests;
 
@@ -1164,7 +1165,10 @@ public sealed class OcelotRouteTests
         var app = builder.Build();
 
         app.UseForwardedHeaders();
+        app.UseCorrelationId();
         app.UseGatewayDownstreamForwardedHeaders();
+        app.UseRouting();
+        app.UseRequestLogging();
         app.UseAuthentication();
         app.UseGatewayCookieAccessToken();
         app.UseAuthorization();

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using AuthCore.Api.Observability;
 using AuthCore.Api.Security;
 using AuthCore.Application.UseCases.Authentication.ExternalLogin;
@@ -78,7 +79,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         _metrics.RecordGoogleLoginStarted();
         _logger.LogInformation(
             "GoogleLoginStarted. TraceId={TraceId}, HasReturnUrl={HasReturnUrl}.",
-            httpContext.TraceIdentifier,
+            Activity.Current?.TraceId.ToString(),
             !string.IsNullOrWhiteSpace(returnUrl));
 
         var authenticationProperties = new AuthenticationProperties
@@ -155,7 +156,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         RecordDuration(startedAtUtc);
         _logger.LogInformation(
             "GoogleLoginSucceeded. TraceId={TraceId}, UserIdentifier={UserIdentifier}, RequiresOnboarding={RequiresOnboarding}.",
-            httpContext.TraceIdentifier,
+            Activity.Current?.TraceId.ToString(),
             result.Session?.UserIdentifier,
             result.RequiresOnboarding);
 
@@ -176,7 +177,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         RecordDuration(startedAtUtc);
         _logger.LogWarning(
             "GoogleLoginFailed. TraceId={TraceId}, FailureReason={FailureReason}.",
-            httpContext.TraceIdentifier,
+            Activity.Current?.TraceId.ToString(),
             reason);
 
         return new GoogleExternalAuthenticationResult(ExternalCallbackFailedRedirectUrl);

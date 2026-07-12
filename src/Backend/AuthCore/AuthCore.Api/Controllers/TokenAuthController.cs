@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using AuthCore.Api.Contracts.Requests;
 using AuthCore.Api.Contracts.Responses;
@@ -74,7 +75,7 @@ public sealed class TokenAuthController : ControllerBase
 
         _logger.LogInformation(
             "Login no modo token realizado com sucesso. TraceId={TraceId}",
-            HttpContext.TraceIdentifier);
+            Activity.Current?.TraceId.ToString());
 
         return Ok(new ResponseAuthenticatedSessionJson
         {
@@ -138,7 +139,7 @@ public sealed class TokenAuthController : ControllerBase
 
         _logger.LogInformation(
             "Logout do modo token concluido. TraceId={TraceId}",
-            HttpContext.TraceIdentifier);
+            Activity.Current?.TraceId.ToString());
 
         return NoContent();
     }

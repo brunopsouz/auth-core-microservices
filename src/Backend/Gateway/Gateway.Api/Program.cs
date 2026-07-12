@@ -21,8 +21,10 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 app.UseForwardedHeaders();
+app.UseCorrelationId();
 app.UseGatewayDownstreamForwardedHeaders();
 app.UseRouting();
+app.UseRequestLogging();
 app.UseAuthentication();
 app.UseGatewayCookieAccessToken();
 app.UseAuthorization();

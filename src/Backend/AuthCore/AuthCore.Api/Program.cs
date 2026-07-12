@@ -36,6 +36,9 @@ app.MapGet("/", () => Results.Redirect(app.Environment.IsDevelopment() ? "/swagg
     .ExcludeFromDescription();
 
 app.UseForwardedHeaders();
+app.UseCorrelationId();
+app.UseRouting();
+app.UseRequestLogging();
 app.UseExceptionHandler();
 app.UseCors("AuthCoreBrowserSession");
 app.UseAuthentication();
