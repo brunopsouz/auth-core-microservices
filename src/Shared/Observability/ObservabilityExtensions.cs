@@ -1,9 +1,12 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -52,6 +55,8 @@ public static class ObservabilityExtensions
         var sampler = CreateSampler(options, environment);
         var otlpEndpoint = ResolveOtlpEndpoint(options);
 
+        Sdk.SetDefaultTextMapPropagator(new TraceContextPropagator());
+
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(
                 options.ServiceName,
@@ -86,7 +91,14 @@ public static class ObservabilityExtensions
     {
         tracing
             .SetResourceBuilder(resourceBuilder)
-            .SetSampler(sampler);
+            .SetSampler(sampler)
+            .AddAspNetCoreInstrumentation(instrumentation =>
+            {
+                instrumentation.Filter = context => ShouldTraceRequest(context.Request.Path, options);
+                instrumentation.RecordException = false;
+            })
+            .AddHttpClientInstrumentation()
+            .AddProcessor(new SafeHttpTelemetryActivityProcessor());
 
         foreach (var activitySourceName in descriptor.ActivitySourceNames)
         {
@@ -111,7 +123,10 @@ public static class ObservabilityExtensions
         Uri? otlpEndpoint,
         ResourceBuilder resourceBuilder)
     {
-        metrics.SetResourceBuilder(resourceBuilder);
+        metrics
+            .SetResourceBuilder(resourceBuilder)
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation();
 
         foreach (var meterName in descriptor.MeterNames)
         {
@@ -127,6 +142,18 @@ public static class ObservabilityExtensions
         {
             metrics.AddConsoleExporter();
         }
+    }
+
+    private static bool ShouldTraceRequest(PathString path, ObservabilityOptions options)
+    {
+        return !options.ExcludeHealthChecks
+            || !IsHealthCheckPath(path);
+    }
+
+    private static bool IsHealthCheckPath(PathString path)
+    {
+        return path.Equals("/health", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void ConfigureLogging(
@@ -190,6 +217,16 @@ public static class ObservabilityExtensions
 
     private static bool ValidateOptions(ObservabilityOptions options)
     {
+        if (options.RequestLogging.SlowRequestThresholdMilliseconds <= 0d)
+        {
+            return false;
+        }
+
+        if (!options.Enabled)
+        {
+            return true;
+        }
+
         if (string.IsNullOrWhiteSpace(options.ServiceName)
             || string.IsNullOrWhiteSpace(options.ServiceNamespace)
             || !double.IsFinite(options.TraceSamplingRatio)

@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shared.Observability;
 
-namespace Gateway.IntegrationTests.Observability;
+namespace NotificationCore.IntegrationTests.Observability;
 
 public sealed class ObservabilityBootstrapTests
 {
@@ -22,46 +22,32 @@ public sealed class ObservabilityBootstrapTests
 
         Assert.True(options.Enabled);
         Assert.False(options.OtlpEnabled);
-        Assert.Equal("gateway-tests", options.ServiceName);
+        Assert.Equal("notificationcore-api", options.ServiceName);
         Assert.Equal("auth-core-microservices", options.ServiceNamespace);
     }
 
     [Fact]
-    public void AddObservability_WhenTraceSamplingRatioIsNotFinite_ShouldFailFast()
+    public void AddObservability_WhenTraceSamplingRatioIsLessThanZero_ShouldFailFast()
     {
         var builder = WebApplication.CreateBuilder();
 
-        builder.Configuration.AddInMemoryCollection(CreateConfiguration(traceSamplingRatio: "NaN"));
+        builder.Configuration.AddInMemoryCollection(CreateConfiguration(traceSamplingRatio: "-0.1"));
 
         Assert.Throws<OptionsValidationException>(
             () => builder.Services.AddObservability(builder.Configuration, builder.Environment));
     }
 
-    [Fact]
-    public void AddObservability_WhenSlowRequestThresholdIsNotPositive_ShouldFailFast()
-    {
-        var builder = WebApplication.CreateBuilder();
-
-        builder.Configuration.AddInMemoryCollection(CreateConfiguration(slowRequestThresholdMilliseconds: "0"));
-
-        Assert.Throws<OptionsValidationException>(
-            () => builder.Services.AddObservability(builder.Configuration, builder.Environment));
-    }
-
-    private static IReadOnlyDictionary<string, string?> CreateConfiguration(
-        string traceSamplingRatio = "1",
-        string slowRequestThresholdMilliseconds = "1000")
+    private static IReadOnlyDictionary<string, string?> CreateConfiguration(string traceSamplingRatio = "1")
     {
         return new Dictionary<string, string?>
         {
             ["Observability:Enabled"] = "true",
-            ["Observability:ServiceName"] = "gateway-tests",
+            ["Observability:ServiceName"] = "notificationcore-api",
             ["Observability:ServiceNamespace"] = "auth-core-microservices",
             ["Observability:OtlpEnabled"] = "false",
             ["Observability:ConsoleExporterEnabled"] = "false",
             ["Observability:TraceSamplingRatio"] = traceSamplingRatio,
-            ["Observability:ExcludeHealthChecks"] = "true",
-            ["Observability:RequestLogging:SlowRequestThresholdMilliseconds"] = slowRequestThresholdMilliseconds
+            ["Observability:ExcludeHealthChecks"] = "true"
         };
     }
 }

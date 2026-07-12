@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shared.Observability;
 
-namespace Gateway.IntegrationTests.Observability;
+namespace AuthCore.IntegrationTests.Observability;
 
 public sealed class ObservabilityBootstrapTests
 {
@@ -22,46 +22,50 @@ public sealed class ObservabilityBootstrapTests
 
         Assert.True(options.Enabled);
         Assert.False(options.OtlpEnabled);
-        Assert.Equal("gateway-tests", options.ServiceName);
+        Assert.Equal("authcore-api", options.ServiceName);
         Assert.Equal("auth-core-microservices", options.ServiceNamespace);
     }
 
     [Fact]
-    public void AddObservability_WhenTraceSamplingRatioIsNotFinite_ShouldFailFast()
+    public void AddObservability_WhenTraceSamplingRatioIsGreaterThanOne_ShouldFailFast()
     {
         var builder = WebApplication.CreateBuilder();
 
-        builder.Configuration.AddInMemoryCollection(CreateConfiguration(traceSamplingRatio: "NaN"));
+        builder.Configuration.AddInMemoryCollection(CreateConfiguration(traceSamplingRatio: "1.1"));
 
         Assert.Throws<OptionsValidationException>(
             () => builder.Services.AddObservability(builder.Configuration, builder.Environment));
     }
 
     [Fact]
-    public void AddObservability_WhenSlowRequestThresholdIsNotPositive_ShouldFailFast()
+    public async Task AddObservability_WhenObservabilityIsDisabled_ShouldBuildHostWithoutResourceConfiguration()
     {
         var builder = WebApplication.CreateBuilder();
 
-        builder.Configuration.AddInMemoryCollection(CreateConfiguration(slowRequestThresholdMilliseconds: "0"));
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Observability:Enabled"] = "false"
+        });
+        builder.Services.AddObservability(builder.Configuration, builder.Environment);
 
-        Assert.Throws<OptionsValidationException>(
-            () => builder.Services.AddObservability(builder.Configuration, builder.Environment));
+        await using var app = builder.Build();
+
+        var options = app.Services.GetRequiredService<IOptions<ObservabilityOptions>>().Value;
+
+        Assert.False(options.Enabled);
     }
 
-    private static IReadOnlyDictionary<string, string?> CreateConfiguration(
-        string traceSamplingRatio = "1",
-        string slowRequestThresholdMilliseconds = "1000")
+    private static IReadOnlyDictionary<string, string?> CreateConfiguration(string traceSamplingRatio = "1")
     {
         return new Dictionary<string, string?>
         {
             ["Observability:Enabled"] = "true",
-            ["Observability:ServiceName"] = "gateway-tests",
+            ["Observability:ServiceName"] = "authcore-api",
             ["Observability:ServiceNamespace"] = "auth-core-microservices",
             ["Observability:OtlpEnabled"] = "false",
             ["Observability:ConsoleExporterEnabled"] = "false",
             ["Observability:TraceSamplingRatio"] = traceSamplingRatio,
-            ["Observability:ExcludeHealthChecks"] = "true",
-            ["Observability:RequestLogging:SlowRequestThresholdMilliseconds"] = slowRequestThresholdMilliseconds
+            ["Observability:ExcludeHealthChecks"] = "true"
         };
     }
 }
