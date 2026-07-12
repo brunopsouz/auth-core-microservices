@@ -78,7 +78,7 @@ public static class InfrastructureDependencyInjection
         services.AddSingleton(serviceProvider =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-            return NpgsqlDataSource.Create(BuildConnectionString(options.PostgreSql, "NotificationCore"));
+            return BuildDataSource(BuildConnectionString(options.PostgreSql, "NotificationCore"));
         });
         services.AddScoped<IDbConnectionFactory, NpgsqlConnectionFactory>();
         services.AddScoped<NpgsqlUnitOfWork>();
@@ -273,6 +273,16 @@ public static class InfrastructureDependencyInjection
         };
 
         return builder.ConnectionString;
+    }
+
+    private static NpgsqlDataSource BuildDataSource(string connectionString)
+    {
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString)
+        {
+            Name = NpgsqlObservability.DataSourceName
+        };
+
+        return dataSourceBuilder.Build();
     }
 
 }

@@ -105,6 +105,8 @@ public static class ObservabilityExtensions
             tracing.AddSource(activitySourceName);
         }
 
+        descriptor.ConfigureTracingProvider?.Invoke(tracing);
+
         if (options.OtlpEnabled)
         {
             tracing.AddOtlpExporter(exporter => exporter.Endpoint = otlpEndpoint!);
@@ -132,6 +134,8 @@ public static class ObservabilityExtensions
         {
             metrics.AddMeter(meterName);
         }
+
+        descriptor.ConfigureMeterProvider?.Invoke(metrics);
 
         if (options.OtlpEnabled)
         {

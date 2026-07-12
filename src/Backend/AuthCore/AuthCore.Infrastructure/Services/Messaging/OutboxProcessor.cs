@@ -22,7 +22,10 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     private const string PRIORITY = "High";
     private const string CONFIRMATION_CODE_VARIABLE = "confirmationCode";
     private const string EXPIRES_IN_MINUTES_VARIABLE = "expiresInMinutes";
+    private const string CANCELLED_RESULT = "cancelled";
+    private const string FAILURE_RESULT = "failure";
     private const string LEGACY_IDEMPOTENCY_KEY_PREFIX = "auth-email-confirmation-legacy";
+    private const string PROCESSED_RESULT = "processed";
 
     /// <summary>
     /// Campo que armazena outbox repository.
@@ -77,6 +80,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
         var stopwatch = Stopwatch.StartNew();
         var processedCount = 0;
         var failedCount = 0;
+        var cycleResult = FAILURE_RESULT;
 
         try
         {
@@ -100,6 +104,9 @@ internal sealed class OutboxProcessor : IOutboxProcessor
                 ProcessedCount = processedCount,
                 FailedCount = failedCount
             };
+            cycleResult = failedCount > 0
+                ? FAILURE_RESULT
+                : PROCESSED_RESULT;
 
             _logger.LogInformation(
                 "Ciclo da outbox concluído. Total={TotalCount}, Processadas={ProcessedCount}, Falhas={FailedCount}.",
@@ -109,10 +116,15 @@ internal sealed class OutboxProcessor : IOutboxProcessor
 
             return result;
         }
+        catch (OperationCanceledException)
+        {
+            cycleResult = CANCELLED_RESULT;
+            throw;
+        }
         finally
         {
             stopwatch.Stop();
-            _outboxMetrics.RecordDuration(stopwatch.Elapsed);
+            _outboxMetrics.RecordDuration(stopwatch.Elapsed, cycleResult);
         }
 
     }
@@ -188,7 +200,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
                 leaseId,
                 errorMessage,
                 cancellationToken);
-            _outboxMetrics.RecordFailed(message.Type);
+            _outboxMetrics.RecordFailed(message.Type, exception);
 
             _logger.LogWarning(
                 "Falha ao processar mensagem de outbox. MessageId={MessageId}, Type={MessageType}, AttemptCount={AttemptCount}, ExceptionType={ExceptionType}, ErrorMessage={ErrorMessage}, ExceptionDetails={ExceptionDetails}.",

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using AuthCore.Api.Exceptions;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Application.Common.Exceptions;
@@ -137,6 +139,72 @@ public sealed class ApiExceptionHandlerTests
     }
 
     [Fact]
+    public async Task TryHandleAsync_WhenExceptionIsUnknown_ShouldRecordUnhandledExceptionMetricOnceAndMarkActivityError()
+    {
+        using var metricCollector = MetricCollector.Listen(UnhandledExceptionMetrics.MeterName);
+        using var activityCollector = ActivityCollector.Listen();
+        var logger = new CapturingLogger<ApiExceptionHandler>();
+        var exceptionHandler = new ApiExceptionHandler(logger, new UnhandledExceptionMetrics());
+        var httpContext = CreateHttpContext();
+        httpContext.Items[CorrelationIdConstants.HttpContextItemKey] = "corr-auth-secret";
+        var exception = new InvalidOperationException("Erro interno com person@example.com e token secreto.");
+
+        using var activity = activityCollector.StartActivity("authcore-handler-test");
+        var firstHandled = await exceptionHandler.TryHandleAsync(httpContext, exception, CancellationToken.None);
+        ResetResponse(httpContext);
+        var secondHandled = await exceptionHandler.TryHandleAsync(httpContext, exception, CancellationToken.None);
+
+        var measurement = Assert.Single(metricCollector.GetMeasurements());
+        var instrument = Assert.Single(metricCollector.GetInstruments());
+
+        Assert.True(firstHandled);
+        Assert.True(secondHandled);
+        Assert.Equal("app.exceptions.unhandled", instrument.Name);
+        Assert.Equal("Counter`1", instrument.Kind);
+        Assert.Equal("{exception}", instrument.Unit);
+        Assert.False(string.IsNullOrWhiteSpace(instrument.Description));
+        Assert.Equal(1d, measurement.Value);
+        Assert.Equal(["error.type"], measurement.Tags.Keys);
+        Assert.Equal("protocol", measurement.Tags["error.type"]);
+        Assert.Equal(ActivityStatusCode.Error, activity?.Status);
+        Assert.Empty(activity?.Events ?? []);
+        Assert.DoesNotContain("InvalidOperationException", RenderTags(measurement));
+        Assert.DoesNotContain("person@example.com", RenderTags(measurement));
+        Assert.DoesNotContain("corr-auth-secret", RenderTags(measurement));
+        Assert.DoesNotContain("token secreto", RenderTags(measurement));
+    }
+
+    [Fact]
+    public async Task TryHandleAsync_WhenExceptionIsExpected_ShouldNotRecordUnhandledExceptionMetric()
+    {
+        using var metricCollector = MetricCollector.Listen(UnhandledExceptionMetrics.MeterName);
+        var exceptionHandler = new ApiExceptionHandler(NullLogger<ApiExceptionHandler>.Instance, new UnhandledExceptionMetrics());
+
+        await exceptionHandler.TryHandleAsync(CreateHttpContext(), new DomainException("Erro de domínio."), CancellationToken.None);
+        await exceptionHandler.TryHandleAsync(CreateHttpContext(), new UnauthorizedException("Não autenticado."), CancellationToken.None);
+        await exceptionHandler.TryHandleAsync(CreateHttpContext(), new ForbiddenException("Sem permissão."), CancellationToken.None);
+        await exceptionHandler.TryHandleAsync(CreateHttpContext(), new NotFoundException("Não encontrado."), CancellationToken.None);
+        await exceptionHandler.TryHandleAsync(CreateHttpContext(), new ConflictException("Conflito."), CancellationToken.None);
+
+        Assert.Empty(metricCollector.GetMeasurements());
+    }
+
+    [Fact]
+    public void Record_WhenTraceSamplingWouldDropSpan_ShouldStillRecordUnhandledExceptionMetric()
+    {
+        using var metricCollector = MetricCollector.Listen(UnhandledExceptionMetrics.MeterName);
+        var metrics = new UnhandledExceptionMetrics();
+        var httpContext = CreateHttpContext();
+
+        metrics.Record(httpContext, "timeout");
+
+        var measurement = Assert.Single(metricCollector.GetMeasurements());
+
+        Assert.Equal(1d, measurement.Value);
+        Assert.Equal("timeout", measurement.Tags["error.type"]);
+    }
+
+    [Fact]
     public async Task TryHandleAsync_WhenExceptionIsUnknown_ShouldLogExceptionAndStoreSafeErrorCategory()
     {
         var logger = new CapturingLogger<ApiExceptionHandler>();
@@ -202,6 +270,17 @@ public sealed class ApiExceptionHandlerTests
             cancellationToken: CancellationToken.None))!;
     }
 
+    private static void ResetResponse(HttpContext httpContext)
+    {
+        httpContext.Response.Body = new MemoryStream();
+        httpContext.Response.StatusCode = StatusCodes.Status200OK;
+    }
+
+    private static string RenderTags(CapturedMeasurement measurement)
+    {
+        return string.Join(" ", measurement.Tags.Select(tag => $"{tag.Key}={tag.Value}"));
+    }
+
     private static async Task<string> ReadResponseTextAsync(HttpContext httpContext)
     {
         httpContext.Response.Body.Position = 0;
@@ -248,6 +327,134 @@ public sealed class ApiExceptionHandlerTests
         public LogLevel Level { get; }
 
         public Exception? Exception { get; }
+    }
+
+    private sealed record CapturedInstrument(string MeterName, string Name, string? Unit, string? Description, string Kind);
+
+    private sealed record CapturedMeasurement(
+        string MeterName,
+        string Name,
+        double Value,
+        IReadOnlyDictionary<string, object?> Tags);
+
+    private sealed class MetricCollector : IDisposable
+    {
+        private const string MutexName = "AuthCoreMicroservicesUnhandledExceptionMetricsTests";
+
+        private readonly HashSet<string> _meterNames;
+        private readonly object _gate = new();
+        private readonly MeterListener _listener = new();
+        private readonly Mutex _mutex = new(false, MutexName);
+
+        private MetricCollector(params string[] meterNames)
+        {
+            _mutex.WaitOne();
+            _meterNames = meterNames.ToHashSet(StringComparer.Ordinal);
+            _listener.InstrumentPublished = (instrument, listener) =>
+            {
+                if (!_meterNames.Contains(instrument.Meter.Name))
+                    return;
+
+                lock (_gate)
+                {
+                    Instruments.Add(new CapturedInstrument(
+                        instrument.Meter.Name,
+                        instrument.Name,
+                        instrument.Unit,
+                        instrument.Description,
+                        instrument.GetType().Name));
+                }
+
+                listener.EnableMeasurementEvents(instrument);
+            };
+            _listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, _) =>
+                CaptureMeasurement(instrument, measurement, tags));
+        }
+
+        private List<CapturedInstrument> Instruments { get; } = [];
+
+        private List<CapturedMeasurement> Measurements { get; } = [];
+
+        public static MetricCollector Listen(params string[] meterNames)
+        {
+            var collector = new MetricCollector(meterNames);
+            collector._listener.Start();
+
+            return collector;
+        }
+
+        public CapturedInstrument[] GetInstruments()
+        {
+            lock (_gate)
+            {
+                return [.. Instruments];
+            }
+        }
+
+        public CapturedMeasurement[] GetMeasurements()
+        {
+            lock (_gate)
+            {
+                return [.. Measurements];
+            }
+        }
+
+        public void Dispose()
+        {
+            _listener.Dispose();
+            _mutex.ReleaseMutex();
+            _mutex.Dispose();
+        }
+
+        private void CaptureMeasurement(
+            Instrument instrument,
+            long measurement,
+            ReadOnlySpan<KeyValuePair<string, object?>> tags)
+        {
+            if (!_meterNames.Contains(instrument.Meter.Name))
+                return;
+
+            lock (_gate)
+            {
+                Measurements.Add(new CapturedMeasurement(
+                    instrument.Meter.Name,
+                    instrument.Name,
+                    measurement,
+                    tags.ToArray().ToDictionary(tag => tag.Key, tag => tag.Value)));
+            }
+        }
+    }
+
+    private sealed class ActivityCollector : IDisposable
+    {
+        private readonly ActivitySource _activitySource = new("AuthCore.ExceptionHandler.Tests");
+        private readonly ActivityListener _listener;
+
+        private ActivityCollector()
+        {
+            _listener = new ActivityListener
+            {
+                ShouldListenTo = source => source.Name == _activitySource.Name,
+                Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded
+            };
+            ActivitySource.AddActivityListener(_listener);
+        }
+
+        public static ActivityCollector Listen()
+        {
+            return new ActivityCollector();
+        }
+
+        public Activity? StartActivity(string name)
+        {
+            return _activitySource.StartActivity(name);
+        }
+
+        public void Dispose()
+        {
+            _listener.Dispose();
+            _activitySource.Dispose();
+        }
     }
 
 }

@@ -79,6 +79,7 @@ public sealed class AutomaticHttpInstrumentationTests
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Equal(ActivityStatusCode.Error, serverSpan.Status);
         Assert.Equal(500, tags["http.response.status_code"]);
+        Assert.DoesNotContain(telemetry.Metrics, metric => metric.Name == "app.exceptions.unhandled");
     }
 
     [Fact]

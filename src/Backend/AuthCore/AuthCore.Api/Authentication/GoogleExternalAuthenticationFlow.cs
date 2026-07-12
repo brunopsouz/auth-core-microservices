@@ -14,8 +14,10 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
     private const string ExternalCallbackFailedRedirectUrl =
         "/auth/error?reason=external_callback_failed";
     private const string ExternalCallbackFailedReason = "external_callback_failed";
+    private const string FailureResult = "failure";
     private const string GoogleCompletionPath = "/api/auth/external/google/complete";
     private const string MissingRequiredClaimsReason = "missing_required_claims";
+    private const string SuccessResult = "success";
 
     private readonly IAuthenticationCookieWriter _authenticationCookieWriter;
     private readonly ICompleteGoogleLoginUseCase _completeGoogleLoginUseCase;
@@ -153,7 +155,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         }
 
         _metrics.RecordGoogleLoginSucceeded(result.RequiresOnboarding);
-        RecordDuration(startedAtUtc);
+        RecordDuration(startedAtUtc, SuccessResult);
         _logger.LogInformation(
             "GoogleLoginSucceeded. TraceId={TraceId}, UserIdentifier={UserIdentifier}, RequiresOnboarding={RequiresOnboarding}.",
             Activity.Current?.TraceId.ToString(),
@@ -174,7 +176,9 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
             _metrics.RecordGoogleLoginCancelled();
 
         _metrics.RecordGoogleLoginFailed(reason);
-        RecordDuration(startedAtUtc);
+        RecordDuration(startedAtUtc, reason.Equals(ExternalCallbackFailedReason, StringComparison.Ordinal)
+            ? "cancelled"
+            : FailureResult);
         _logger.LogWarning(
             "GoogleLoginFailed. TraceId={TraceId}, FailureReason={FailureReason}.",
             Activity.Current?.TraceId.ToString(),
@@ -183,8 +187,8 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         return new GoogleExternalAuthenticationResult(ExternalCallbackFailedRedirectUrl);
     }
 
-    private void RecordDuration(DateTimeOffset startedAtUtc)
+    private void RecordDuration(DateTimeOffset startedAtUtc, string result)
     {
-        _metrics.RecordGoogleCallbackDuration(_timeProvider.GetUtcNow() - startedAtUtc);
+        _metrics.RecordGoogleCallbackDuration(_timeProvider.GetUtcNow() - startedAtUtc, result);
     }
 }

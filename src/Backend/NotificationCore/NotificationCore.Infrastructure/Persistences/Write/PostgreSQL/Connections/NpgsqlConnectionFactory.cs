@@ -39,19 +39,23 @@ internal sealed class NpgsqlConnectionFactory : IDbConnectionFactory
     public async Task<IDbConnection> CreateOpenConnectionAsync(CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
+        var succeeded = false;
         try
         {
-            return await _dataSource.OpenConnectionAsync(cancellationToken);
+            var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+            succeeded = true;
+
+            return connection;
         }
-        catch
+        catch (Exception exception)
         {
-            _metrics.RecordAcquisitionFailure();
+            _metrics.RecordAcquisitionFailure(exception);
             throw;
         }
         finally
         {
             stopwatch.Stop();
-            _metrics.RecordAcquisition(stopwatch.Elapsed);
+            _metrics.RecordAcquisition(stopwatch.Elapsed, succeeded);
         }
     }
 }
