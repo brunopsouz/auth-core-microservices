@@ -259,19 +259,51 @@
 - **Riscos/cuidados:** nomes atuais ainda não são exportados, então a renomeação não quebra contrato operacional conhecido; documentar mesmo assim.
 - **Fora do escopo:** compatibilidade com dashboards inexistentes.
 
+#### Mapeamento intermediário OBS-006
+
+| Métrica anterior | Métrica final | Tipo | Unidade | Labels |
+| ---------------- | ------------- | ---- | ------- | ------ |
+| `authcore.database.connection.acquisition.duration.ms` | `authcore.db.connection.acquire.duration` | Histogram | `s` | `result` |
+| `authcore.database.connection.lease.duration.ms` | `authcore.db.connection.lease.duration` | Histogram | `s` | `result` |
+| `authcore.database.transaction.duration.ms` | `authcore.db.transaction.duration` | Histogram | `s` | `result` |
+| `authcore.database.connection.acquisition.failures` | `authcore.db.connection.acquire.failures` | Counter | `{connection}` | `error.type` |
+| `authcore.outbox.messages.processed` | `authcore.outbox.messages.processed` | Counter | `{message}` | `event_type`, `result` |
+| `authcore.outbox.messages.failed` | `authcore.outbox.messages.failed` | Counter | `{message}` | `event_type`, `reason` |
+| `authcore.outbox.processing.duration.ms` | `authcore.outbox.processing.duration` | Histogram | `s` | `result` |
+| `auth_google_login_started_total` | `authcore.auth.external.login.started` | Counter | `{request}` | `provider` |
+| `auth_google_login_succeeded_total` | `authcore.auth.external.login.succeeded` | Counter | `{request}` | `provider`, `result` |
+| `auth_google_login_failed_total` | `authcore.auth.external.login.failed` | Counter | `{request}` | `provider`, `reason` |
+| `auth_google_login_cancelled_total` | `authcore.auth.external.login.cancelled` | Counter | `{request}` | `provider`, `result` |
+| `auth_google_callback_duration_ms` | `authcore.auth.external.callback.duration` | Histogram | `s` | `provider`, `result` |
+| `notificationcore.database.connection.acquisition.duration.ms` | `notificationcore.db.connection.acquire.duration` | Histogram | `s` | `result` |
+| `notificationcore.database.connection.lease.duration.ms` | `notificationcore.db.connection.lease.duration` | Histogram | `s` | `result` |
+| `notificationcore.database.transaction.duration.ms` | `notificationcore.db.transaction.duration` | Histogram | `s` | `result` |
+| `notificationcore.database.connection.acquisition.failures` | `notificationcore.db.connection.acquire.failures` | Counter | `{connection}` | `error.type` |
+| `notificationcore.notifications.pending` | `notificationcore.notifications.pending` | Counter | `{notification}` | nenhuma |
+| `notificationcore.notifications.sent` | `notificationcore.notifications.sent` | Counter | `{notification}` | nenhuma |
+| `notificationcore.notifications.failed` | `notificationcore.notifications.failed` | Counter | `{notification}` | nenhuma |
+| `notificationcore.notifications.dispatch.duration.ms` | `notificationcore.notifications.dispatch.duration` | Histogram | `s` | nenhuma |
+| `notificationcore.notifications.send.duration.ms` | `notificationcore.notifications.send.duration` | Histogram | `s` | `provider` |
+
 ### OBS-007 — Instrumentar exceções não tratadas
 
 - **Objetivo:** contar falhas 5xx fora das métricas HTTP e marcar spans.
 - **Contexto técnico:** os dois exception handlers centralizam falhas, mas não emitem métricas e hoje podem registrar detalhes excessivos.
 - **Projetos:** AuthCore.Api e NotificationCore.Api; Gateway somente via middleware se houver handler equivalente.
 - **Alterar:** `ApiExceptionHandler.cs`; `RequestLoggingMiddleware.cs`.
-- **Criar:** `src/Shared/Observability/HttpExceptionMetrics.cs`, com o único instrumento transversal `app.exceptions.unhandled` e resource identificando o serviço.
-- **Passos:** incrementar somente exceção não tratada/5xx; tags `error.type` e `operation` pelas allowlists; marcar `ActivityStatusCode.Error`; adicionar evento manual contendo apenas categoria/tipo normalizado, nunca `RecordException`, exception message ou stack.
+- **Criar:** `src/Shared/Observability/UnhandledExceptionMetrics.cs`, com o único instrumento transversal `app.exceptions.unhandled` no meter `app.observability`.
+- **Passos:** incrementar somente no ramo de exceção inesperada dos handlers globais; tag única `error.type` por allowlist; marcar `ActivityStatusCode.Error`; não adicionar evento manual, `RecordException`, exception message ou stack.
 - **Dependências:** OBS-004/006.
 - **Aceite:** uma exceção gera um incremento, status 500 e span Error; exceções 4xx conhecidas não entram no contador unhandled.
 - **Validação:** ampliar `ApiExceptionHandlerTests` dos dois serviços.
 - **Riscos/cuidados:** impedir contagem dupla entre handler e request middleware.
 - **Fora do escopo:** alertas.
+
+#### Definição OBS-007
+
+| Meter | Instrumento | Tipo | Unidade | Descrição | Labels | Hosts | Condição de incremento |
+| ----- | ----------- | ---- | ------- | --------- | ------ | ----- | ---------------------- |
+| `app.observability` | `app.exceptions.unhandled` | Counter | `{exception}` | Number of unexpected exceptions handled by the application's global exception handler. | `error.type` | AuthCore.Api, NotificationCore.Api | Exceção não derivada das exceções esperadas da aplicação chega ao `ApiExceptionHandler`, gera resposta 500 segura e ainda não foi registrada no `HttpContext` atual. |
 
 ## Fase 5 — Dependências
 
@@ -282,12 +314,25 @@
 - **Projetos:** duas Infrastructure e duas APIs.
 - **Alterar:** dois `.Infrastructure.csproj`, `InfrastructureDependencyInjection.cs`, `NpgsqlConnectionFactory.cs`, métricas/tests.
 - **Criar:** nenhum wrapper de comando.
-- **Passos:** adicionar `Npgsql.OpenTelemetry` 10.0.2; trocar `NpgsqlDataSource.Create` por builder com `Name = AuthCore/NotificationCore`; habilitar `AddNpgsql`; registrar meter `Npgsql`; manter defaults sem command text/parâmetros; revisar custom metrics para não duplicar `db.client.operation.duration`.
+- **Passos:** adicionar `Npgsql.OpenTelemetry` 10.0.2; trocar `NpgsqlDataSource.Create` por builder com `Name = authcore-postgresql/notificationcore-postgresql`; habilitar `AddNpgsql`; registrar meter `Npgsql`; manter defaults sem command text/parâmetros; revisar custom metrics para não duplicar `db.client.operation.duration`.
 - **Dependências:** OBS-005/006.
 - **Aceite:** span DB filho do request/worker; `db.client.operation.duration` exportada; pool name fixo; nenhum password, connection string, SQL literal ou parâmetro.
 - **Validação:** testes PostgreSQL existentes + inspeção de export em cenário de integração.
 - **Riscos/cuidados:** tracing Npgsql é documentado como experimental; fixar versão e cobrir tags de segurança.
 - **Fora do escopo:** instrumentar cada repository manualmente.
+
+#### Definição OBS-008
+
+- Pacote adicionado: `Npgsql.OpenTelemetry` 10.0.2 em `AuthCore.Infrastructure` e `NotificationCore.Infrastructure`. O `Shared.Observability` permanece sem dependência de Npgsql/PostgreSQL.
+- Extension point criado em `ObservabilityServiceDescriptor`: callbacks opcionais para `TracerProviderBuilder` e `MeterProviderBuilder`, aplicados dentro dos providers existentes, antes dos exporters.
+- Hosts instrumentados: `AuthCore.Api` e `NotificationCore.Api`. O `Gateway.Api` não registra pacote, meter, `AddNpgsql()` ou data source PostgreSQL.
+- Tracing: `AddNpgsql()` é chamado nos dois hosts por meio do descriptor do host, usando a namespace real `Npgsql` do pacote 10.0.2.
+- Métricas nativas: o meter `Npgsql` é registrado nos dois hosts e `AddNpgsqlInstrumentation()` é conectado ao mesmo `MeterProvider`.
+- Data sources: `NpgsqlDataSourceBuilder.Name` usa nomes fixos de baixa cardinalidade: `authcore-postgresql` e `notificationcore-postgresql`.
+- Atributos permitidos: atributos técnicos estáveis emitidos pelo Npgsql, como sistema/operação, status de erro e nome lógico do pool.
+- Atributos proibidos: connection string, `Host=`, `Username=`, `Password=`, SQL completo, parâmetros, valores de parâmetros, e-mail, token, correlation ID, trace ID e IDs de negócio.
+- Métricas customizadas da OBS-006 preservadas: aquisição, lease, transação e falhas de aquisição continuam separadas das métricas nativas Npgsql.
+- Limitação real do driver: `NpgsqlDataSourceBuilder.Name` existe, mas `NpgsqlDataSource` não expõe `Name` publicamente; a validação do pool name deve usar os atributos exportados por spans/métricas.
 
 ### OBS-009 — Instrumentar Redis sem pacote beta
 
@@ -415,7 +460,7 @@ A ordem desloca spans customizados para junto das dependências, pois spans HTTP
 | Nome | Tipo | Serviço | Descrição | Labels permitidas | Local | Task |
 |---|---|---|---|---|---|---|
 | `http.server.request.duration` | Histogram | Todos | Duração HTTP nativa, base de P95/P99/erros. | method, route template, status_code, error.type | ASP.NET Core | OBS-005 |
-| `app.exceptions.unhandled` | Counter | Todos | Exceções 5xx não tratadas. | operation, error.type allowlist | Exception handler | OBS-007 |
+| `app.exceptions.unhandled` | Counter | Auth/Notification | Exceções inesperadas tratadas pelo handler global. | error.type allowlist | Exception handler | OBS-007 |
 | `db.client.operation.duration` | Histogram | Auth/Notification | Duração de comandos Npgsql. | db.system, operation.name, pool.name fixo, error.type | Npgsql | OBS-008 |
 | `authcore.db.connection.acquire.duration` | Histogram | Auth | Aquisição de conexão, segundos. | result | ConnectionFactory | OBS-006 |
 | `notificationcore.db.connection.acquire.duration` | Histogram | Notification | Idem. | result | ConnectionFactory | OBS-006 |
@@ -518,7 +563,7 @@ Login, refresh, criação/revogação de sessão, registro e verificação usam 
 - [ ] Logs contêm service, environment, correlationId, traceId, spanId, método, rota template, status e elapsed.
 - [ ] `userId` aparece somente quando autenticado e somente em logs autorizados.
 - [ ] `http.server.request.duration` permite agrupar por método/rota/status e calcular P95/P99 no backend.
-- [ ] Resposta 500 incrementa `app.exceptions.unhandled` uma vez e marca span Error.
+- [ ] Exceção inesperada tratada pelo handler global incrementa `app.exceptions.unhandled` uma vez e marca span Error.
 - [ ] Span servidor contém client spans Ocelot/HttpClient/Npgsql/Redis/Rabbit/SMTP conforme o fluxo.
 - [ ] Npgsql pool name não contém connection string; SQL e parâmetros não aparecem.
 - [ ] Redis não contém keys/scripts/valores.

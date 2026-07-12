@@ -18,6 +18,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Shared.Observability;
 
 namespace AuthCore.Api;
 
@@ -43,6 +44,7 @@ public static class ApiDependencyInjection
 
         services.AddControllers();
         services.AddExceptionHandler<ApiExceptionHandler>();
+        services.AddSingleton<UnhandledExceptionMetrics>();
         services.AddProblemDetails();
         services.AddEndpointsApiExplorer();
         services.AddHttpContextAccessor();

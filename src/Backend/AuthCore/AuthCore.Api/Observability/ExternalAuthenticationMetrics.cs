@@ -7,24 +7,48 @@ namespace AuthCore.Api.Observability;
 /// </summary>
 internal sealed class ExternalAuthenticationMetrics
 {
-    private static readonly Meter Meter = new("AuthCore.ExternalAuthentication", "1.0.0");
+    internal const string MeterName = "authcore.auth.external";
+
+    private const string ProviderTagName = "provider";
+    private const string ReasonTagName = "reason";
+    private const string ResultTagName = "result";
+    private const string GoogleProvider = "google";
+    private const string SuccessResult = "success";
+    private const string PendingResult = "pending";
+    private const string FailureResult = "failure";
+    private const string CancelledResult = "cancelled";
+    private const string ValidationReason = "validation";
+    private const string CancelledReason = "cancelled";
+    private const string UnknownReason = "unknown";
+
+    private static readonly Meter Meter = new(MeterName, "1.0.0");
     private static readonly Counter<long> StartedLogins = Meter.CreateCounter<long>(
-        "auth_google_login_started_total");
+        "authcore.auth.external.login.started",
+        unit: "{request}",
+        description: "Number of external authentication login flows started.");
     private static readonly Counter<long> SucceededLogins = Meter.CreateCounter<long>(
-        "auth_google_login_succeeded_total");
+        "authcore.auth.external.login.succeeded",
+        unit: "{request}",
+        description: "Number of external authentication login flows completed successfully.");
     private static readonly Counter<long> FailedLogins = Meter.CreateCounter<long>(
-        "auth_google_login_failed_total");
+        "authcore.auth.external.login.failed",
+        unit: "{request}",
+        description: "Number of external authentication login flows that failed.");
     private static readonly Counter<long> CancelledLogins = Meter.CreateCounter<long>(
-        "auth_google_login_cancelled_total");
+        "authcore.auth.external.login.cancelled",
+        unit: "{request}",
+        description: "Number of external authentication login flows cancelled by the provider callback.");
     private static readonly Histogram<double> CallbackDuration = Meter.CreateHistogram<double>(
-        "auth_google_callback_duration_ms");
+        "authcore.auth.external.callback.duration",
+        unit: "s",
+        description: "Duration of external authentication callback processing.");
 
     /// <summary>
     /// Operacao para registrar inicio de login Google.
     /// </summary>
     public void RecordGoogleLoginStarted()
     {
-        StartedLogins.Add(1);
+        StartedLogins.Add(1, new KeyValuePair<string, object?>(ProviderTagName, GoogleProvider));
     }
 
     /// <summary>
@@ -35,7 +59,8 @@ internal sealed class ExternalAuthenticationMetrics
     {
         SucceededLogins.Add(
             1,
-            new KeyValuePair<string, object?>("requires_onboarding", requiresOnboarding));
+            new KeyValuePair<string, object?>(ProviderTagName, GoogleProvider),
+            new KeyValuePair<string, object?>(ResultTagName, requiresOnboarding ? PendingResult : SuccessResult));
     }
 
     /// <summary>
@@ -44,7 +69,10 @@ internal sealed class ExternalAuthenticationMetrics
     /// <param name="reason">Motivo normalizado da falha.</param>
     public void RecordGoogleLoginFailed(string reason)
     {
-        FailedLogins.Add(1, new KeyValuePair<string, object?>("reason", NormalizeReason(reason)));
+        FailedLogins.Add(
+            1,
+            new KeyValuePair<string, object?>(ProviderTagName, GoogleProvider),
+            new KeyValuePair<string, object?>(ReasonTagName, NormalizeReason(reason)));
     }
 
     /// <summary>
@@ -52,16 +80,23 @@ internal sealed class ExternalAuthenticationMetrics
     /// </summary>
     public void RecordGoogleLoginCancelled()
     {
-        CancelledLogins.Add(1);
+        CancelledLogins.Add(
+            1,
+            new KeyValuePair<string, object?>(ProviderTagName, GoogleProvider),
+            new KeyValuePair<string, object?>(ResultTagName, CancelledResult));
     }
 
     /// <summary>
     /// Operacao para registrar duracao do callback Google.
     /// </summary>
     /// <param name="elapsed">Duracao do processamento.</param>
-    public void RecordGoogleCallbackDuration(TimeSpan elapsed)
+    /// <param name="result">Resultado normalizado do callback.</param>
+    public void RecordGoogleCallbackDuration(TimeSpan elapsed, string result)
     {
-        CallbackDuration.Record(elapsed.TotalMilliseconds);
+        CallbackDuration.Record(
+            ToNonNegativeSeconds(elapsed),
+            new KeyValuePair<string, object?>(ProviderTagName, GoogleProvider),
+            new KeyValuePair<string, object?>(ResultTagName, NormalizeResult(result)));
     }
 
     /// <summary>
@@ -71,8 +106,27 @@ internal sealed class ExternalAuthenticationMetrics
     /// <returns>Motivo seguro para metricas.</returns>
     private static string NormalizeReason(string reason)
     {
-        return string.IsNullOrWhiteSpace(reason)
-            ? "unknown"
-            : reason.Trim().ToLowerInvariant();
+        return reason switch
+        {
+            "external_callback_failed" => CancelledReason,
+            "missing_required_claims" => ValidationReason,
+            _ => UnknownReason
+        };
+    }
+
+    private static string NormalizeResult(string result)
+    {
+        return result switch
+        {
+            SuccessResult => SuccessResult,
+            FailureResult => FailureResult,
+            CancelledResult => CancelledResult,
+            _ => UnknownReason
+        };
+    }
+
+    private static double ToNonNegativeSeconds(TimeSpan elapsed)
+    {
+        return Math.Max(0, elapsed.TotalSeconds);
     }
 }

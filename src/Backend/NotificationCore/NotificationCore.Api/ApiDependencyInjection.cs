@@ -2,6 +2,7 @@ using NotificationCore.Api.Exceptions;
 using NotificationCore.Api.HealthChecks;
 using NotificationCore.Api.Workers;
 using Microsoft.Extensions.Configuration;
+using Shared.Observability;
 
 namespace NotificationCore.Api;
 
@@ -23,6 +24,7 @@ public static class ApiDependencyInjection
 
         services.AddControllers();
         services.AddExceptionHandler<ApiExceptionHandler>();
+        services.AddSingleton<UnhandledExceptionMetrics>();
         services.AddProblemDetails();
         services.AddEndpointsApiExplorer();
         services.AddRouting(options => options.LowercaseUrls = true);

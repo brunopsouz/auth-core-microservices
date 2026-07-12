@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Net.Mime;
+using System.Security.Authentication;
 using AuthCore.Api.Contracts.Responses;
 using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
@@ -18,16 +20,31 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
     /// Campo que armazena logger.
     /// </summary>
     private readonly ILogger<ApiExceptionHandler> _logger;
+    private readonly UnhandledExceptionMetrics _unhandledExceptionMetrics;
 
     /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
     /// <param name="logger">Serviço de logging da aplicação.</param>
     public ApiExceptionHandler(ILogger<ApiExceptionHandler> logger)
+        : this(logger, new UnhandledExceptionMetrics())
+    {
+    }
+
+    /// <summary>
+    /// Operação para criar instância da classe.
+    /// </summary>
+    /// <param name="logger">Serviço de logging da aplicação.</param>
+    /// <param name="unhandledExceptionMetrics">Métricas de exceções inesperadas.</param>
+    public ApiExceptionHandler(
+        ILogger<ApiExceptionHandler> logger,
+        UnhandledExceptionMetrics unhandledExceptionMetrics)
     {
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(unhandledExceptionMetrics);
 
         _logger = logger;
+        _unhandledExceptionMetrics = unhandledExceptionMetrics;
     }
 
     /// <summary>
@@ -51,6 +68,7 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
         }
         else
         {
+            RecordUnhandledException(httpContext, exception);
             await HandleUnknownExceptionAsync(httpContext, cancellationToken);
         }
 
@@ -59,6 +77,12 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
         LogUnexpectedException(exception, httpContext, statusCode);
 
         return true;
+    }
+
+    private void RecordUnhandledException(HttpContext httpContext, Exception exception)
+    {
+        Activity.Current?.SetStatus(ActivityStatusCode.Error);
+        _unhandledExceptionMetrics.Record(httpContext, ClassifyUnexpectedException(exception));
     }
 
     private static async Task HandleProjectExceptionAsync(
@@ -118,6 +142,19 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
             StatusCodes.Status409Conflict => "conflict",
             >= StatusCodes.Status500InternalServerError => "unexpected",
             _ => "handled"
+        };
+    }
+
+    private static string ClassifyUnexpectedException(Exception exception)
+    {
+        return exception switch
+        {
+            OperationCanceledException => "cancelled",
+            TimeoutException => "timeout",
+            SocketException or IOException => "connectivity",
+            AuthenticationException => "authentication",
+            InvalidOperationException or FormatException or ArgumentException => "protocol",
+            _ => "unknown"
         };
     }
 

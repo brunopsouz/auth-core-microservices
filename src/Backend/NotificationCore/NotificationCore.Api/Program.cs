@@ -1,9 +1,11 @@
 using NotificationCore.Api;
 using NotificationCore.Application;
 using NotificationCore.Infrastructure;
+using NotificationCore.Infrastructure.Observability;
 using NotificationCore.Infrastructure.Persistences.Migrations;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Npgsql;
 using Shared.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,9 +15,13 @@ builder.Services.AddObservability(
     builder.Environment,
     new ObservabilityServiceDescriptor(meterNames:
     [
-        "NotificationCore.Database",
-        "NotificationCore.Notifications"
-    ]));
+        DatabaseMetrics.MeterName,
+        NpgsqlObservability.MeterName,
+        NotificationMetrics.MeterName,
+        UnhandledExceptionMetrics.MeterName
+    ],
+    configureTracingProvider: tracing => tracing.AddNpgsql(),
+    configureMeterProvider: metrics => metrics.AddNpgsqlInstrumentation()));
 builder.Services.AddApi(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();

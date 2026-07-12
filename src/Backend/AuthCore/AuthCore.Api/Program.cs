@@ -1,9 +1,13 @@
-﻿using AuthCore.Api;
+using AuthCore.Api;
+using AuthCore.Api.Observability;
 using AuthCore.Application;
 using AuthCore.Infrastructure;
+using AuthCore.Infrastructure.Observability;
 using AuthCore.Infrastructure.Persistences.Migrations;
+using AuthCore.Infrastructure.Services.Messaging;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Npgsql;
 using Shared.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,10 +17,14 @@ builder.Services.AddObservability(
     builder.Environment,
     new ObservabilityServiceDescriptor(meterNames:
     [
-        "AuthCore.Database",
-        "AuthCore.Outbox",
-        "AuthCore.ExternalAuthentication"
-    ]));
+        DatabaseMetrics.MeterName,
+        NpgsqlObservability.MeterName,
+        OutboxMetrics.MeterName,
+        ExternalAuthenticationMetrics.MeterName,
+        UnhandledExceptionMetrics.MeterName
+    ],
+    configureTracingProvider: tracing => tracing.AddNpgsql(),
+    configureMeterProvider: metrics => metrics.AddNpgsqlInstrumentation()));
 builder.Services.AddApi(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddApplication();

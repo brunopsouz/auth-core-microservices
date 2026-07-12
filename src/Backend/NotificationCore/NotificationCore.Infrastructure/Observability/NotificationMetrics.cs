@@ -7,17 +7,33 @@ namespace NotificationCore.Infrastructure.Observability;
 /// </summary>
 internal sealed class NotificationMetrics
 {
-    private static readonly Meter Meter = new("NotificationCore.Notifications", "1.0.0");
+    internal const string MeterName = "notificationcore.notifications";
+
+    private const string ProviderTagName = "provider";
+    private const string SmtpProvider = "smtp";
+    private const string UnknownProvider = "unknown";
+
+    private static readonly Meter Meter = new(MeterName, "1.0.0");
     private static readonly Counter<long> PendingNotifications = Meter.CreateCounter<long>(
-        "notificationcore.notifications.pending");
+        "notificationcore.notifications.pending",
+        unit: "{notification}",
+        description: "Number of pending notifications found by the dispatcher.");
     private static readonly Counter<long> SentNotifications = Meter.CreateCounter<long>(
-        "notificationcore.notifications.sent");
+        "notificationcore.notifications.sent",
+        unit: "{notification}",
+        description: "Number of notifications delivered by the dispatcher.");
     private static readonly Counter<long> FailedNotifications = Meter.CreateCounter<long>(
-        "notificationcore.notifications.failed");
+        "notificationcore.notifications.failed",
+        unit: "{notification}",
+        description: "Number of notifications finished as failed by the dispatcher.");
     private static readonly Histogram<double> DispatchDuration = Meter.CreateHistogram<double>(
-        "notificationcore.notifications.dispatch.duration.ms");
+        "notificationcore.notifications.dispatch.duration",
+        unit: "s",
+        description: "Duration of a notification dispatcher cycle.");
     private static readonly Histogram<double> SendDuration = Meter.CreateHistogram<double>(
-        "notificationcore.notifications.send.duration.ms");
+        "notificationcore.notifications.send.duration",
+        unit: "s",
+        description: "Duration of notification provider send operation.");
 
     /// <summary>
     /// Operação para registrar notificações pendentes encontradas.
@@ -55,7 +71,7 @@ internal sealed class NotificationMetrics
     /// <param name="elapsed">Duração do ciclo.</param>
     public void RecordDispatchDuration(TimeSpan elapsed)
     {
-        DispatchDuration.Record(elapsed.TotalMilliseconds);
+        DispatchDuration.Record(ToNonNegativeSeconds(elapsed));
     }
 
     /// <summary>
@@ -66,7 +82,19 @@ internal sealed class NotificationMetrics
     public void RecordSendDuration(TimeSpan elapsed, string provider)
     {
         SendDuration.Record(
-            elapsed.TotalMilliseconds,
-            new KeyValuePair<string, object?>("provider", provider));
+            ToNonNegativeSeconds(elapsed),
+            new KeyValuePair<string, object?>(ProviderTagName, NormalizeProvider(provider)));
+    }
+
+    private static double ToNonNegativeSeconds(TimeSpan elapsed)
+    {
+        return Math.Max(0, elapsed.TotalSeconds);
+    }
+
+    private static string NormalizeProvider(string provider)
+    {
+        return provider.Equals("Smtp", StringComparison.OrdinalIgnoreCase)
+            ? SmtpProvider
+            : UnknownProvider;
     }
 }
