@@ -270,11 +270,11 @@
 | `authcore.outbox.messages.processed` | `authcore.outbox.messages.processed` | Counter | `{message}` | `event_type`, `result` |
 | `authcore.outbox.messages.failed` | `authcore.outbox.messages.failed` | Counter | `{message}` | `event_type`, `reason` |
 | `authcore.outbox.processing.duration.ms` | `authcore.outbox.processing.duration` | Histogram | `s` | `result` |
-| `auth_google_login_started_total` | `authcore.auth.external.login.started` | Counter | `{request}` | `provider` |
-| `auth_google_login_succeeded_total` | `authcore.auth.external.login.succeeded` | Counter | `{request}` | `provider`, `result` |
-| `auth_google_login_failed_total` | `authcore.auth.external.login.failed` | Counter | `{request}` | `provider`, `reason` |
-| `auth_google_login_cancelled_total` | `authcore.auth.external.login.cancelled` | Counter | `{request}` | `provider`, `result` |
-| `auth_google_callback_duration_ms` | `authcore.auth.external.callback.duration` | Histogram | `s` | `provider`, `result` |
+| `auth_google_login_started_total` | Removida na OBS-012 | Counter | `{request}` | redirect inicial não representa login concluído |
+| `auth_google_login_succeeded_total` | `authcore.authentication.attempts` | Counter | `{attempt}` | `flow`, `result`, `reason` |
+| `auth_google_login_failed_total` | `authcore.authentication.attempts` | Counter | `{attempt}` | `flow`, `result`, `reason` |
+| `auth_google_login_cancelled_total` | `authcore.authentication.attempts` | Counter | `{attempt}` | `flow`, `result`, `reason` |
+| `auth_google_callback_duration_ms` | Removida na OBS-012 | Histogram | `s` | duração duplicava HTTP server metrics |
 | `notificationcore.database.connection.acquisition.duration.ms` | `notificationcore.db.connection.acquire.duration` | Histogram | `s` | `result` |
 | `notificationcore.database.connection.lease.duration.ms` | `notificationcore.db.connection.lease.duration` | Histogram | `s` | `result` |
 | `notificationcore.database.transaction.duration.ms` | `notificationcore.db.transaction.duration` | Histogram | `s` | `result` |
@@ -283,7 +283,7 @@
 | `notificationcore.notifications.sent` | `notificationcore.notifications.sent` | Counter | `{notification}` | nenhuma |
 | `notificationcore.notifications.failed` | `notificationcore.notifications.failed` | Counter | `{notification}` | nenhuma |
 | `notificationcore.notifications.dispatch.duration.ms` | `notificationcore.notifications.dispatch.duration` | Histogram | `s` | nenhuma |
-| `notificationcore.notifications.send.duration.ms` | `notificationcore.notifications.send.duration` | Histogram | `s` | `provider` |
+| `notificationcore.notifications.send.duration.ms` | removida em OBS-011 | Histogram | `s` | `provider` |
 
 ### OBS-007 — Instrumentar exceções não tratadas
 
@@ -333,15 +333,25 @@
 - Atributos proibidos: connection string, `Host=`, `Username=`, `Password=`, SQL completo, parâmetros, valores de parâmetros, e-mail, token, correlation ID, trace ID e IDs de negócio.
 - Métricas customizadas da OBS-006 preservadas: aquisição, lease, transação e falhas de aquisição continuam separadas das métricas nativas Npgsql.
 - Limitação real do driver: `NpgsqlDataSourceBuilder.Name` existe, mas `NpgsqlDataSource` não expõe `Name` publicamente; a validação do pool name deve usar os atributos exportados por spans/métricas.
+- Correção de validação pós-OBS-010: a regressão dos testes reais `AddObservability_WhenNpgsqlCommandRuns_ShouldExportSafeChildSpanAndNativeMetrics` foi de configuração de execução, não de código RabbitMQ/Redis/Npgsql. Os comandos estavam usando connection strings com `Pooling=false`, enquanto a asserção valida métricas nativas de pool `db.client.connection.*`; com pooling desabilitado o Npgsql exporta `db.client.operation.duration`, mas não emite métricas de conexão do pool.
+- Resultado da investigação: os testes falham isoladamente com `Pooling=false` e passam isolados, juntos, após Redis real e nas duas ordens com RabbitMQ real quando executados com `Pooling=true;Minimum Pool Size=0;Maximum Pool Size=5`. Não foi comprovada interferência entre providers, processors, exporters ou estado global do OpenTelemetry.
+- Regra de execução do gate real OBS-008: quando `OBSERVABILITY_POSTGRES_REQUIRED=true`, as variáveis `AUTHCORE_TEST_POSTGRES` e `NOTIFICATIONCORE_TEST_POSTGRES` devem manter pooling habilitado para validar simultaneamente spans Npgsql, `db.client.operation.duration` e métricas nativas `db.client.connection.*`.
 
 ### OBS-009 — Instrumentar Redis sem pacote beta
 
 - **Objetivo:** medir operações Redis próprias com API estável.
-- **Contexto técnico:** Redis existe apenas no AuthCore; a instrumentação contrib disponível é pré-release e as operações próprias estão concentradas em duas classes.
+- **Contexto técnico:** Redis existe apenas no AuthCore; a instrumentação contrib disponível é pré-release e as operações próprias estão concentradas em `RedisSessionStore` e `RedisLoginRateLimiter`.
 - **Projetos:** AuthCore.Api e AuthCore.Infrastructure.
-- **Alterar:** `RedisSessionStore.cs`, `RedisLoginRateLimiter.cs`; DI e testes de autenticação.
-- **Criar:** `AuthCore.Infrastructure/Observability/RedisTelemetry.cs` e equivalente pequeno na Api caso o rate limiter não possa consumir o tipo internal da Infrastructure.
-- **Passos:** ActivitySource e histogram/counter; wrappers `try/finally`; operation allowlist (`get`, `set`, `delete`, `eval`, `expire`), result (`success`, `failure`); nunca key/script/value; registrar source/meter no AuthCore host.
+- **Alterar:** `RedisSessionStore.cs`, `RedisLoginRateLimiter.cs`, `AuthCore.Api/Program.cs`; testes de integração de observabilidade Redis.
+- **Criar:** `AuthCore.Infrastructure/Observability/RedisTelemetry.cs`.
+- **MeterName:** `authcore.redis`.
+- **ActivitySource:** `authcore.redis`.
+- **Instrumentos:** `authcore.redis.operation.duration` (`Histogram<double>`, unidade `s`, descrição `Duration of Redis operations performed by AuthCore.`, labels `operation` e `result`) e `authcore.redis.operation.failures` (`Counter<long>`, unidade `{operation}`, descrição `Number of failed Redis operations performed by AuthCore.`, labels `operation` e `error.type`).
+- **Allowlists:** `operation`: `get`, `set`, `delete`, `eval`, `expire`; `result`: `success`, `failure`, `cancelled`; `error.type`: `timeout`, `connectivity`, `authentication`, `protocol`, `cancelled`, `unknown`.
+- **Operações instrumentadas:** `RedisSessionStore` mede `StringGetAsync`/`KeyExistsAsync`/`SetMembersAsync` como `get`, `SetRemoveAsync`/`KeyDeleteAsync` como `delete` e `ScriptEvaluateAsync` como `eval`; `RedisLoginRateLimiter` mede `StringIncrementAsync` como `set`, `KeyExpireAsync` como `expire` e `KeyTimeToLiveAsync` como `get`.
+- **Componentes deliberadamente não instrumentados:** Redis do Data Protection, `RedisHealthCheck`, profiling/administração do servidor Redis e infraestrutura do container.
+- **Estratégia de testes reais:** testes de integração com Redis do `docker-compose.yml`, prefixo isolado por teste, limpeza apenas de keys do prefixo, skip real quando Redis é opcional e falha obrigatória com `OBSERVABILITY_REDIS_REQUIRED=true`.
+- **Limitações:** o rate limiter real não usa Lua; portanto `eval` é observado nas operações de script já existentes do `RedisSessionStore`, não no rate limiter. A classificação `authentication` usa `RedisConnectionException.FailureType` quando a versão atual do StackExchange.Redis expõe essa informação.
 - **Dependências:** OBS-006.
 - **Aceite:** duração e falha mensuráveis; spans filhos preservam trace; Data Protection continua funcional sem instrumentação detalhada.
 - **Validação:** testes com fake/multiplexer de integração disponível e listeners.
@@ -349,6 +359,10 @@
 - **Fora do escopo:** pacote `OpenTelemetry.Instrumentation.StackExchangeRedis` pré-release e profiling de Data Protection.
 
 ### OBS-010 — Instrumentar RabbitMQ e propagar trace context
+
+> Implementado: foi adotado `MessageEnvelope<T>` com `MessageEnvelopeMetadata` em `Shared.Messaging.Contracts`, contendo `CorrelationId`, `TraceParent` e `TraceState` opcionais. O contrato de negócio `SendTransactionalNotificationRequested` permaneceu sem campos de observabilidade. `Shared.Observability` permanece sem RabbitMQ. AuthCore registra `authcore.rabbitmq` como MeterName/ActivitySource e NotificationCore registra `notificationcore.rabbitmq`; Gateway não registra telemetria RabbitMQ. Os spans são `rabbitmq publish notification_requests` (`Producer`) e `rabbitmq consume notification_requests` (`Consumer`). As métricas criadas são `authcore.rabbitmq.messages.published` (`queue`, `result`, `event_type`) e `notificationcore.rabbitmq.messages.consumed` (`queue`, `result`). Apenas `traceparent` e `tracestate` são propagados; `baggage` é removido. Mensagens legadas continuam aceitas por fallback de desserialização. Publisher confirms já existiam (`ConfirmSelect`/`WaitForConfirmsOrDie`), portanto `success` representa confirmação do broker. `notificationcore.rabbitmq.requeues` não foi criada porque `messages.consumed{result=requeue}` cobre o evento sem métrica redundante.
+>
+> Validação real: executada contra o serviço `rabbitmq` do `src/Backend/docker-compose.yml` (`rabbitmq:3-management-alpine`, container `backend-rabbitmq-1`) com recursos isolados por teste. O RabbitMQ Client 6.8.1 devolveu os headers W3C aceitos pelo carrier seguro (`byte[]` UTF-8 ou `string`). Foi validado o fluxo Activity original -> Outbox -> publisher real com confirms -> broker real -> consumer real, com producer e consumer no mesmo `TraceId` e consumer filho do producer. Foram validados `ack`, `requeue`, `dead_letter`, métrica de falha de publish por conflito real de topologia, sampling `0`, observabilidade desabilitada e ausência de sentinelas em spans/métricas RabbitMQ. No ambiente local, o volume RabbitMQ existente tinha credencial divergente de `.env.development`; a validação obrigatória foi executada com senha temporária de processo para o usuário existente, sem imprimir segredo, e depois a senha foi restaurada para o valor local.
 
 - **Objetivo:** ligar request/outbox/publish/consume no mesmo trace e medir resultados.
 - **Contexto técnico:** correlation property já atravessa o broker, mas nasce desconectada do request e o atraso da outbox exige persistir W3C context no envelope.
@@ -364,17 +378,32 @@
 
 ### OBS-011 — Instrumentar SMTP e dispatcher
 
-- **Objetivo:** localizar latência/falha de entrega.
-- **Contexto técnico:** SMTP já mede duração agregada e o dispatcher já retorna `DispatchCounters`, ponto seguro para transportar contagens sem acoplar Application ao OTel.
+- **Objetivo:** localizar latência/falha do despacho e da tentativa SMTP sem afirmar entrega na caixa do destinatário.
+- **Contexto técnico:** `notificationcore.notifications.send.duration` media exatamente a tentativa técnica do `SmtpEmailProvider`; por isso foi substituída por métricas SMTP específicas para evitar duplicidade. O dispatcher já retornava `DispatchCounters`, ponto seguro para transportar contagens sem acoplar Application ao OTel.
 - **Projetos:** NotificationCore.Api, NotificationCore.Application e NotificationCore.Infrastructure.
-- **Alterar:** `NotificationCore.Application/UseCases/Notifications/DispatchPendingNotification/DispatchCounters.cs` e `PendingNotificationDispatcher.cs`; `SmtpEmailProvider.cs`, `NotificationDispatcherHostedService.cs`, `NotificationMetrics.cs` e testes.
-- **Criar:** `NotificationCore.Infrastructure/Observability/SmtpTelemetry.cs` e `NotificationActivitySource.cs`.
-- **Passos:** manter Application sem referência a OTel; ampliar apenas `DispatchCounters` com contadores `EmailVerificationSent/Failed` e `DeliveryRetries`; em `PendingNotificationDispatcher`, mapear exatamente `TemplateKey == "auth.email-confirmation"` para `email_verification` e todos os demais para as categorias allowlisted, incrementando os counters após o resultado persistido; no hosted service, converter counters em `NotificationMetrics`; criar span `notification dispatch` por ciclo e `smtp send` por tentativa no provider; métricas duration/attempts com provider/result; registrar categoria de erro, não exception type/message livre; preservar correlation em scope, não em labels.
+- **Alterar:** `RegisterNotificationRequestCommand.cs`, `RegisterNotificationRequestUseCase.cs`, `DispatchCounters.cs`, `PendingNotificationDispatcher.cs`, `DispatchPendingNotificationResult.cs`, `SmtpEmailProvider.cs`, `NotificationDispatcherHostedService.cs`, `NotificationMetrics.cs`, `InboxRepository.cs`, `Program.cs` e testes.
+- **Criar:** `NotificationCore.Infrastructure/Observability/SmtpTelemetry.cs`, `NotificationCore.Api/Observability/NotificationDispatchTelemetry.cs`, `NotificationCore.Api/Observability/NotificationDispatchTelemetryContext.cs`, `NotificationCore.Api/Observability/NotificationDispatchTelemetryResult.cs` e `NotificationCore.Api/Observability/NotificationDispatchTelemetryContextReader.cs`.
+- **Passos:** manter Application sem referência a OpenTelemetry, `Meter`, `Counter`, `Histogram` ou `ActivitySource`; preservar o payload original do RabbitMQ no inbox quando a mensagem chega envelopada; extrair `TraceParent`/`TraceState` do envelope persistido durante a retomada; criar `notification dispatch` no composition root da Api com `ActivityLink` para o contexto original quando não houver `Activity.Current`; criar `smtp send` no provider técnico como filho natural do dispatch; renomear `notificationcore.notifications.send.duration` para `notificationcore.smtp.send.duration`; criar `notificationcore.smtp.send.attempts`; criar `notificationcore.notifications.delivery.retries` somente para retry agendado; registrar categoria de erro allowlisted, não exception type/message livre; preservar correlation em scope/header de e-mail, nunca em labels/tags.
 - **Dependências:** OBS-006/010.
-- **Aceite:** tentativa, sucesso, falha e duração SMTP mensuráveis; `notification_type=email_verification` é emitido somente para o template fechado `auth.email-confirmation`; retry identificado; nenhum tipo livre vira label; trace do consumer chega ao send quando o processamento é imediato, ou novo trace com link/correlação quando persistido e retomado depois.
-- **Validação:** `SmtpEmailProviderTests` e `NotificationDispatcherHostedServiceTests`.
-- **Riscos/cuidados:** o dispatcher assíncrono pode perder Activity após persistência; não fingir parentesco inválido, usar link/correlation.
+- **Aceite:** tentativa, sucesso, falha e duração SMTP mensuráveis; `notification_type=email_verification` é emitido somente para o template fechado `auth.email-confirmation`; retry identificado; nenhum tipo livre vira label; dispatch retomado usa link, não parent remoto falso; SMTP é filho do dispatch; mensagens legadas sem envelope continuam processáveis.
+- **Validação:** `SmtpEmailProviderTests`, `NotificationDispatcherHostedServiceTests`, `CustomMetricsTests`, `SmtpAndDispatcherTelemetryTests`, testes de Application do dispatcher e regressões reais PostgreSQL/Redis/RabbitMQ.
+- **Riscos/cuidados:** o dispatcher assíncrono perde o parent natural após persistência; não fingir parentesco inválido, usar link/correlation. Não há servidor SMTP local no compose; os testes automatizados usam adapter/fake seguro e telemetria em memória, sem envio real a usuários.
 - **Fora do escopo:** conteúdo/destinatário do e-mail.
+
+#### Definição OBS-011
+
+- `notificationcore.notifications.send.duration` foi removida para não duplicar o cronômetro do SMTP.
+- `notificationcore.smtp.send.duration`: `Histogram<double>`, unidade `s`, labels `provider` e `result`, valores fechados `provider=smtp` e `result=success|failure|cancelled`.
+- `notificationcore.smtp.send.attempts`: `Counter<long>`, unidade `{attempt}`, mesmas labels e valores.
+- `notificationcore.notifications.delivery.retries`: `Counter<long>`, unidade `{retry}`, label `notification_type`; semântica escolhida: retry agendado após falha temporária do provider. Valores: `email_verification`, `test_email`, `other_transactional`.
+- Métricas preservadas: `notificationcore.notifications.pending`, `notificationcore.notifications.sent`, `notificationcore.notifications.failed` e `notificationcore.notifications.dispatch.duration`; `sent` significa aceitação pelo provider sem erro retornado ao cliente, não entrega na caixa do destinatário.
+- ActivitySource de dispatch: `notificationcore.notifications`, span `notification dispatch`, `ActivityKind.Internal`, tags permitidas `notification.type`, `notification.channel`, `notification.result` e `notification.retry`.
+- ActivitySource SMTP: `notificationcore.smtp`, span `smtp send`, `ActivityKind.Client`, tags permitidas `server.address`, `server.port`, `notification.provider`, `notification.result` e `error.type`.
+- `error.type` SMTP usa allowlist: `timeout`, `connectivity`, `authentication`, `protocol`, `cancelled`, `unknown`.
+- Refinamento arquitetural posterior da OBS-011: a implementação inicial usou `INotificationDispatchTelemetry` na Application; essa interface foi removida. A Application passou a retornar apenas `DispatchPendingNotificationResult`/`DispatchCounters` neutros, sem callbacks de observabilidade, `TraceParent`, `TraceState`, spans ou nomes de métricas.
+- A telemetria do dispatch ficou no boundary técnico da Api: `NotificationDispatcherHostedService` lê contextos seguros por `NotificationDispatchTelemetryContextReader`, chama o caso de uso dentro de `NotificationDispatchTelemetry.TrackAsync`, aplica status/tags no span e emite métricas a partir do resultado funcional.
+- Não houve migration: o payload original envelopado é preservado em `InboxMessages.Payload`, e `InboxRepository` busca tanto `IdempotencyKey` legado no topo quanto `Payload.IdempotencyKey` no envelope. Registros antigos continuam válidos.
+- Semântica de SMTP success: sucesso é registrado somente quando connect/auth/send/disconnect terminam sem exceção, preservando o comportamento existente do provider.
 
 ## Fase 6 — Métricas de negócio e fluxos AuthCore
 
@@ -392,6 +421,23 @@
 - **Riscos/cuidados:** não contar rate limit como credencial inválida; evitar duplicar token login e session login; `email_verification.requested` não significa e-mail entregue.
 - **Fora do escopo:** métricas dentro de entidades/value objects.
 
+#### Implementado na OBS-012
+
+- **Inventário real:** havia somente `ExternalAuthenticationMetrics` em `AuthCore.Api`, com meter `authcore.auth.external`, contadores `authcore.auth.external.login.started`, `authcore.auth.external.login.succeeded`, `authcore.auth.external.login.failed`, `authcore.auth.external.login.cancelled` e histograma `authcore.auth.external.callback.duration`.
+- **Métricas Google removidas:** o contador de redirect inicial e o histograma de duração do callback foram removidos. O callback inválido deixou de gerar `cancelled` e `failed` simultaneamente.
+- **Meter final:** `authcore.authentication`, registrado apenas no host `AuthCore.Api`.
+- **Instrumentos finais:**
+  - `authcore.authentication.attempts`, Counter, unidade `{attempt}`, labels `flow`, `result`, `reason`.
+  - `authcore.refresh_tokens.operations`, Counter, unidade `{operation}`, labels `operation`, `result`, `reason`.
+  - `authcore.sessions.operations`, Counter, unidade `{operation}`, labels `operation`, `result`, `reason`.
+  - `authcore.registration.attempts`, Counter, unidade `{attempt}`, labels `result`, `reason`.
+  - `authcore.email_verification.attempts`, Counter, unidade `{attempt}`, labels `result`, `reason`.
+- **Allowlists:** `flow` usa `password_session`, `password_token`, `google_session`; `operation` usa `create`, `rotate`, `revoke`, `revoke_all`; `result` e `reason` são normalizados por instrumento no código, sem valores livres.
+- **Boundary:** `AuthBusinessMetrics`, `AuthFlowTelemetryMiddleware` e o fluxo Google ficaram em `AuthCore.Api/Observability` ou no boundary HTTP. Domain e Application não receberam dependências de OpenTelemetry nem abstrações de telemetria.
+- **Antiduplicação:** o middleware não observa o redirect `GET /api/auth/external/google`; o fluxo Google registra sucesso apenas quando o callback cria sessão. Quando o callback exige onboarding, o sucesso `google_session` é contado no `POST /api/auth/external/google/onboarding`, evitando contagem dupla. Login por sessão registra também `sessions.operations{operation=create}` somente em sucesso.
+- **Validação adicionada:** `CustomMetricsTests` valida catálogo, unidades e ausência das métricas legadas; `AuthFlowTelemetryMiddlewareTests` valida classificação de login por sessão, rate limit, redirect Google e refresh token.
+- **Desvios do plano:** não foi alterado `ApiExceptionHandler` para escrever razões em `HttpContext.Items`, porque os status atuais cobrem os casos seguros principais sem acoplar o handler a nomes de métrica. Reuse, expiração e revogação de refresh token continuam agregados como `invalid_token` no middleware porque a Application lança exceção genérica segura. Também não foram adicionadas tags `auth.flow`/`auth.result` em spans servidor, pois a execução solicitada restringiu a OBS-012 a métricas e proibiu novos spans de autenticação.
+
 ## Fase 7 — Health checks
 
 ### OBS-013 — Separar liveness/readiness e completar dependências
@@ -407,6 +453,18 @@
 - **Validação:** smoke tests e indisponibilidade controlada de cada dependência.
 - **Riscos/cuidados:** SMTP health sem enviar e-mail; evitar cascading health no Gateway.
 - **Fora do escopo:** SLO/alerta.
+- **Inventário OBS-013:** antes da alteração existia apenas `/health` nos três hosts. AuthCore registrava `postgresql`, `redis` e `outbox`, sem tags. NotificationCore registrava `postgresql`, `rabbitmq` e `dispatcher`, sem tags. Gateway registrava health checks sem checks específicos e expunha `/health` com `Degraded` mapeado para HTTP 200. Não havia pacotes `AspNetCore.HealthChecks.*` nem HealthChecks UI; o uso era do `Microsoft.Extensions.Diagnostics.HealthChecks` do framework. O response writer existente era o padrão do middleware, sem JSON sanitizado próprio. O Gateway/Ocelot e testes/documentação consumiam `/health`, portanto o endpoint legado foi preservado como alias de readiness.
+- **Inventário de dependências:** PostgreSQL já usava `NpgsqlDataSource` singleton em AuthCore e NotificationCore; os health checks antigos passavam por `IDbConnectionFactory`, que emite métricas técnicas de conexão. Redis já usava `IConnectionMultiplexer` singleton. RabbitMQ não tinha conexão singleton compartilhada para health; publisher/consumer abrem conexões próprias com `RabbitMQ.Client`. SMTP usava `SmtpEmailProvider`/MailKit para envio; o health check não reutiliza envio. Outbox, consumer RabbitMQ, dispatcher e SMTP são controlados por `Outbox:Enabled`, `RabbitMq:Enabled`/`NOTIFICATIONCORE_RABBITMQ_CONSUMER_ENABLED` e `NotificationDispatcher:Enabled`.
+- **Endpoints finais:** os três hosts expõem `/health/live`, `/health/ready`, `/health/dependencies` e preservam `/health` como alias de `/health/ready`. Todos desabilitam cache, usam `AllowAnonymous`, retornam `Healthy`/`Degraded` como HTTP 200 e `Unhealthy` como HTTP 503.
+- **Tags finais:** `live`, `ready`, `dependency`, `critical`, `optional`, centralizadas em `Shared.Observability.HealthCheckTags`.
+- **Resposta:** `/health/live`, `/health/ready` e `/health` retornam somente `{ "status": "Healthy" }`. `/health/dependencies` retorna JSON seguro com `status` agregado e `checks` ordenados por nome, contendo apenas `name`, `status` e `durationMs`. Não são serializados `description`, `exception`, `data`, mensagens, stack trace, host, porta, banco, endpoint, queue, exchange, connection string ou credenciais.
+- **Checks finais por serviço:** AuthCore registra `self` (`live`, `ready`), `postgresql` (`ready`, `dependency`, `critical`), `redis` (`ready`, `dependency`, `critical`) e `rabbitmq` (`dependency`, `optional`) somente quando `Outbox:Enabled=true`. NotificationCore registra `self`, `postgresql` crítico, `rabbitmq` crítico somente quando consumer habilitado e `smtp` opcional somente quando dispatcher habilitado. Gateway registra apenas `self`, sem fan-out para AuthCore, NotificationCore ou dependências internas deles.
+- **Implementação das dependências:** PostgreSQL usa o `NpgsqlDataSource` existente, abre conexão, executa `SELECT 1` e descarta a conexão. Redis usa o `IConnectionMultiplexer` existente e executa `PING`, sem `SCAN`, `GET`, `SET` ou métricas de negócio. RabbitMQ abre conexão/canal curtos quando necessário, não publica, não consome e não declara topologia. SMTP cria `SmtpClient`, conecta/TLS quando configurado e desconecta, sem autenticar, sem criar mensagem e sem chamar `SmtpEmailProvider.SendAsync`.
+- **Timeouts:** checks de dependência usam `HealthChecks:DependencyTimeoutSeconds`, padrão local `5`, limitado entre `1` e `30` segundos, com `CancellationToken` propagado.
+- **Baixo ruído:** `RequestLoggingMiddleware` já tratava `/health` e `/health/*` como health e não logava sucesso por padrão. A instrumentação ASP.NET Core já excluía `/health` e `/health/*` quando `Observability:ExcludeHealthChecks=true`. Nenhuma métrica customizada de health check foi adicionada.
+- **Docker:** não havia `HEALTHCHECK` nos containers das APIs, então não foi adicionado `curl`/`wget` nem aumento de imagem. Checks nativos de PostgreSQL, Redis e RabbitMQ foram preservados. O `depends_on` do AuthCore para RabbitMQ foi relaxado de `service_healthy` para `service_started`, alinhando RabbitMQ como dependência opcional do AuthCore quando a Outbox desacopla publicação. NotificationCore mantém RabbitMQ como `service_healthy`, pois o consumer é crítico quando habilitado.
+- **Validação adicionada:** testes de smoke validam registros, nomes e tags por host; testes de endpoints validam status HTTP, cache desabilitado, resposta sanitizada e ordenação determinística; teste arquitetural valida que Application/Domain não referenciam health checks, que `Shared.Observability` não referencia Npgsql/Redis/RabbitMQ/MailKit/AuthCore/NotificationCore e que nenhum pacote HealthChecks UI/AspNetCore.HealthChecks foi adicionado.
+- **Desvios do plano:** `outbox` deixou de ser health check registrado porque era consulta funcional de repositório e não dependência técnica padronizada. SMTP não participa de readiness; foi classificado como `dependency/optional` para evitar retirar tráfego enquanto há persistência e retry. Dependência desabilitada não retorna `Healthy("disabled")`; o check não é registrado, evitando falso sinal de execução. PostgreSQL passou a usar `NpgsqlDataSource` diretamente, não `IDbConnectionFactory`, para evitar métricas funcionais/técnicas de conexão durante probes.
 
 ## Fase 8 — Ambiente local e documentação
 
@@ -486,15 +544,11 @@ A ordem desloca spans customizados para junto das dependências, pois spans HTTP
 | `authcore.outbox.processing.duration` | Histogram | Auth | Duração do ciclo da outbox, segundos. | result | OutboxProcessor | OBS-006 |
 | `notificationcore.notifications.sent` | Counter | Notification | Notificações entregues. | notification_type, channel | Hosted service a partir de DispatchCounters | OBS-006/011 |
 | `notificationcore.notifications.failed` | Counter | Notification | Notificações com falha final. | notification_type, channel | Hosted service a partir de DispatchCounters | OBS-006/011 |
-| `authcore.auth.login.attempts` | Counter | Auth | Login token/browser/Google. | mode | API/Google flow | OBS-012 |
-| `authcore.auth.login.results` | Counter | Auth | Desfecho de login. | mode, result, reason allowlist | API | OBS-012 |
-| `authcore.auth.external.callback.duration` | Histogram | Auth | Duração do callback Google, segundos. | result | GoogleExternalAuthenticationFlow | OBS-006/012 |
-| `authcore.auth.sessions.created` | Counter | Auth | Sessões browser/token criadas. | mode | API | OBS-012 |
-| `authcore.auth.sessions.revoked` | Counter | Auth | Revogação current/single/all. | mode, scope, result | API | OBS-012 |
-| `authcore.auth.refresh_tokens.issued` | Counter | Auth | Token inicial/rotacionado. | grant (`login`,`refresh`) | API | OBS-012 |
-| `authcore.auth.refresh_tokens.rejected` | Counter | Auth | Refresh rejeitado. | reason allowlist | API | OBS-012 |
-| `authcore.users.registered` | Counter | Auth | Registro concluído. | method (`password`,`google`) | API | OBS-012 |
-| `authcore.email_verification.requested` | Counter | Auth | Notificação de verificação enfileirada; não entrega. | operation (`register`,`resend`) | API/outbox boundary | OBS-012 |
+| `authcore.authentication.attempts` | Counter | Auth | Tentativas de autenticação password session/token e Google. | flow, result, reason | API/Google flow | OBS-012 |
+| `authcore.refresh_tokens.operations` | Counter | Auth | Operações de refresh token. | operation, result, reason | API | OBS-012 |
+| `authcore.sessions.operations` | Counter | Auth | Operações de sessão browser. | operation, result, reason | API | OBS-012 |
+| `authcore.registration.attempts` | Counter | Auth | Tentativas de registro. | result, reason | API | OBS-012 |
+| `authcore.email_verification.attempts` | Counter | Auth | Tentativas de verificação de e-mail. | result, reason | API | OBS-012 |
 
 `service` e `environment` são resource attributes, não labels repetidas em cada medição. `queue`, `mode`, `result`, `reason`, `operation`, `provider` e `event_type` devem ter allowlists fechadas no código.
 

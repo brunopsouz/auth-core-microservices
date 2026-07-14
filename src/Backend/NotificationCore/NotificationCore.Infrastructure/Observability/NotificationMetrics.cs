@@ -9,10 +9,6 @@ internal sealed class NotificationMetrics
 {
     internal const string MeterName = "notificationcore.notifications";
 
-    private const string ProviderTagName = "provider";
-    private const string SmtpProvider = "smtp";
-    private const string UnknownProvider = "unknown";
-
     private static readonly Meter Meter = new(MeterName, "1.0.0");
     private static readonly Counter<long> PendingNotifications = Meter.CreateCounter<long>(
         "notificationcore.notifications.pending",
@@ -21,7 +17,7 @@ internal sealed class NotificationMetrics
     private static readonly Counter<long> SentNotifications = Meter.CreateCounter<long>(
         "notificationcore.notifications.sent",
         unit: "{notification}",
-        description: "Number of notifications delivered by the dispatcher.");
+        description: "Number of notifications accepted by the notification provider without client-side error.");
     private static readonly Counter<long> FailedNotifications = Meter.CreateCounter<long>(
         "notificationcore.notifications.failed",
         unit: "{notification}",
@@ -30,10 +26,10 @@ internal sealed class NotificationMetrics
         "notificationcore.notifications.dispatch.duration",
         unit: "s",
         description: "Duration of a notification dispatcher cycle.");
-    private static readonly Histogram<double> SendDuration = Meter.CreateHistogram<double>(
-        "notificationcore.notifications.send.duration",
-        unit: "s",
-        description: "Duration of notification provider send operation.");
+    private static readonly Counter<long> DeliveryRetries = Meter.CreateCounter<long>(
+        "notificationcore.notifications.delivery.retries",
+        unit: "{retry}",
+        description: "Number of notification delivery retries scheduled by NotificationCore.");
 
     /// <summary>
     /// Operação para registrar notificações pendentes encontradas.
@@ -75,15 +71,30 @@ internal sealed class NotificationMetrics
     }
 
     /// <summary>
-    /// Operação para registrar duração do envio ao provedor.
+    /// Operação para registrar retries agendados de verificação de e-mail.
     /// </summary>
-    /// <param name="elapsed">Duração do envio.</param>
-    /// <param name="provider">Nome do provedor.</param>
-    public void RecordSendDuration(TimeSpan elapsed, string provider)
+    /// <param name="count">Quantidade de retries.</param>
+    public void RecordEmailVerificationRetries(long count)
     {
-        SendDuration.Record(
-            ToNonNegativeSeconds(elapsed),
-            new KeyValuePair<string, object?>(ProviderTagName, NormalizeProvider(provider)));
+        RecordDeliveryRetries(count, "email_verification");
+    }
+
+    /// <summary>
+    /// Operação para registrar retries agendados de e-mail de teste.
+    /// </summary>
+    /// <param name="count">Quantidade de retries.</param>
+    public void RecordTestEmailRetries(long count)
+    {
+        RecordDeliveryRetries(count, "test_email");
+    }
+
+    /// <summary>
+    /// Operação para registrar retries agendados de demais transacionais.
+    /// </summary>
+    /// <param name="count">Quantidade de retries.</param>
+    public void RecordOtherTransactionalRetries(long count)
+    {
+        RecordDeliveryRetries(count, "other_transactional");
     }
 
     private static double ToNonNegativeSeconds(TimeSpan elapsed)
@@ -91,10 +102,13 @@ internal sealed class NotificationMetrics
         return Math.Max(0, elapsed.TotalSeconds);
     }
 
-    private static string NormalizeProvider(string provider)
+    private static void RecordDeliveryRetries(long count, string notificationType)
     {
-        return provider.Equals("Smtp", StringComparison.OrdinalIgnoreCase)
-            ? SmtpProvider
-            : UnknownProvider;
+        if (count > 0)
+        {
+            DeliveryRetries.Add(
+                count,
+                new KeyValuePair<string, object?>("notification_type", notificationType));
+        }
     }
 }

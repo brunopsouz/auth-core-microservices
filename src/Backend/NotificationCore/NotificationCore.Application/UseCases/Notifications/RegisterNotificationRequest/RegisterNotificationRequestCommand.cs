@@ -13,6 +13,11 @@ public sealed class RegisterNotificationRequestCommand
     public SendTransactionalNotificationRequested Request { get; init; } = null!;
 
     /// <summary>
+    /// Payload original recebido da mensageria.
+    /// </summary>
+    public string OriginalPayload { get; init; } = string.Empty;
+
+    /// <summary>
     /// Token para cancelamento do processamento.
     /// </summary>
     public CancellationToken CancellationToken { get; init; }

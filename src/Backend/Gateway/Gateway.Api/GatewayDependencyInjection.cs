@@ -6,9 +6,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Ocelot.DependencyInjection;
+using Shared.Observability;
 using NetIPNetwork = System.Net.IPNetwork;
 
 namespace Gateway.Api;
@@ -40,7 +42,11 @@ public static class GatewayDependencyInjection
         AddAuthentication(services, configuration);
 
         services.AddAuthorization();
-        services.AddHealthChecks();
+        services.AddHealthChecks()
+            .AddCheck(
+                "self",
+                () => HealthCheckResult.Healthy(),
+                tags: [HealthCheckTags.Live, HealthCheckTags.Ready]);
         services.AddRouting(options => options.LowercaseUrls = true);
         services.AddOcelot(configuration);
 

@@ -65,7 +65,9 @@ internal sealed class RegisterNotificationRequestUseCase : IRegisterNotification
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(command.Request);
 
-        var payload = JsonSerializer.Serialize(command.Request);
+        var payload = string.IsNullOrWhiteSpace(command.OriginalPayload)
+            ? JsonSerializer.Serialize(command.Request)
+            : command.OriginalPayload;
         var receivedAtUtc = DateTime.UtcNow;
         var shouldMarkInboxAsFailed = false;
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Shared.Messaging.Contracts;
 using Shared.Messaging.Contracts.Notifications;
 using NotificationCore.Domain.Common.Exceptions;
 using NotificationCore.Domain.Common.Repositories;
@@ -158,10 +159,28 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
         DispatchCounters counters,
         CancellationToken cancellationToken)
     {
-        var processingStartedAtUtc = DateTime.UtcNow;
-        var request = await GetOriginalRequestAsync(notification, cancellationToken);
+        var dispatchRequest = await GetOriginalRequestAsync(notification, cancellationToken);
+        await DispatchNotificationCoreAsync(
+            notification,
+            retryDelay,
+            counters,
+            dispatchRequest,
+            cancellationToken);
+    }
 
-        if (request is null)
+    /// <summary>
+    /// Operação para executar o núcleo do despacho de uma notificação.
+    /// </summary>
+    private async Task DispatchNotificationCoreAsync(
+        Notification notification,
+        TimeSpan retryDelay,
+        DispatchCounters counters,
+        DispatchNotificationRequest? dispatchRequest,
+        CancellationToken cancellationToken)
+    {
+        var processingStartedAtUtc = DateTime.UtcNow;
+
+        if (dispatchRequest?.Request is null)
         {
             MarkAsPermanentFailure(
                 notification,
@@ -181,7 +200,7 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
             renderedTemplate = await _templateRenderer.RenderAsync(
                 notification.TemplateKey.Value,
                 notification.Channel,
-                CreateVariables(request));
+                CreateVariables(dispatchRequest.Request));
         }
         catch (DomainException)
         {
@@ -239,7 +258,7 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
     /// </summary>
     /// <param name="notification">Notificacao em processamento.</param>
     /// <returns>Mensagem original ou nula.</returns>
-    private async Task<SendTransactionalNotificationRequested?> GetOriginalRequestAsync(
+    private async Task<DispatchNotificationRequest?> GetOriginalRequestAsync(
         Notification notification,
         CancellationToken cancellationToken)
     {
@@ -338,9 +357,14 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
                 errorMessage);
 
             if (notification.Status == NotificationStatus.RetryScheduled)
+            {
                 counters.RetryScheduled++;
+                counters.IncrementRetryScheduled(notification.TemplateKey.Value);
+            }
             else
+            {
                 counters.DeadLettered++;
+            }
 
             return;
         }
@@ -381,11 +405,22 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
     /// </summary>
     /// <param name="payload">Mensagem de inbox.</param>
     /// <returns>Mensagem transacional ou nula.</returns>
-    private static SendTransactionalNotificationRequested? DeserializeRequest(string payload)
+    private static DispatchNotificationRequest? DeserializeRequest(string payload)
     {
         try
         {
-            return JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(payload);
+            var envelope = JsonSerializer.Deserialize<MessageEnvelope<SendTransactionalNotificationRequested>>(payload);
+
+            if (envelope?.Payload is not null)
+            {
+                return new DispatchNotificationRequest(envelope.Payload);
+            }
+
+            var request = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(payload);
+
+            return request is null
+                ? null
+                : new DispatchNotificationRequest(request);
         }
         catch (JsonException)
         {
@@ -393,6 +428,9 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
         }
     }
 
+    /// <summary>
+    /// Operação para criar contexto técnico seguro do despacho.
+    /// </summary>
     /// <summary>
     /// Operacao para criar copia segura das variaveis.
     /// </summary>
@@ -443,4 +481,6 @@ internal sealed class PendingNotificationDispatcher : IPendingNotificationDispat
             ? "Falha no provedor de e-mail"
             : message.Trim().TrimEnd('.');
     }
+
+    private sealed record DispatchNotificationRequest(SendTransactionalNotificationRequested Request);
 }

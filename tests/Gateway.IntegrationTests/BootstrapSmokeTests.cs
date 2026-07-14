@@ -5,7 +5,6 @@ using Gateway.Api.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
@@ -15,6 +14,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Ocelot.Middleware;
+using Shared.Observability;
 
 namespace Gateway.IntegrationTests;
 
@@ -37,6 +37,9 @@ public sealed class BootstrapSmokeTests
 
         var jwtOptions = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
         var healthCheckService = app.Services.GetRequiredService<HealthCheckService>();
+        var healthCheckOptions = app.Services
+            .GetRequiredService<IOptions<HealthCheckServiceOptions>>()
+            .Value;
         var authenticationSchemeProvider = app.Services.GetRequiredService<IAuthenticationSchemeProvider>();
         var bearerScheme = await authenticationSchemeProvider.GetSchemeAsync(JwtBearerDefaults.AuthenticationScheme);
 
@@ -44,6 +47,10 @@ public sealed class BootstrapSmokeTests
         Assert.Equal("authcore-tests", jwtOptions.Audience);
         Assert.False(jwtOptions.RequireHttpsMetadata);
         Assert.NotNull(healthCheckService);
+        var registration = Assert.Single(healthCheckOptions.Registrations);
+        Assert.Equal("self", registration.Name);
+        Assert.Contains("live", registration.Tags);
+        Assert.Contains("ready", registration.Tags);
         Assert.NotNull(bearerScheme);
     }
 
@@ -58,21 +65,8 @@ public sealed class BootstrapSmokeTests
         await using var app = builder.Build();
 
         app.UseRouting();
-#pragma warning disable ASP0014
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapHealthChecks("/health", new HealthCheckOptions
-            {
-                AllowCachingResponses = false,
-                ResultStatusCodes =
-                {
-                    [HealthStatus.Healthy] = StatusCodes.Status200OK,
-                    [HealthStatus.Degraded] = StatusCodes.Status200OK,
-                    [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
-                }
-            });
-        });
-#pragma warning restore ASP0014
+        app.MapStandardHealthCheckEndpoints();
+        app.UseEndpoints(_ => { });
 
         await app.UseOcelot();
         app.Urls.Add("http://127.0.0.1:0");
@@ -108,25 +102,17 @@ public sealed class BootstrapSmokeTests
         {
             service = "gateway",
             health = "/health",
+            live = "/health/live",
+            ready = "/health/ready",
+            dependencies = "/health/dependencies",
             authCoreHealth = "/authcore/health",
-            notificationCoreHealth = "/notificationcore/health"
+            authCoreReady = "/authcore/health/ready",
+            notificationCoreHealth = "/notificationcore/health",
+            notificationCoreReady = "/notificationcore/health/ready"
         }));
         app.UseRouting();
-#pragma warning disable ASP0014
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapHealthChecks("/health", new HealthCheckOptions
-            {
-                AllowCachingResponses = false,
-                ResultStatusCodes =
-                {
-                    [HealthStatus.Healthy] = StatusCodes.Status200OK,
-                    [HealthStatus.Degraded] = StatusCodes.Status200OK,
-                    [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
-                }
-            });
-        });
-#pragma warning restore ASP0014
+        app.MapStandardHealthCheckEndpoints();
+        app.UseEndpoints(_ => { });
 
         await app.UseOcelot();
         app.Urls.Add("http://127.0.0.1:0");
@@ -148,8 +134,13 @@ public sealed class BootstrapSmokeTests
         Assert.NotNull(payload);
         Assert.Equal("gateway", payload.Service);
         Assert.Equal("/health", payload.Health);
+        Assert.Equal("/health/live", payload.Live);
+        Assert.Equal("/health/ready", payload.Ready);
+        Assert.Equal("/health/dependencies", payload.Dependencies);
         Assert.Equal("/authcore/health", payload.AuthCoreHealth);
+        Assert.Equal("/authcore/health/ready", payload.AuthCoreReady);
         Assert.Equal("/notificationcore/health", payload.NotificationCoreHealth);
+        Assert.Equal("/notificationcore/health/ready", payload.NotificationCoreReady);
 
         await app.StopAsync();
     }
@@ -204,8 +195,18 @@ public sealed class BootstrapSmokeTests
 
         public string Health { get; set; } = string.Empty;
 
+        public string Live { get; set; } = string.Empty;
+
+        public string Ready { get; set; } = string.Empty;
+
+        public string Dependencies { get; set; } = string.Empty;
+
         public string AuthCoreHealth { get; set; } = string.Empty;
 
+        public string AuthCoreReady { get; set; } = string.Empty;
+
         public string NotificationCoreHealth { get; set; } = string.Empty;
+
+        public string NotificationCoreReady { get; set; } = string.Empty;
     }
 }

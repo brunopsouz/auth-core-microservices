@@ -6,6 +6,7 @@ COPY ["Backend/NotificationCore/NotificationCore.Application/NotificationCore.Ap
 COPY ["Backend/NotificationCore/NotificationCore.Domain/NotificationCore.Domain.csproj", "Backend/NotificationCore/NotificationCore.Domain/"]
 COPY ["Backend/NotificationCore/NotificationCore.Infrastructure/NotificationCore.Infrastructure.csproj", "Backend/NotificationCore/NotificationCore.Infrastructure/"]
 COPY ["Shared/Messaging.Contracts/Messaging.Contracts.csproj", "Shared/Messaging.Contracts/"]
+COPY ["Shared/Observability/Shared.Observability.csproj", "Shared/Observability/"]
 
 RUN dotnet restore "Backend/NotificationCore/NotificationCore.Api/NotificationCore.Api.csproj"
 

@@ -35,6 +35,42 @@ internal sealed class DispatchCounters
     public int DeadLettered { get; set; }
 
     /// <summary>
+    /// Quantidade de retries agendados para verificação de e-mail.
+    /// </summary>
+    public int EmailVerificationRetries { get; private set; }
+
+    /// <summary>
+    /// Quantidade de retries agendados para e-mail de teste.
+    /// </summary>
+    public int TestEmailRetries { get; private set; }
+
+    /// <summary>
+    /// Quantidade de retries agendados para demais transacionais.
+    /// </summary>
+    public int OtherTransactionalRetries { get; private set; }
+
+    /// <summary>
+    /// Operação para incrementar retry agendado por tipo controlado.
+    /// </summary>
+    /// <param name="templateKey">Chave do template da notificação.</param>
+    public void IncrementRetryScheduled(string templateKey)
+    {
+        if (string.Equals(templateKey, "auth.email-confirmation", StringComparison.Ordinal))
+        {
+            EmailVerificationRetries++;
+            return;
+        }
+
+        if (string.Equals(templateKey, "notificationcore.test-email", StringComparison.Ordinal))
+        {
+            TestEmailRetries++;
+            return;
+        }
+
+        OtherTransactionalRetries++;
+    }
+
+    /// <summary>
     /// Operacao para criar resultado do despacho.
     /// </summary>
     /// <returns>Resultado do despacho.</returns>
@@ -45,7 +81,10 @@ internal sealed class DispatchCounters
             Found = Found,
             Sent = Sent,
             RetryScheduled = RetryScheduled,
-            DeadLettered = DeadLettered
+            DeadLettered = DeadLettered,
+            EmailVerificationRetries = EmailVerificationRetries,
+            TestEmailRetries = TestEmailRetries,
+            OtherTransactionalRetries = OtherTransactionalRetries
         };
     }
 }

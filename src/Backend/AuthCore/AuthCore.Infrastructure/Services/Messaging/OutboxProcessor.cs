@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using Shared.Messaging.Contracts.Notifications;
 using Shared.Messaging.Contracts.Security;
+using Shared.Messaging.Contracts;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Infrastructure.Configurations;
@@ -26,6 +27,10 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     private const string FAILURE_RESULT = "failure";
     private const string LEGACY_IDEMPOTENCY_KEY_PREFIX = "auth-email-confirmation-legacy";
     private const string PROCESSED_RESULT = "processed";
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     /// <summary>
     /// Campo que armazena outbox repository.
@@ -224,8 +229,8 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     {
         if (message.Type == nameof(SendTransactionalNotificationRequested))
         {
-            var request = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(message.Content)
-                ?? throw new InvalidOperationException("Conteúdo da mensagem de outbox inválido.");
+            var notificationMessage = DeserializeNotificationMessage(message.Content);
+            var request = notificationMessage.Request;
 
             ValidateNotificationRequest(request);
 
@@ -234,6 +239,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
             await _notificationRequestPublisher.PublishAsync(
                 request,
                 message.Content,
+                notificationMessage.Metadata,
                 cancellationToken);
 
             return;
@@ -249,12 +255,34 @@ internal sealed class OutboxProcessor : IOutboxProcessor
             await _notificationRequestPublisher.PublishAsync(
                 request,
                 payload,
+                metadata: null,
                 cancellationToken);
 
             return;
         }
 
         throw new InvalidOperationException($"Tipo de mensagem de outbox não suportado: {message.Type}.");
+    }
+
+    private static NotificationOutboxMessage DeserializeNotificationMessage(string content)
+    {
+        var envelope = JsonSerializer.Deserialize<MessageEnvelope<SendTransactionalNotificationRequested>>(
+            content,
+            JsonSerializerOptions);
+
+        if (envelope?.Payload is not null)
+        {
+            return new NotificationOutboxMessage(
+                envelope.Payload,
+                envelope.Metadata);
+        }
+
+        var request = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(
+            content,
+            JsonSerializerOptions)
+            ?? throw new InvalidOperationException("Conteúdo da mensagem de outbox inválido.");
+
+        return new NotificationOutboxMessage(request, Metadata: null);
     }
 
     /// <summary>
@@ -342,5 +370,9 @@ internal sealed class OutboxProcessor : IOutboxProcessor
 
         return SensitivePayloadSanitizer.SanitizeText(message);
     }
+
+    private sealed record NotificationOutboxMessage(
+        SendTransactionalNotificationRequested Request,
+        MessageEnvelopeMetadata? Metadata);
 
 }

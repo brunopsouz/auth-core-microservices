@@ -12,7 +12,8 @@ public sealed class CustomMetricsTests
             "NotificationCore.Database",
             "NotificationCore.Notifications",
             DatabaseMetrics.MeterName,
-            NotificationMetrics.MeterName);
+            NotificationMetrics.MeterName,
+            SmtpTelemetry.MeterName);
         var databaseMetrics = new DatabaseMetrics();
         var notificationMetrics = new NotificationMetrics();
 
@@ -27,7 +28,11 @@ public sealed class CustomMetricsTests
         notificationMetrics.RecordFailed(1);
         notificationMetrics.RecordDispatchDuration(TimeSpan.FromMilliseconds(900));
         notificationMetrics.RecordDispatchDuration(TimeSpan.FromMilliseconds(-1));
-        notificationMetrics.RecordSendDuration(TimeSpan.FromMilliseconds(150), "smtp.example.com");
+        notificationMetrics.RecordEmailVerificationRetries(1);
+        notificationMetrics.RecordTestEmailRetries(1);
+        notificationMetrics.RecordOtherTransactionalRetries(1);
+        SmtpTelemetry.CompleteSend(activity: null, TimeSpan.FromMilliseconds(150), "success");
+        SmtpTelemetry.CompleteSend(activity: null, TimeSpan.FromMilliseconds(50), "failure", new TimeoutException("smtp timeout sentinel"));
         var instruments = collector.GetInstruments();
         var measurements = collector.GetMeasurements();
 
@@ -39,7 +44,9 @@ public sealed class CustomMetricsTests
         collector.AssertInstrument("notificationcore.notifications.sent", "{notification}");
         collector.AssertInstrument("notificationcore.notifications.failed", "{notification}");
         collector.AssertInstrument("notificationcore.notifications.dispatch.duration", "s");
-        collector.AssertInstrument("notificationcore.notifications.send.duration", "s");
+        collector.AssertInstrument("notificationcore.notifications.delivery.retries", "{retry}");
+        collector.AssertInstrument("notificationcore.smtp.send.duration", "s");
+        collector.AssertInstrument("notificationcore.smtp.send.attempts", "{attempt}");
 
         Assert.Contains(measurements, measurement =>
             measurement.Name == "notificationcore.db.connection.acquire.duration"
@@ -63,11 +70,30 @@ public sealed class CustomMetricsTests
             measurement.Name == "notificationcore.notifications.dispatch.duration"
             && measurement.Value == 0.9d);
         Assert.Contains(measurements, measurement =>
-            measurement.Name == "notificationcore.notifications.send.duration"
+            measurement.Name == "notificationcore.notifications.delivery.retries"
+            && measurement.Value == 1d
+            && Convert.ToString(measurement.Tags["notification_type"]) == "email_verification");
+        Assert.Contains(measurements, measurement =>
+            measurement.Name == "notificationcore.notifications.delivery.retries"
+            && measurement.Value == 1d
+            && Convert.ToString(measurement.Tags["notification_type"]) == "test_email");
+        Assert.Contains(measurements, measurement =>
+            measurement.Name == "notificationcore.notifications.delivery.retries"
+            && measurement.Value == 1d
+            && Convert.ToString(measurement.Tags["notification_type"]) == "other_transactional");
+        Assert.Contains(measurements, measurement =>
+            measurement.Name == "notificationcore.smtp.send.duration"
             && measurement.Value == 0.15d
-            && Convert.ToString(measurement.Tags["provider"]) == "unknown");
+            && Convert.ToString(measurement.Tags["provider"]) == "smtp"
+            && Convert.ToString(measurement.Tags["result"]) == "success");
+        Assert.Contains(measurements, measurement =>
+            measurement.Name == "notificationcore.smtp.send.attempts"
+            && measurement.Value == 1d
+            && Convert.ToString(measurement.Tags["provider"]) == "smtp"
+            && Convert.ToString(measurement.Tags["result"]) == "failure");
 
         Assert.All(measurements, measurement => Assert.True(measurement.Value >= 0));
+        Assert.DoesNotContain(instruments, instrument => instrument.Name == "notificationcore.notifications.send.duration");
         Assert.DoesNotContain(instruments, instrument => instrument.MeterName is
             "NotificationCore.Database"
             or "NotificationCore.Notifications");

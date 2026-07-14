@@ -18,10 +18,10 @@ public sealed class CustomMetricsTests
             "AuthCore.ExternalAuthentication",
             DatabaseMetrics.MeterName,
             OutboxMetrics.MeterName,
-            ExternalAuthenticationMetrics.MeterName);
+            AuthBusinessMetrics.MeterName);
         var databaseMetrics = new DatabaseMetrics();
         var outboxMetrics = new OutboxMetrics();
-        var externalAuthenticationMetrics = new ExternalAuthenticationMetrics();
+        var authBusinessMetrics = new AuthBusinessMetrics();
 
         databaseMetrics.RecordAcquisition(TimeSpan.FromMilliseconds(250), succeeded: true);
         databaseMetrics.RecordAcquisition(TimeSpan.FromMilliseconds(125), succeeded: false);
@@ -35,11 +35,32 @@ public sealed class CustomMetricsTests
             new InvalidOperationException("raw exception text"));
         outboxMetrics.RecordDuration(TimeSpan.FromMilliseconds(750), "processed");
         outboxMetrics.RecordDuration(TimeSpan.FromMilliseconds(175), "failure");
-        externalAuthenticationMetrics.RecordGoogleLoginStarted();
-        externalAuthenticationMetrics.RecordGoogleLoginSucceeded(requiresOnboarding: true);
-        externalAuthenticationMetrics.RecordGoogleLoginFailed("missing_required_claims");
-        externalAuthenticationMetrics.RecordGoogleLoginCancelled();
-        externalAuthenticationMetrics.RecordGoogleCallbackDuration(TimeSpan.FromMilliseconds(125), "success");
+        authBusinessMetrics.RecordAuthenticationAttempt(
+            AuthBusinessMetrics.FlowPasswordSession,
+            AuthBusinessMetrics.ResultSuccess,
+            AuthBusinessMetrics.ReasonNone);
+        authBusinessMetrics.RecordAuthenticationAttempt(
+            AuthBusinessMetrics.FlowPasswordToken,
+            AuthBusinessMetrics.ResultBlocked,
+            AuthBusinessMetrics.ReasonRateLimited);
+        authBusinessMetrics.RecordAuthenticationAttempt(
+            AuthBusinessMetrics.FlowGoogleSession,
+            AuthBusinessMetrics.ResultFailure,
+            AuthBusinessMetrics.ReasonValidationError);
+        authBusinessMetrics.RecordRefreshTokenOperation(
+            AuthBusinessMetrics.OperationRotate,
+            AuthBusinessMetrics.ResultFailure,
+            "reused_token");
+        authBusinessMetrics.RecordSessionOperation(
+            AuthBusinessMetrics.OperationRevokeAll,
+            AuthBusinessMetrics.ResultSuccess,
+            AuthBusinessMetrics.ReasonNone);
+        authBusinessMetrics.RecordRegistrationAttempt(
+            AuthBusinessMetrics.ResultFailure,
+            AuthBusinessMetrics.ReasonDuplicateEmail);
+        authBusinessMetrics.RecordEmailVerificationAttempt(
+            AuthBusinessMetrics.ResultFailure,
+            AuthBusinessMetrics.ReasonInvalidToken);
         var instruments = collector.GetInstruments();
         var measurements = collector.GetMeasurements();
 
@@ -50,11 +71,11 @@ public sealed class CustomMetricsTests
         collector.AssertInstrument("authcore.outbox.messages.processed", "{message}");
         collector.AssertInstrument("authcore.outbox.messages.failed", "{message}");
         collector.AssertInstrument("authcore.outbox.processing.duration", "s");
-        collector.AssertInstrument("authcore.auth.external.login.started", "{request}");
-        collector.AssertInstrument("authcore.auth.external.login.succeeded", "{request}");
-        collector.AssertInstrument("authcore.auth.external.login.failed", "{request}");
-        collector.AssertInstrument("authcore.auth.external.login.cancelled", "{request}");
-        collector.AssertInstrument("authcore.auth.external.callback.duration", "s");
+        collector.AssertInstrument("authcore.authentication.attempts", "{attempt}");
+        collector.AssertInstrument("authcore.refresh_tokens.operations", "{operation}");
+        collector.AssertInstrument("authcore.sessions.operations", "{operation}");
+        collector.AssertInstrument("authcore.registration.attempts", "{attempt}");
+        collector.AssertInstrument("authcore.email_verification.attempts", "{attempt}");
 
         Assert.Contains(measurements, measurement =>
             measurement.Name == "authcore.db.connection.acquire.duration"
@@ -77,13 +98,37 @@ public sealed class CustomMetricsTests
             && Convert.ToString(measurement.Tags["event_type"]) == "unknown"
             && Convert.ToString(measurement.Tags["reason"]) == "protocol");
         Assert.Contains(measurements, measurement =>
-            measurement.Name == "authcore.auth.external.login.failed"
-            && Convert.ToString(measurement.Tags["provider"]) == "google"
-            && Convert.ToString(measurement.Tags["reason"]) == "validation");
+            measurement.Name == "authcore.authentication.attempts"
+            && Convert.ToString(measurement.Tags["flow"]) == "google_session"
+            && Convert.ToString(measurement.Tags["result"]) == "failure"
+            && Convert.ToString(measurement.Tags["reason"]) == "validation_error");
         Assert.Contains(measurements, measurement =>
-            measurement.Name == "authcore.auth.external.callback.duration"
-            && measurement.Value == 0.125d
-            && Convert.ToString(measurement.Tags["result"]) == "success");
+            measurement.Name == "authcore.authentication.attempts"
+            && Convert.ToString(measurement.Tags["flow"]) == "password_token"
+            && Convert.ToString(measurement.Tags["result"]) == "blocked"
+            && Convert.ToString(measurement.Tags["reason"]) == "rate_limited");
+        Assert.Contains(measurements, measurement =>
+            measurement.Name == "authcore.refresh_tokens.operations"
+            && Convert.ToString(measurement.Tags["operation"]) == "rotate"
+            && Convert.ToString(measurement.Tags["result"]) == "failure"
+            && Convert.ToString(measurement.Tags["reason"]) == "reused_token");
+        Assert.Contains(measurements, measurement =>
+            measurement.Name == "authcore.sessions.operations"
+            && Convert.ToString(measurement.Tags["operation"]) == "revoke_all"
+            && Convert.ToString(measurement.Tags["result"]) == "success"
+            && Convert.ToString(measurement.Tags["reason"]) == "none");
+        Assert.Contains(measurements, measurement =>
+            measurement.Name == "authcore.registration.attempts"
+            && Convert.ToString(measurement.Tags["result"]) == "failure"
+            && Convert.ToString(measurement.Tags["reason"]) == "duplicate_email");
+        Assert.Contains(measurements, measurement =>
+            measurement.Name == "authcore.email_verification.attempts"
+            && Convert.ToString(measurement.Tags["result"]) == "failure"
+            && Convert.ToString(measurement.Tags["reason"]) == "invalid_token");
+        Assert.DoesNotContain(measurements, measurement =>
+            measurement.Tags.ContainsKey("provider"));
+        Assert.DoesNotContain(measurements, measurement =>
+            measurement.Name.StartsWith("authcore.auth.external.", StringComparison.Ordinal));
         Assert.Contains(measurements, measurement =>
             measurement.Name == "authcore.outbox.processing.duration"
             && measurement.Value == 0.175d
@@ -97,6 +142,7 @@ public sealed class CustomMetricsTests
         Assert.DoesNotContain(instruments, instrument => instrument.Name.Contains("_total", StringComparison.Ordinal));
         Assert.DoesNotContain(instruments, instrument => instrument.Name.EndsWith(".ms", StringComparison.Ordinal));
         Assert.DoesNotContain(instruments, instrument => instrument.Name == "auth_google_callback_duration_ms");
+        Assert.DoesNotContain(instruments, instrument => instrument.Name == "authcore.auth.external.callback.duration");
         Assert.DoesNotContain(instruments, instrument => instrument.Name == "authcore.database.connection.acquisition.duration.ms");
         Assert.DoesNotContain(measurements, ContainsForbiddenMetricValue);
     }
@@ -105,9 +151,7 @@ public sealed class CustomMetricsTests
     {
         var renderedTags = string.Join(" ", measurement.Tags.Select(tag => $"{tag.Key}={tag.Value}"));
 
-        return renderedTags.Contains("password", StringComparison.OrdinalIgnoreCase)
-            || renderedTags.Contains("token", StringComparison.OrdinalIgnoreCase)
-            || renderedTags.Contains("user@example.com", StringComparison.OrdinalIgnoreCase)
+        return renderedTags.Contains("user@example.com", StringComparison.OrdinalIgnoreCase)
             || renderedTags.Contains("corr-123", StringComparison.OrdinalIgnoreCase)
             || renderedTags.Contains("trace-123", StringComparison.OrdinalIgnoreCase)
             || renderedTags.Contains("InvalidOperationException", StringComparison.OrdinalIgnoreCase)

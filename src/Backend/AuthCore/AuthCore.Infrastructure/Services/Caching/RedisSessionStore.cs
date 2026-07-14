@@ -3,6 +3,7 @@ using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
 using AuthCore.Domain.Users;
 using AuthCore.Infrastructure.Configurations;
+using AuthCore.Infrastructure.Observability;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
@@ -136,19 +137,21 @@ internal sealed class RedisSessionStore : ISessionStore
 
         var ttl = GetTtl(session.ExpiresAtUtc);
         var payload = Serialize(session);
-        var result = await _database.ScriptEvaluateAsync(
-            SAVE_SESSION_SCRIPT,
-            [
-                GetSessionKey(session.SessionId),
-                GetRevokedSessionKey(session.PublicSessionId),
-                GetUserSessionsKey(session.UserId)
-            ],
-            [
-                payload,
-                session.Version,
-                (long)ttl.TotalMilliseconds,
-                session.SessionId
-            ]);
+        var result = await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationEval,
+            () => _database.ScriptEvaluateAsync(
+                SAVE_SESSION_SCRIPT,
+                [
+                    GetSessionKey(session.SessionId),
+                    GetRevokedSessionKey(session.PublicSessionId),
+                    GetUserSessionsKey(session.UserId)
+                ],
+                [
+                    payload,
+                    session.Version,
+                    (long)ttl.TotalMilliseconds,
+                    session.SessionId
+                ]));
 
         return (long)result == 1;
     }
@@ -160,7 +163,9 @@ internal sealed class RedisSessionStore : ISessionStore
     /// <returns>Sessao encontrada ou nula.</returns>
     public async Task<Session?> GetByIdAsync(string sessionId)
     {
-        var sessionValue = await _database.StringGetAsync(GetSessionKey(sessionId));
+        var sessionValue = await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationGet,
+            () => _database.StringGetAsync(GetSessionKey(sessionId)));
 
         if (!sessionValue.HasValue)
             return null;
@@ -170,7 +175,9 @@ internal sealed class RedisSessionStore : ISessionStore
         if (sessionModel is null)
             return null;
 
-        if (await _database.KeyExistsAsync(GetRevokedSessionKey(sessionModel.PublicSessionId)))
+        if (await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationGet,
+            () => _database.KeyExistsAsync(GetRevokedSessionKey(sessionModel.PublicSessionId))))
         {
             await RemoveAsync(sessionId);
             return null;
@@ -187,7 +194,9 @@ internal sealed class RedisSessionStore : ISessionStore
     public async Task<IReadOnlyCollection<Session>> ListByUserIdAsync(Guid userId)
     {
         var userSessionsKey = GetUserSessionsKey(userId);
-        var sessionIds = await _database.SetMembersAsync(userSessionsKey);
+        var sessionIds = await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationGet,
+            () => _database.SetMembersAsync(userSessionsKey));
         var sessions = new List<Session>(sessionIds.Length);
 
         foreach (var sessionId in sessionIds)
@@ -197,7 +206,9 @@ internal sealed class RedisSessionStore : ISessionStore
 
             if (session is null)
             {
-                await _database.SetRemoveAsync(userSessionsKey, normalizedSessionId);
+                await RedisTelemetry.TrackAsync(
+                    RedisTelemetry.OperationDelete,
+                    () => _database.SetRemoveAsync(userSessionsKey, normalizedSessionId));
                 continue;
             }
 
@@ -221,18 +232,20 @@ internal sealed class RedisSessionStore : ISessionStore
             throw new ArgumentException("A sessao informada deve estar revogada.", nameof(session));
 
         var ttl = GetTtl(session.ExpiresAtUtc);
-        await _database.ScriptEvaluateAsync(
-            REVOKE_SESSION_SCRIPT,
-            [
-                GetRevokedSessionKey(session.PublicSessionId),
-                GetUserSessionsKey(session.UserId)
-            ],
-            [
-                session.Version,
-                (long)ttl.TotalMilliseconds,
-                session.PublicSessionId,
-                GetSessionKeyPrefix()
-            ]);
+        await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationEval,
+            () => _database.ScriptEvaluateAsync(
+                REVOKE_SESSION_SCRIPT,
+                [
+                    GetRevokedSessionKey(session.PublicSessionId),
+                    GetUserSessionsKey(session.UserId)
+                ],
+                [
+                    session.Version,
+                    (long)ttl.TotalMilliseconds,
+                    session.PublicSessionId,
+                    GetSessionKeyPrefix()
+                ]));
     }
 
     /// <summary>
@@ -242,17 +255,23 @@ internal sealed class RedisSessionStore : ISessionStore
     public async Task RemoveAsync(string sessionId)
     {
         var sessionKey = GetSessionKey(sessionId);
-        var sessionValue = await _database.StringGetAsync(sessionKey);
+        var sessionValue = await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationGet,
+            () => _database.StringGetAsync(sessionKey));
 
         if (sessionValue.HasValue)
         {
             var sessionModel = Deserialize(sessionValue);
 
             if (sessionModel is not null)
-                await _database.SetRemoveAsync(GetUserSessionsKey(sessionModel.UserId), sessionId);
+                await RedisTelemetry.TrackAsync(
+                    RedisTelemetry.OperationDelete,
+                    () => _database.SetRemoveAsync(GetUserSessionsKey(sessionModel.UserId), sessionId));
         }
 
-        await _database.KeyDeleteAsync(sessionKey);
+        await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationDelete,
+            () => _database.KeyDeleteAsync(sessionKey));
     }
 
     /// <summary>
@@ -262,7 +281,9 @@ internal sealed class RedisSessionStore : ISessionStore
     /// <param name="maximumVersion">Maior versao que pode ser removida.</param>
     public async Task RemoveWhenVersionIsNotNewerAsync(string sessionId, long maximumVersion)
     {
-        var sessionValue = await _database.StringGetAsync(GetSessionKey(sessionId));
+        var sessionValue = await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationGet,
+            () => _database.StringGetAsync(GetSessionKey(sessionId)));
 
         if (!sessionValue.HasValue)
             return;
@@ -271,20 +292,24 @@ internal sealed class RedisSessionStore : ISessionStore
 
         if (sessionModel is null)
         {
-            await _database.KeyDeleteAsync(GetSessionKey(sessionId));
+            await RedisTelemetry.TrackAsync(
+                RedisTelemetry.OperationDelete,
+                () => _database.KeyDeleteAsync(GetSessionKey(sessionId)));
             return;
         }
 
-        await _database.ScriptEvaluateAsync(
-            REMOVE_SESSION_BY_VERSION_SCRIPT,
-            [
-                GetSessionKey(sessionId),
-                GetUserSessionsKey(sessionModel.UserId)
-            ],
-            [
-                maximumVersion,
-                sessionId
-            ]);
+        await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationEval,
+            () => _database.ScriptEvaluateAsync(
+                REMOVE_SESSION_BY_VERSION_SCRIPT,
+                [
+                    GetSessionKey(sessionId),
+                    GetUserSessionsKey(sessionModel.UserId)
+                ],
+                [
+                    maximumVersion,
+                    sessionId
+                ]));
     }
 
 

@@ -1,6 +1,4 @@
-﻿using Gateway.Api;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Gateway.Api;
 using Ocelot.Middleware;
 using Shared.Observability;
 
@@ -16,8 +14,13 @@ app.MapGet("/", () => Results.Ok(new
 {
     service = "gateway",
     health = "/health",
+    live = "/health/live",
+    ready = "/health/ready",
+    dependencies = "/health/dependencies",
     authCoreHealth = "/authcore/health",
-    notificationCoreHealth = "/notificationcore/health"
+    authCoreReady = "/authcore/health/ready",
+    notificationCoreHealth = "/notificationcore/health",
+    notificationCoreReady = "/notificationcore/health/ready"
 }));
 
 app.UseForwardedHeaders();
@@ -29,21 +32,8 @@ app.UseAuthentication();
 app.UseGatewayCookieAccessToken();
 app.UseAuthorization();
 app.UseGatewayRateLimitClientIdentity();
-#pragma warning disable ASP0014
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapHealthChecks("/health", new HealthCheckOptions
-    {
-        AllowCachingResponses = false,
-        ResultStatusCodes =
-        {
-            [HealthStatus.Healthy] = StatusCodes.Status200OK,
-            [HealthStatus.Degraded] = StatusCodes.Status200OK,
-            [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
-        }
-    });
-});
-#pragma warning restore ASP0014
+app.MapStandardHealthCheckEndpoints();
+app.UseEndpoints(_ => { });
 
 await app.UseOcelot();
 await app.RunAsync();

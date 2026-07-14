@@ -56,13 +56,15 @@ services:
       AUTH__CSRF__ALLOWEDORIGINS__1: ${AUTH__CSRF__ALLOWEDORIGINS__1}
       AUTH__CSRF__ALLOWEDORIGINS__2: ${AUTH__CSRF__ALLOWEDORIGINS__2}
       AUTH__CSRF__ALLOWEDORIGINS__3: ${AUTH__CSRF__ALLOWEDORIGINS__3}
+      OBSERVABILITY__OTLPENABLED: ${OBSERVABILITY__OTLPENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     depends_on:
       authcore-postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
+        condition: service_started
     networks:
       - notificationcore-local
     restart: unless-stopped
@@ -103,6 +105,8 @@ services:
       NOTIFICATIONDISPATCHER__POLLINGINTERVALSECONDS: ${NOTIFICATIONCORE_DISPATCHER_POLLING_INTERVAL_SECONDS}
       NOTIFICATIONDISPATCHER__RETRYDELAYSECONDS: ${NOTIFICATIONCORE_DISPATCHER_RETRY_DELAY_SECONDS}
       NOTIFICATIONDISPATCHER__PROCESSINGTIMEOUTSECONDS: ${NOTIFICATIONCORE_DISPATCHER_PROCESSING_TIMEOUT_SECONDS}
+      OBSERVABILITY__OTLPENABLED: ${OBSERVABILITY__OTLPENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     depends_on:
       notificationcore-postgres:
         condition: service_healthy
@@ -135,6 +139,8 @@ services:
       AUTH__CSRF__ALLOWEDORIGINS__3: ${AUTH__CSRF__ALLOWEDORIGINS__3}
       REVERSEPROXY__KNOWNNETWORKS__0: ${REVERSEPROXY__KNOWNNETWORKS__0:-172.28.0.0/16}
       REVERSEPROXY__FORWARDLIMIT: ${REVERSEPROXY__FORWARDLIMIT:-2}
+      OBSERVABILITY__OTLPENABLED: ${OBSERVABILITY__OTLPENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     depends_on:
       authcore-api:
         condition: service_started
@@ -217,6 +223,20 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    networks:
+      - notificationcore-local
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.104.0
+    profiles:
+      - observability
+    command: ["--config=/etc/otelcol/config.yaml"]
+    ports:
+      - "127.0.0.1:${OTEL_COLLECTOR_OTLP_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${OTEL_COLLECTOR_OTLP_HTTP_PORT:-4318}:4318"
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
     networks:
       - notificationcore-local
     restart: unless-stopped

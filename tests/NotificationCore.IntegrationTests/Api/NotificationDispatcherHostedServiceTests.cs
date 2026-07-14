@@ -1,8 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using NotificationCore.Api.Observability;
 using NotificationCore.Api.Workers;
 using NotificationCore.Application.UseCases.Notifications.DispatchPendingNotification;
+using NotificationCore.Domain.Common.Repositories;
+using NotificationCore.Domain.Notifications.Aggregates;
+using NotificationCore.Domain.Notifications.Repositories;
 using NotificationCore.Infrastructure.Configurations;
 using NotificationCore.Infrastructure.Observability;
 
@@ -66,6 +70,10 @@ public sealed class NotificationDispatcherHostedServiceTests
         var services = new ServiceCollection();
 
         services.AddScoped(_ => useCase);
+        services.AddScoped<NotificationDispatchTelemetryContextReader>();
+        services.AddScoped<INotificationDispatchRepository, EmptyNotificationDispatchRepository>();
+        services.AddScoped<IInboxRepository, EmptyInboxRepository>();
+        services.AddLogging();
 
         return services.BuildServiceProvider();
     }
@@ -78,6 +86,7 @@ public sealed class NotificationDispatcherHostedServiceTests
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(options),
             new NotificationMetrics(),
+            new NotificationDispatchTelemetry(),
             NullLogger<NotificationDispatcherHostedService>.Instance);
     }
 
@@ -121,6 +130,76 @@ public sealed class NotificationDispatcherHostedServiceTests
             using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
             return await _commandReceived.Task.WaitAsync(cancellationTokenSource.Token);
+        }
+    }
+
+    private sealed class EmptyNotificationDispatchRepository : INotificationDispatchRepository
+    {
+        public Task<IReadOnlyCollection<Notification>> GetPendingForDispatchAsync(
+            DateTime dueAtUtc,
+            int take,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyCollection<Notification>>([]);
+        }
+
+        public Task<IReadOnlyCollection<Notification>> GetProcessingTimedOutAsync(
+            DateTime dueAtUtc,
+            int take,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyCollection<Notification>>([]);
+        }
+
+        public Task<bool> TryUpdateProcessingTimedOutAsync(
+            Notification notification,
+            DateTime processingTimeoutAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(false);
+        }
+    }
+
+    private sealed class EmptyInboxRepository : IInboxRepository
+    {
+        public Task<InboxProcessingStartResult> TryStartProcessingAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            string payload,
+            DateTime receivedAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(InboxProcessingStartResult.Skipped(false, 0));
+        }
+
+        public Task<string?> GetPayloadByNotificationIdempotencyKeyAsync(
+            string idempotencyKey,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<string?>(null);
+        }
+
+        public Task MarkAsProcessedAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            DateTime processedAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task MarkAsFailedAsync(
+            Guid messageId,
+            string messageType,
+            string consumerName,
+            string payload,
+            DateTime receivedAtUtc,
+            string error,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 }

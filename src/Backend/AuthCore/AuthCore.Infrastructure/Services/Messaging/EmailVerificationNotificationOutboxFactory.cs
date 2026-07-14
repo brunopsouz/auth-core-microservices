@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using AuthCore.Domain.Common.Repositories;
 using AuthCore.Domain.Passports;
 using AuthCore.Domain.Passports.Repositories;
+using Shared.Messaging.Contracts;
 using Shared.Messaging.Contracts.Notifications;
 
 namespace AuthCore.Infrastructure.Services.Messaging;
@@ -12,6 +14,8 @@ namespace AuthCore.Infrastructure.Services.Messaging;
 /// </summary>
 internal sealed class EmailVerificationNotificationOutboxFactory : IEmailVerificationNotificationOutboxFactory
 {
+    private const string CorrelationIdActivityTagName = "correlation.id";
+
     /// <summary>
     /// Operacao para criar mensagem de outbox de verificacao de e-mail.
     /// </summary>
@@ -26,10 +30,11 @@ internal sealed class EmailVerificationNotificationOutboxFactory : IEmailVerific
     {
         ArgumentNullException.ThrowIfNull(verification);
 
+        var correlationId = GetCorrelationId();
         var request = new SendTransactionalNotificationRequested
         {
             MessageId = Guid.NewGuid(),
-            CorrelationId = Guid.NewGuid().ToString("D"),
+            CorrelationId = correlationId,
             CausationId = verification.Id.ToString("D"),
             EventType = nameof(SendTransactionalNotificationRequested),
             Version = 1,
@@ -51,10 +56,38 @@ internal sealed class EmailVerificationNotificationOutboxFactory : IEmailVerific
             OccurredAtUtc = requestedAtUtc
         };
 
+        var envelope = new MessageEnvelope<SendTransactionalNotificationRequested>
+        {
+            Metadata = CreateMetadata(correlationId),
+            Payload = request
+        };
+
         return OutboxMessage.Create(
             nameof(SendTransactionalNotificationRequested),
-            JsonSerializer.Serialize(request),
+            JsonSerializer.Serialize(envelope),
             requestedAtUtc);
+    }
+
+    private static MessageEnvelopeMetadata CreateMetadata(string correlationId)
+    {
+        var activity = Activity.Current;
+
+        return new MessageEnvelopeMetadata
+        {
+            CorrelationId = correlationId,
+            TraceParent = activity?.IdFormat == ActivityIdFormat.W3C
+                ? activity.Id
+                : null,
+            TraceState = activity?.TraceStateString
+        };
+    }
+
+    private static string GetCorrelationId()
+    {
+        return Activity.Current?.GetTagItem(CorrelationIdActivityTagName) is string correlationId
+            && !string.IsNullOrWhiteSpace(correlationId)
+            ? correlationId
+            : Guid.NewGuid().ToString("D");
     }
 
     /// <summary>

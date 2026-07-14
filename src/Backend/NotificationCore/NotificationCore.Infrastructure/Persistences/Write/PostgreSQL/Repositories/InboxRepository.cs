@@ -117,7 +117,9 @@ internal sealed class InboxRepository : IInboxRepository
         const string sql = """
             SELECT "Payload"
             FROM "InboxMessages"
-            WHERE "Payload"::jsonb ->> 'IdempotencyKey' = @IdempotencyKey
+            WHERE COALESCE(
+                "Payload"::jsonb ->> 'IdempotencyKey',
+                "Payload"::jsonb -> 'Payload' ->> 'IdempotencyKey') = @IdempotencyKey
             ORDER BY "ReceivedAtUtc" ASC
             LIMIT 1;
             """;

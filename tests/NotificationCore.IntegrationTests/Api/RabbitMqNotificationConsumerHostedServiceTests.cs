@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Shared.Messaging.Contracts;
 using Shared.Messaging.Contracts.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -86,6 +87,35 @@ public sealed class RabbitMqNotificationConsumerHostedServiceTests
         Assert.Equal(Guid.Parse("0d4caa56-b276-46c8-98b5-4ab562206dea"), receivedRequest.MessageId);
         Assert.Equal("auth.email-confirmation", receivedRequest.TemplateKey);
         Assert.Equal("123456", receivedRequest.Variables["confirmationCode"]);
+
+        await hostedService.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ProcessMessage_WhenRequestUsesEnvelope_ShouldAckAndExecuteUseCase()
+    {
+        var consumer = new FakeRabbitMqNotificationConsumer();
+        var useCase = new SpyRegisterNotificationRequestUseCase();
+        await using var serviceProvider = CreateServiceProvider(useCase);
+        var hostedService = CreateHostedService(serviceProvider, consumer);
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var request = CreateRequest();
+        var envelope = new MessageEnvelope<SendTransactionalNotificationRequested>
+        {
+            Metadata = new MessageEnvelopeMetadata
+            {
+                CorrelationId = request.CorrelationId,
+                TraceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+            },
+            Payload = request
+        };
+        var disposition = await consumer.ProcessAsync(JsonSerializer.Serialize(envelope));
+
+        Assert.Equal(RabbitMqNotificationDisposition.Ack, disposition);
+        var receivedRequest = Assert.Single(useCase.Requests);
+        Assert.Equal(request.MessageId, receivedRequest.MessageId);
 
         await hostedService.StopAsync(CancellationToken.None);
     }

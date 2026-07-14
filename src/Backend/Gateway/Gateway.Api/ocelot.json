@@ -291,10 +291,70 @@
       ]
     },
     {
+      "Key": "authcore-health-live",
+      "UpstreamPathTemplate": "/authcore/health/live",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/health/live",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "authcore-api", "Port": 8080 }
+      ]
+    },
+    {
+      "Key": "authcore-health-ready",
+      "UpstreamPathTemplate": "/authcore/health/ready",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/health/ready",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "authcore-api", "Port": 8080 }
+      ]
+    },
+    {
+      "Key": "authcore-health-dependencies",
+      "UpstreamPathTemplate": "/authcore/health/dependencies",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/health/dependencies",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "authcore-api", "Port": 8080 }
+      ]
+    },
+    {
       "Key": "notificationcore-health",
       "UpstreamPathTemplate": "/notificationcore/health",
       "UpstreamHttpMethod": [ "GET" ],
       "DownstreamPathTemplate": "/health",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "notificationcore-api", "Port": 8080 }
+      ]
+    },
+    {
+      "Key": "notificationcore-health-live",
+      "UpstreamPathTemplate": "/notificationcore/health/live",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/health/live",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "notificationcore-api", "Port": 8080 }
+      ]
+    },
+    {
+      "Key": "notificationcore-health-ready",
+      "UpstreamPathTemplate": "/notificationcore/health/ready",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/health/ready",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "notificationcore-api", "Port": 8080 }
+      ]
+    },
+    {
+      "Key": "notificationcore-health-dependencies",
+      "UpstreamPathTemplate": "/notificationcore/health/dependencies",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/health/dependencies",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         { "Host": "notificationcore-api", "Port": 8080 }

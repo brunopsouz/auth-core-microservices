@@ -24,4 +24,19 @@ public sealed class DispatchPendingNotificationResult
     /// Quantidade de notificações finalizadas sem entrega.
     /// </summary>
     public int DeadLettered { get; init; }
+
+    /// <summary>
+    /// Quantidade de retries agendados para verificação de e-mail.
+    /// </summary>
+    public int EmailVerificationRetries { get; init; }
+
+    /// <summary>
+    /// Quantidade de retries agendados para e-mail de teste.
+    /// </summary>
+    public int TestEmailRetries { get; init; }
+
+    /// <summary>
+    /// Quantidade de retries agendados para demais transacionais.
+    /// </summary>
+    public int OtherTransactionalRetries { get; init; }
 }

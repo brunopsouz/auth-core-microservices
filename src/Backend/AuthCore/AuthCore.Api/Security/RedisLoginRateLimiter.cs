@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using AuthCore.Infrastructure.Observability;
 using AuthCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -87,10 +88,16 @@ internal sealed class RedisLoginRateLimiter : ILoginRateLimiter
     /// <returns>Valor do contador após o incremento.</returns>
     private async Task<long> IncrementWithExpirationAsync(string key, TimeSpan window)
     {
-        var count = await _database.StringIncrementAsync(key);
+        var count = await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationSet,
+            () => _database.StringIncrementAsync(key));
 
         if (count == 1)
-            await _database.KeyExpireAsync(key, window);
+        {
+            await RedisTelemetry.TrackAsync(
+                RedisTelemetry.OperationExpire,
+                () => _database.KeyExpireAsync(key, window));
+        }
 
         return count;
     }
@@ -102,7 +109,9 @@ internal sealed class RedisLoginRateLimiter : ILoginRateLimiter
     /// <returns>Tempo restante para nova tentativa.</returns>
     private async Task<TimeSpan> GetRetryAfterAsync(string key)
     {
-        var ttl = await _database.KeyTimeToLiveAsync(key);
+        var ttl = await RedisTelemetry.TrackAsync(
+            RedisTelemetry.OperationGet,
+            () => _database.KeyTimeToLiveAsync(key));
 
         if (ttl is null || ttl <= TimeSpan.Zero)
             return TimeSpan.FromSeconds(1);

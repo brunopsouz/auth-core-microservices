@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
+using NotificationCore.Api.Observability;
 using NotificationCore.Application.UseCases.Notifications.DispatchPendingNotification;
 using NotificationCore.Infrastructure.Configurations;
 using NotificationCore.Infrastructure.Observability;
@@ -20,6 +21,10 @@ internal sealed class NotificationDispatcherHostedService : BackgroundService
     /// </summary>
     private readonly NotificationMetrics _notificationMetrics;
     /// <summary>
+    /// Campo que armazena notification dispatch telemetry.
+    /// </summary>
+    private readonly NotificationDispatchTelemetry _notificationDispatchTelemetry;
+    /// <summary>
     /// Campo que armazena notification dispatcher options.
     /// </summary>
     private readonly NotificationDispatcherOptions _notificationDispatcherOptions;
@@ -36,20 +41,24 @@ internal sealed class NotificationDispatcherHostedService : BackgroundService
     /// <param name="notificationDispatcherOptions">Opções do despachante de notificações.</param>
     /// <param name="notificationMetrics">Métricas de notificações.</param>
     /// <param name="logger">Serviço de logging.</param>
+    /// <param name="notificationDispatchTelemetry">Telemetria técnica do despacho.</param>
     public NotificationDispatcherHostedService(
         IServiceScopeFactory serviceScopeFactory,
         IOptions<NotificationDispatcherOptions> notificationDispatcherOptions,
         NotificationMetrics notificationMetrics,
+        NotificationDispatchTelemetry notificationDispatchTelemetry,
         ILogger<NotificationDispatcherHostedService> logger)
     {
         ArgumentNullException.ThrowIfNull(serviceScopeFactory);
         ArgumentNullException.ThrowIfNull(notificationDispatcherOptions);
         ArgumentNullException.ThrowIfNull(notificationMetrics);
+        ArgumentNullException.ThrowIfNull(notificationDispatchTelemetry);
         ArgumentNullException.ThrowIfNull(logger);
 
         _serviceScopeFactory = serviceScopeFactory;
         _notificationDispatcherOptions = notificationDispatcherOptions.Value;
         _notificationMetrics = notificationMetrics;
+        _notificationDispatchTelemetry = notificationDispatchTelemetry;
         _logger = logger;
     }
 
@@ -79,11 +88,20 @@ internal sealed class NotificationDispatcherHostedService : BackgroundService
 
                 await using var scope = _serviceScopeFactory.CreateAsyncScope();
                 var useCase = scope.ServiceProvider.GetRequiredService<IDispatchPendingNotificationUseCase>();
-                var result = await useCase.Execute(CreateCommand(stoppingToken));
+                var contextReader = scope.ServiceProvider.GetRequiredService<NotificationDispatchTelemetryContextReader>();
+                var command = CreateCommand(stoppingToken);
+                var contexts = await contextReader.ReadAsync(command);
+                var result = await _notificationDispatchTelemetry.TrackAsync(
+                    contexts,
+                    () => useCase.Execute(command),
+                    stoppingToken);
 
                 _notificationMetrics.RecordPending(result.Found);
                 _notificationMetrics.RecordSent(result.Sent);
                 _notificationMetrics.RecordFailed(result.DeadLettered);
+                _notificationMetrics.RecordEmailVerificationRetries(result.EmailVerificationRetries);
+                _notificationMetrics.RecordTestEmailRetries(result.TestEmailRetries);
+                _notificationMetrics.RecordOtherTransactionalRetries(result.OtherTransactionalRetries);
 
                 _logger.LogInformation(
                     "Ciclo de despacho de notificações concluído. Found={Found}, Sent={Sent}, RetryScheduled={RetryScheduled}, DeadLettered={DeadLettered}.",
