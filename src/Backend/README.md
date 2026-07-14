@@ -112,7 +112,10 @@ Cada contexto possui seu proprio banco PostgreSQL em desenvolvimento, preservand
 | RabbitMQ | Transporte de mensagens assincronas entre AuthCore e NotificationCore. |
 | Servico SMTP | Envio real de e-mails por provedor configurado via variaveis `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME` e demais chaves SMTP do `.env.development`. |
 | Docker Compose | Sobe bancos, Redis, RabbitMQ, Gateway e APIs conforme o modo de execucao. |
+| OpenTelemetry Collector | Receiver OTLP opcional para validar traces, métricas e logs localmente via profile `observability`. |
 | FluentMigrator | Versiona e aplica mudancas de schema de cada contexto. |
+
+O guia operacional de observabilidade fica em [../../docs/observability.md](../../docs/observability.md).
 
 ## Servicos
 
@@ -345,6 +348,16 @@ Subir a aplicacao completa via Docker Compose:
 ```bash
 ./run.sh docker
 ```
+
+Subir a aplicação completa com OpenTelemetry Collector opcional:
+
+```bash
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability up --build
+```
+
+O Collector recebe OTLP por gRPC em `localhost:4317` e HTTP em `localhost:4318`, usando o exporter `debug` para inspeção local dos três sinais. As APIs enviam para `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` quando `OBSERVABILITY__OTLPENABLED=true`. O serviço não é dependência das APIs; subir sem o profile ou parar o Collector não encerra os serviços.
+
+Para manter o Collector opcional, o exemplo de ambiente deixa `OBSERVABILITY__OTLPENABLED=false`. Altere para `true` no `.env.development` apenas quando for executar com `--profile observability`.
 
 Encerrar containers:
 

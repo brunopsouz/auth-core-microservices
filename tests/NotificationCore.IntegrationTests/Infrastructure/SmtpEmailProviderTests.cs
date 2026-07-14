@@ -1,4 +1,7 @@
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
@@ -12,6 +15,31 @@ using SystemAuthenticationException = System.Security.Authentication.Authenticat
 
 public sealed class SmtpEmailProviderTests
 {
+    [Fact]
+    public async Task SendAsync_WhenLoopbackSmtpAcceptsMessage_ShouldReturnSuccessWithoutExternalServer()
+    {
+        await using var server = await LoopbackSmtpServer.StartAsync();
+        var provider = new SmtpEmailProvider(
+            Options.Create(new SmtpOptions
+            {
+                Host = "127.0.0.1",
+                Port = server.Port,
+                Username = string.Empty,
+                Password = "smtp-password-sentinel-observability",
+                UseTls = false,
+                SenderEmail = "notifications@example.com",
+                SenderName = "NotificationCore",
+                TimeoutSeconds = 10
+            }),
+            new MailKitSmtpClientFactory());
+
+        var result = await provider.SendAsync(CreateSentinelMessage());
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("smtp-subject-sentinel-observability", server.Data, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("smtp-body-sentinel-observability", server.Data, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task SendAsync_WhenSmtpSendSucceeds_ShouldReturnSuccessAndUseConfiguredSender()
     {
@@ -111,7 +139,8 @@ public sealed class SmtpEmailProviderTests
                 SenderName = "NotificationCore",
                 TimeoutSeconds = 10
             }),
-            new FakeSmtpClientFactory(smtpClient));
+            new FakeSmtpClientFactory(smtpClient),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SmtpEmailProvider>.Instance);
     }
 
     private static EmailProviderMessage CreateMessage()
@@ -124,6 +153,19 @@ public sealed class SmtpEmailProviderTests
             Subject = "Confirme seu e-mail",
             HtmlBody = "<p>Seu código é 123456.</p>",
             TextBody = "Seu código é 123456."
+        };
+    }
+
+    private static EmailProviderMessage CreateSentinelMessage()
+    {
+        return new EmailProviderMessage
+        {
+            NotificationId = Guid.Parse("2d2b1eb0-7db5-4077-bb03-09c815ecde78"),
+            CorrelationId = "correlation-123",
+            Recipient = "smtp-recipient-sentinel@example.invalid",
+            Subject = "smtp-subject-sentinel-observability",
+            HtmlBody = "<p>smtp-body-sentinel-observability smtp-token-sentinel-observability</p>",
+            TextBody = "smtp-body-sentinel-observability smtp-token-sentinel-observability"
         };
     }
 
@@ -221,6 +263,123 @@ public sealed class SmtpEmailProviderTests
             Disposed = true;
 
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class LoopbackSmtpServer : IAsyncDisposable
+    {
+        private readonly CancellationTokenSource _cancellationTokenSource = new();
+        private readonly TcpListener _listener;
+        private readonly Task _serverTask;
+
+        private LoopbackSmtpServer(TcpListener listener)
+        {
+            _listener = listener;
+            Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            _serverTask = AcceptAsync(_cancellationTokenSource.Token);
+        }
+
+        public int Port { get; }
+
+        public string Data { get; private set; } = string.Empty;
+
+        public static Task<LoopbackSmtpServer> StartAsync()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, port: 0);
+            listener.Start();
+
+            return Task.FromResult(new LoopbackSmtpServer(listener));
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _cancellationTokenSource.CancelAsync();
+            _listener.Stop();
+
+            try
+            {
+                await _serverTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (SocketException)
+            {
+            }
+
+            _cancellationTokenSource.Dispose();
+        }
+
+        private async Task AcceptAsync(CancellationToken cancellationToken)
+        {
+            using var client = await _listener.AcceptTcpClientAsync(cancellationToken);
+            await using var stream = client.GetStream();
+            using var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
+            await using var writer = new StreamWriter(stream, Encoding.ASCII, leaveOpen: true)
+            {
+                NewLine = "\r\n",
+                AutoFlush = true
+            };
+
+            await writer.WriteLineAsync("220 localhost ESMTP");
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(cancellationToken);
+
+                if (line is null)
+                    return;
+
+                if (line.StartsWith("EHLO", StringComparison.OrdinalIgnoreCase)
+                    || line.StartsWith("HELO", StringComparison.OrdinalIgnoreCase))
+                {
+                    await writer.WriteLineAsync("250-localhost");
+                    await writer.WriteLineAsync("250 OK");
+                    continue;
+                }
+
+                if (line.StartsWith("MAIL FROM", StringComparison.OrdinalIgnoreCase)
+                    || line.StartsWith("RCPT TO", StringComparison.OrdinalIgnoreCase))
+                {
+                    await writer.WriteLineAsync("250 OK");
+                    continue;
+                }
+
+                if (line.StartsWith("DATA", StringComparison.OrdinalIgnoreCase))
+                {
+                    await writer.WriteLineAsync("354 End data with <CR><LF>.<CR><LF>");
+                    Data = await ReadDataAsync(reader, cancellationToken);
+                    await writer.WriteLineAsync("250 queued");
+                    continue;
+                }
+
+                if (line.StartsWith("QUIT", StringComparison.OrdinalIgnoreCase))
+                {
+                    await writer.WriteLineAsync("221 bye");
+                    return;
+                }
+
+                await writer.WriteLineAsync("250 OK");
+            }
+        }
+
+        private static async Task<string> ReadDataAsync(
+            StreamReader reader,
+            CancellationToken cancellationToken)
+        {
+            var builder = new StringBuilder();
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(cancellationToken);
+
+                if (line is null || line == ".")
+                    break;
+
+                builder.AppendLine(line);
+            }
+
+            return builder.ToString();
         }
     }
 }

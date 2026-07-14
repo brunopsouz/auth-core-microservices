@@ -122,7 +122,6 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IEmailProvider>(serviceProvider => new SmtpEmailProvider(
             serviceProvider.GetRequiredService<IOptions<SmtpOptions>>(),
             serviceProvider.GetRequiredService<ISmtpClientFactory>(),
-            serviceProvider.GetRequiredService<NotificationMetrics>(),
             serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<SmtpEmailProvider>>()));
     }
 

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Shared.Messaging.Contracts;
 using Shared.Messaging.Contracts.Notifications;
 using Shared.Messaging.Contracts.Security;
 using Microsoft.Extensions.Options;
@@ -91,11 +92,11 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
         RabbitMqNotificationMessage message,
         CancellationToken cancellationToken)
     {
-        SendTransactionalNotificationRequested? request;
+        ParsedNotificationMessage? parsedMessage;
 
         try
         {
-            request = DeserializeRequest(message);
+            parsedMessage = DeserializeRequest(message);
         }
         catch (JsonException exception)
         {
@@ -110,7 +111,7 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
             return RabbitMqNotificationDisposition.DeadLetter;
         }
 
-        if (request is null)
+        if (parsedMessage?.Request is null)
         {
             _logger.LogWarning(
                 "Mensagem RabbitMQ de notificação vazia. MessageId={MessageId}, CorrelationId={CorrelationId}.",
@@ -120,6 +121,7 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
             return RabbitMqNotificationDisposition.DeadLetter;
         }
 
+        var request = parsedMessage.Request;
         using var loggingScope = _logger.BeginScope(new Dictionary<string, object?>
         {
             ["correlationId"] = request.CorrelationId,
@@ -138,6 +140,7 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
             var result = await useCase.Execute(new RegisterNotificationRequestCommand
             {
                 Request = request,
+                OriginalPayload = parsedMessage.OriginalPayload,
                 CancellationToken = cancellationToken
             });
 
@@ -196,11 +199,28 @@ internal sealed class RabbitMqNotificationConsumerHostedService : BackgroundServ
     /// </summary>
     /// <param name="message">Mensagem consumida do RabbitMQ.</param>
     /// <returns>Solicitação transacional consumida.</returns>
-    private static SendTransactionalNotificationRequested? DeserializeRequest(RabbitMqNotificationMessage message)
+    private static ParsedNotificationMessage? DeserializeRequest(RabbitMqNotificationMessage message)
     {
         var json = Encoding.UTF8.GetString(message.Body);
+        var envelope = JsonSerializer.Deserialize<MessageEnvelope<SendTransactionalNotificationRequested>>(
+            json,
+            _jsonSerializerOptions);
 
-        return JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(json, _jsonSerializerOptions);
+        if (envelope?.Payload is not null)
+        {
+            return new ParsedNotificationMessage(
+                envelope.Payload,
+                json);
+        }
+
+        var request = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(json, _jsonSerializerOptions);
+
+        return request is null
+            ? null
+            : new ParsedNotificationMessage(request, json);
     }
 
+    private sealed record ParsedNotificationMessage(
+        SendTransactionalNotificationRequested Request,
+        string OriginalPayload);
 }

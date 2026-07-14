@@ -72,6 +72,9 @@ public sealed class DispatchPendingNotificationUseCaseTests
         Assert.Equal(0, result.Sent);
         Assert.Equal(1, result.RetryScheduled);
         Assert.Equal(0, result.DeadLettered);
+        Assert.Equal(1, result.EmailVerificationRetries);
+        Assert.Equal(0, result.TestEmailRetries);
+        Assert.Equal(0, result.OtherTransactionalRetries);
         Assert.Equal(NotificationStatus.RetryScheduled, notification.Status);
         Assert.True(notification.ScheduledAtUtc > notification.RequestedAtUtc);
         Assert.Equal(DeliveryAttemptStatus.Failed, attempt.Status);
@@ -496,7 +499,7 @@ public sealed class DispatchPendingNotificationUseCaseTests
         {
             var payload = _payloads.SingleOrDefault(payload =>
             {
-                var request = JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(payload);
+                var request = DeserializeRequest(payload);
 
                 return request?.IdempotencyKey == idempotencyKey;
             });
@@ -529,6 +532,13 @@ public sealed class DispatchPendingNotificationUseCaseTests
         public void Store(string payload)
         {
             _payloads.Add(payload);
+        }
+
+        private static SendTransactionalNotificationRequested? DeserializeRequest(string payload)
+        {
+            var envelope = JsonSerializer.Deserialize<Shared.Messaging.Contracts.MessageEnvelope<SendTransactionalNotificationRequested>>(payload);
+
+            return envelope?.Payload ?? JsonSerializer.Deserialize<SendTransactionalNotificationRequested>(payload);
         }
     }
 

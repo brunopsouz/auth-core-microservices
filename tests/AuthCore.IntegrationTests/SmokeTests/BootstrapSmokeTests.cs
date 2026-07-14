@@ -30,6 +30,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Shared.Observability;
 
 namespace AuthCore.IntegrationTests.SmokeTests;
 
@@ -66,6 +67,9 @@ public sealed class BootstrapSmokeTests
             .GetRequiredService<IOptionsMonitor<GoogleOptions>>()
             .Get("Google");
         var healthCheckService = scope.ServiceProvider.GetService<HealthCheckService>();
+        var healthCheckOptions = scope.ServiceProvider
+            .GetRequiredService<IOptions<HealthCheckServiceOptions>>()
+            .Value;
         var outboxProcessor = scope.ServiceProvider.GetService<IOutboxProcessor>();
         var notificationRequestPublisher = scope.ServiceProvider.GetService<INotificationRequestPublisher>();
         var dataProtectionProvider = scope.ServiceProvider.GetService<IDataProtectionProvider>();
@@ -107,6 +111,10 @@ public sealed class BootstrapSmokeTests
             googleAuthenticationOptions,
             """{"verified_email":true}""");
         Assert.NotNull(healthCheckService);
+        AssertHealthCheck(healthCheckOptions, "self", "live", "ready");
+        AssertHealthCheck(healthCheckOptions, "postgresql", "ready", "dependency", "critical");
+        AssertHealthCheck(healthCheckOptions, "redis", "ready", "dependency", "critical");
+        Assert.DoesNotContain(healthCheckOptions.Registrations, registration => registration.Name == "rabbitmq");
         Assert.NotNull(outboxProcessor);
         Assert.NotNull(notificationRequestPublisher);
         Assert.NotNull(dataProtectionProvider);
@@ -117,6 +125,33 @@ public sealed class BootstrapSmokeTests
             "RedisXmlRepository",
             keyManagementOptions.XmlRepository?.GetType().Name);
         Assert.Contains(hostedServices, service => service.GetType().Name == "OutboxHostedService");
+    }
+
+    private static void AssertHealthCheck(
+        HealthCheckServiceOptions options,
+        string name,
+        params string[] tags)
+    {
+        var registration = Assert.Single(options.Registrations.Where(candidate => candidate.Name == name));
+
+        foreach (var tag in tags)
+            Assert.Contains(tag, registration.Tags);
+    }
+
+    [Fact]
+    public void AddApi_WhenOutboxIsEnabled_ShouldRegisterRabbitMqAsOptionalDependency()
+    {
+        var builder = WebApplication.CreateBuilder();
+
+        builder.Configuration.AddInMemoryCollection(CreateConfigurationValues(outboxEnabled: "true"));
+        builder.Services.AddApi(builder.Configuration);
+
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var healthCheckOptions = serviceProvider
+            .GetRequiredService<IOptions<HealthCheckServiceOptions>>()
+            .Value;
+
+        AssertHealthCheck(healthCheckOptions, "rabbitmq", "dependency", "optional");
     }
 
     [Fact]
@@ -235,7 +270,7 @@ public sealed class BootstrapSmokeTests
         app.UseCors("AuthCoreBrowserSession");
         app.UseAuthentication();
         app.UseAuthorization();
-        app.MapHealthChecks("/health");
+        app.MapStandardHealthCheckEndpoints();
         app.MapControllers();
         app.Urls.Add("http://127.0.0.1:0");
 
@@ -260,7 +295,7 @@ public sealed class BootstrapSmokeTests
         await app.StopAsync();
     }
 
-    private static Dictionary<string, string?> CreateConfigurationValues()
+    private static Dictionary<string, string?> CreateConfigurationValues(string outboxEnabled = "false")
     {
         return new Dictionary<string, string?>
         {
@@ -294,7 +329,7 @@ public sealed class BootstrapSmokeTests
             ["RabbitMq:RoutingKey"] = "notification.email.requested",
             ["RabbitMq:Queue"] = "notification.email.requests",
             ["RabbitMq:DeadLetterQueue"] = "notification.email.requests.dlq",
-            ["Outbox:Enabled"] = "false",
+            ["Outbox:Enabled"] = outboxEnabled,
             ["Outbox:BatchSize"] = "20",
             ["Outbox:PollingIntervalSeconds"] = "10",
             ["Outbox:MaxAttempts"] = "5"

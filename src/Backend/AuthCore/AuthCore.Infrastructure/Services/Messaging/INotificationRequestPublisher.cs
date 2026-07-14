@@ -1,4 +1,5 @@
 using Shared.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts;
 
 namespace AuthCore.Infrastructure.Services.Messaging;
 
@@ -16,5 +17,6 @@ public interface INotificationRequestPublisher
     Task PublishAsync(
         SendTransactionalNotificationRequested request,
         string payload,
+        MessageEnvelopeMetadata? metadata,
         CancellationToken cancellationToken = default);
 }

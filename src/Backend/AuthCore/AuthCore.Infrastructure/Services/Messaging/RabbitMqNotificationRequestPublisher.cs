@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using System.Text;
 using Shared.Messaging.Contracts.Notifications;
+using Shared.Messaging.Contracts;
 using AuthCore.Infrastructure.Configurations;
+using AuthCore.Infrastructure.Observability;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
@@ -51,6 +54,7 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
     public Task PublishAsync(
         SendTransactionalNotificationRequested request,
         string payload,
+        MessageEnvelopeMetadata? metadata,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -67,39 +71,53 @@ internal sealed class RabbitMqNotificationRequestPublisher : INotificationReques
             ["channel"] = request.Channel
         });
 
-        using var connection = CreateConnection(_options);
-        using var channel = connection.CreateModel();
+        using var activity = RabbitMqTelemetry.StartPublishActivity(metadata);
 
-        DeclareTopology(channel, _options);
-        channel.ConfirmSelect();
+        try
+        {
+            using var connection = CreateConnection(_options);
+            using var channel = connection.CreateModel();
 
-        var properties = channel.CreateBasicProperties();
-        properties.ContentType = "application/json";
-        properties.DeliveryMode = 2;
-        properties.MessageId = request.MessageId.ToString("D");
-        properties.CorrelationId = request.CorrelationId;
-        properties.Type = request.EventType;
-        properties.Timestamp = new AmqpTimestamp(new DateTimeOffset(GetOccurredAtUtc(request)).ToUnixTimeSeconds());
+            DeclareTopology(channel, _options);
+            channel.ConfirmSelect();
 
-        var body = Encoding.UTF8.GetBytes(payload);
+            var properties = channel.CreateBasicProperties();
+            properties.ContentType = "application/json";
+            properties.DeliveryMode = 2;
+            properties.MessageId = request.MessageId.ToString("D");
+            properties.CorrelationId = request.CorrelationId;
+            properties.Type = request.EventType;
+            properties.Timestamp = new AmqpTimestamp(new DateTimeOffset(GetOccurredAtUtc(request)).ToUnixTimeSeconds());
+            RabbitMqTelemetry.InjectTraceContext(properties, metadata);
 
-        channel.BasicPublish(
-            exchange: _options.Exchange,
-            routingKey: _options.RoutingKey,
-            mandatory: false,
-            basicProperties: properties,
-            body: body);
+            var body = Encoding.UTF8.GetBytes(payload);
 
-        channel.WaitForConfirmsOrDie(PublishConfirmationTimeout);
+            channel.BasicPublish(
+                exchange: _options.Exchange,
+                routingKey: _options.RoutingKey,
+                mandatory: false,
+                basicProperties: properties,
+                body: body);
 
-        _logger.LogInformation(
-            "Solicitação de notificação publicada. Exchange={Exchange}, RoutingKey={RoutingKey}, MessageId={MessageId}, CorrelationId={CorrelationId}, Source={Source}, TemplateKey={TemplateKey}.",
-            _options.Exchange,
-            _options.RoutingKey,
-            request.MessageId,
-            request.CorrelationId,
-            request.Source,
-            request.TemplateKey);
+            channel.WaitForConfirmsOrDie(PublishConfirmationTimeout);
+            RabbitMqTelemetry.RecordPublished(succeeded: true);
+
+            _logger.LogInformation(
+                "Solicitação de notificação publicada. Exchange={Exchange}, RoutingKey={RoutingKey}, MessageId={MessageId}, CorrelationId={CorrelationId}, Source={Source}, TemplateKey={TemplateKey}.",
+                _options.Exchange,
+                _options.RoutingKey,
+                request.MessageId,
+                request.CorrelationId,
+                request.Source,
+                request.TemplateKey);
+        }
+        catch (Exception exception)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error);
+            activity?.SetTag("error.type", RabbitMqTelemetry.MapErrorType(exception));
+            RabbitMqTelemetry.RecordPublished(succeeded: false);
+            throw;
+        }
 
         return Task.CompletedTask;
     }

@@ -6,6 +6,7 @@ COPY ["Backend/AuthCore/AuthCore.Application/AuthCore.Application.csproj", "Back
 COPY ["Backend/AuthCore/AuthCore.Domain/AuthCore.Domain.csproj", "Backend/AuthCore/AuthCore.Domain/"]
 COPY ["Backend/AuthCore/AuthCore.Infrastructure/AuthCore.Infrastructure.csproj", "Backend/AuthCore/AuthCore.Infrastructure/"]
 COPY ["Shared/Messaging.Contracts/Messaging.Contracts.csproj", "Shared/Messaging.Contracts/"]
+COPY ["Shared/Observability/Shared.Observability.csproj", "Shared/Observability/"]
 
 RUN dotnet restore "Backend/AuthCore/AuthCore.Api/AuthCore.Api.csproj"
 

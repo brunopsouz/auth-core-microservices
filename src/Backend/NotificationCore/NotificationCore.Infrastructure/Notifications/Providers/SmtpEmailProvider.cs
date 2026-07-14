@@ -42,10 +42,6 @@ internal sealed class SmtpEmailProvider : IEmailProvider
     /// </summary>
     private readonly ILogger<SmtpEmailProvider> _logger;
     /// <summary>
-    /// Campo que armazena notification metrics.
-    /// </summary>
-    private readonly NotificationMetrics _notificationMetrics;
-    /// <summary>
     /// Campo que armazena smtp client factory.
     /// </summary>
     private readonly ISmtpClientFactory _smtpClientFactory;
@@ -66,7 +62,6 @@ internal sealed class SmtpEmailProvider : IEmailProvider
         : this(
             options,
             smtpClientFactory,
-            new NotificationMetrics(),
             NullLogger<SmtpEmailProvider>.Instance)
     {
     }
@@ -74,17 +69,14 @@ internal sealed class SmtpEmailProvider : IEmailProvider
     internal SmtpEmailProvider(
         IOptions<SmtpOptions> options,
         ISmtpClientFactory smtpClientFactory,
-        NotificationMetrics notificationMetrics,
         ILogger<SmtpEmailProvider> logger)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(smtpClientFactory);
-        ArgumentNullException.ThrowIfNull(notificationMetrics);
         ArgumentNullException.ThrowIfNull(logger);
 
         _options = options;
         _smtpClientFactory = smtpClientFactory;
-        _notificationMetrics = notificationMetrics;
         _logger = logger;
     }
 
@@ -101,7 +93,11 @@ internal sealed class SmtpEmailProvider : IEmailProvider
     {
         ArgumentNullException.ThrowIfNull(message);
 
+        var options = _options.Value;
         var stopwatch = Stopwatch.StartNew();
+        var telemetryResult = "failure";
+        Exception? telemetryException = null;
+        using var activity = SmtpTelemetry.StartSendActivity(options.Host, options.Port);
         using var scope = _logger.BeginScope(new Dictionary<string, object?>
         {
             ["correlationId"] = message.CorrelationId,
@@ -111,7 +107,6 @@ internal sealed class SmtpEmailProvider : IEmailProvider
 
         try
         {
-            var options = _options.Value;
             var mimeMessage = CreateMimeMessage(options, message);
 
             await using var client = _smtpClientFactory.Create();
@@ -141,10 +136,18 @@ internal sealed class SmtpEmailProvider : IEmailProvider
                 message.CorrelationId,
                 PROVIDER);
 
+            telemetryResult = "success";
             return EmailProviderResult.Success(PROVIDER, NormalizeProviderMessageId(mimeMessage.MessageId));
+        }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            telemetryResult = "cancelled";
+            telemetryException = exception;
+            throw;
         }
         catch (Exception exception) when (IsPermanentFailure(exception))
         {
+            telemetryException = exception;
             _logger.LogWarning(
                 "Falha permanente no envio SMTP. NotificationId={NotificationId}, CorrelationId={CorrelationId}, Provider={Provider}, ExceptionType={ExceptionType}.",
                 message.NotificationId,
@@ -159,6 +162,7 @@ internal sealed class SmtpEmailProvider : IEmailProvider
         }
         catch (Exception exception) when (IsTemporaryFailure(exception))
         {
+            telemetryException = exception;
             _logger.LogWarning(
                 "Falha temporária no envio SMTP. NotificationId={NotificationId}, CorrelationId={CorrelationId}, Provider={Provider}, ExceptionType={ExceptionType}.",
                 message.NotificationId,
@@ -171,8 +175,9 @@ internal sealed class SmtpEmailProvider : IEmailProvider
                 GetErrorCode(exception),
                 TEMPORARY_FAILURE_MESSAGE);
         }
-        catch
+        catch (Exception exception)
         {
+            telemetryException = exception;
             _logger.LogWarning(
                 "Falha permanente não classificada no envio SMTP. NotificationId={NotificationId}, CorrelationId={CorrelationId}, Provider={Provider}.",
                 message.NotificationId,
@@ -187,7 +192,7 @@ internal sealed class SmtpEmailProvider : IEmailProvider
         finally
         {
             stopwatch.Stop();
-            _notificationMetrics.RecordSendDuration(stopwatch.Elapsed, PROVIDER);
+            SmtpTelemetry.CompleteSend(activity, stopwatch.Elapsed, telemetryResult, telemetryException);
         }
     }
 

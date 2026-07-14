@@ -347,8 +347,7 @@ public sealed class ExternalAuthControllerIntegrationTests
         IAuthenticationService? authenticationService = null,
         ILogger<GoogleExternalAuthenticationFlow>? logger = null,
         IExternalReturnUrlValidator? returnUrlValidator = null,
-        ICompleteGoogleLoginUseCase? useCase = null,
-        TimeProvider? timeProvider = null)
+        ICompleteGoogleLoginUseCase? useCase = null)
     {
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Headers.UserAgent = "AuthCore.IntegrationTests";
@@ -373,8 +372,7 @@ public sealed class ExternalAuthControllerIntegrationTests
             returnUrlValidator ?? new StubExternalReturnUrlValidator(),
             new GoogleExternalLoginCommandFactory(),
             googleOnboardingTicketStore,
-            new ExternalAuthenticationMetrics(),
-            timeProvider ?? TimeProvider.System,
+            new AuthBusinessMetrics(),
             logger ?? new SpyLogger<GoogleExternalAuthenticationFlow>());
 
         return new ExternalAuthController(

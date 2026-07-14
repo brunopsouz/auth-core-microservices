@@ -2,7 +2,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using FluentMigrator.Runner;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
@@ -30,6 +29,7 @@ using NotificationCore.Infrastructure.Observability;
 using NotificationCore.Infrastructure.Persistences.Read.PostgreSQL.Repositories;
 using NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.Repositories;
 using NotificationCore.Infrastructure.Persistences.Write.PostgreSQL.UnitOfWork;
+using Shared.Observability;
 
 namespace NotificationCore.IntegrationTests.SmokeTests;
 
@@ -139,9 +139,21 @@ public sealed class BootstrapSmokeTests
         Assert.IsType<RabbitMqNotificationConsumer>(rabbitMqConsumer);
         Assert.Contains(hostedServices, hostedService => hostedService is RabbitMqNotificationConsumerHostedService);
         Assert.Contains(hostedServices, hostedService => hostedService is NotificationDispatcherHostedService);
-        Assert.Contains(healthCheckOptions.Registrations, registration => registration.Name == "postgresql");
-        Assert.Contains(healthCheckOptions.Registrations, registration => registration.Name == "rabbitmq");
-        Assert.Contains(healthCheckOptions.Registrations, registration => registration.Name == "dispatcher");
+        AssertHealthCheck(healthCheckOptions, "self", "live", "ready");
+        AssertHealthCheck(healthCheckOptions, "postgresql", "ready", "dependency", "critical");
+        AssertHealthCheck(healthCheckOptions, "rabbitmq", "ready", "dependency", "critical");
+        AssertHealthCheck(healthCheckOptions, "smtp", "dependency", "optional");
+    }
+
+    private static void AssertHealthCheck(
+        HealthCheckServiceOptions options,
+        string name,
+        params string[] tags)
+    {
+        var registration = Assert.Single(options.Registrations.Where(candidate => candidate.Name == name));
+
+        foreach (var tag in tags)
+            Assert.Contains(tag, registration.Tags);
     }
 
     [Fact]
@@ -170,15 +182,7 @@ public sealed class BootstrapSmokeTests
         await using var app = builder.Build();
 
         app.UseExceptionHandler();
-        app.MapHealthChecks("/health", new HealthCheckOptions
-        {
-            AllowCachingResponses = false,
-            ResultStatusCodes =
-            {
-                [HealthStatus.Healthy] = StatusCodes.Status200OK,
-                [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
-            }
-        });
+        app.MapStandardHealthCheckEndpoints();
         app.MapControllers();
         app.Urls.Add("http://127.0.0.1:0");
 
@@ -192,7 +196,7 @@ public sealed class BootstrapSmokeTests
             .Single();
 
         using var httpClient = new HttpClient();
-        using var response = await httpClient.GetAsync($"{address}/health");
+        using var response = await httpClient.GetAsync($"{address}/health/live");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 

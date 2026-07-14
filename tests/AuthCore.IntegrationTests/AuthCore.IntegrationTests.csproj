@@ -32,6 +32,7 @@
     <ProjectReference Include="..\..\src\Backend\AuthCore\AuthCore.Api\AuthCore.Api.csproj" />
     <ProjectReference Include="..\..\src\Backend\AuthCore\AuthCore.Application\AuthCore.Application.csproj" />
     <ProjectReference Include="..\..\src\Backend\AuthCore\AuthCore.Infrastructure\AuthCore.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Backend\NotificationCore\NotificationCore.Infrastructure\NotificationCore.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Shared\Messaging.Contracts\Messaging.Contracts.csproj" />
   </ItemGroup>
 

@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NotificationCore.Infrastructure.Configurations;
+using NotificationCore.Infrastructure.Observability;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -115,6 +117,8 @@ internal sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsum
             ["deliveryTag"] = eventArgs.DeliveryTag
         });
 
+        using var activity = RabbitMqTelemetry.StartConsumeActivity(eventArgs.BasicProperties);
+
         try
         {
             var message = new RabbitMqNotificationMessage(
@@ -124,13 +128,19 @@ internal sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsum
             var disposition = await handler(message, cancellationToken);
 
             ApplyDisposition(eventArgs.DeliveryTag, disposition);
+            RabbitMqTelemetry.RecordConsumed(RabbitMqTelemetry.NormalizeResult(disposition));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            activity?.SetStatus(ActivityStatusCode.Error);
+            activity?.SetTag("error.type", "cancelled");
             Nack(eventArgs.DeliveryTag, requeue: true);
+            RabbitMqTelemetry.RecordConsumed("requeue");
         }
         catch (Exception exception)
         {
+            activity?.SetStatus(ActivityStatusCode.Error);
+            activity?.SetTag("error.type", RabbitMqTelemetry.MapErrorType(exception));
             _logger.LogError(
                 exception,
                 "Falha inesperada ao consumir mensagem RabbitMQ. DeliveryTag={DeliveryTag}, MessageId={MessageId}, CorrelationId={CorrelationId}.",
@@ -139,6 +149,7 @@ internal sealed class RabbitMqNotificationConsumer : IRabbitMqNotificationConsum
                 eventArgs.BasicProperties?.CorrelationId);
 
             Nack(eventArgs.DeliveryTag, requeue: true);
+            RabbitMqTelemetry.RecordConsumed("failure");
         }
     }
 

@@ -1,7 +1,10 @@
 using NotificationCore.Api.Exceptions;
 using NotificationCore.Api.HealthChecks;
+using NotificationCore.Api.Observability;
 using NotificationCore.Api.Workers;
+using NotificationCore.Infrastructure.Configurations;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Shared.Observability;
 
 namespace NotificationCore.Api;
@@ -25,18 +28,61 @@ public static class ApiDependencyInjection
         services.AddControllers();
         services.AddExceptionHandler<ApiExceptionHandler>();
         services.AddSingleton<UnhandledExceptionMetrics>();
+        services.AddSingleton<NotificationDispatchTelemetry>();
+        services.AddScoped<NotificationDispatchTelemetryContextReader>();
         services.AddProblemDetails();
         services.AddEndpointsApiExplorer();
         services.AddRouting(options => options.LowercaseUrls = true);
-        services.AddHealthChecks()
-            .AddCheck<DatabaseHealthCheck>("postgresql")
-            .AddCheck<RabbitMqHealthCheck>("rabbitmq")
-            .AddCheck<NotificationDispatcherHealthCheck>("dispatcher");
+        AddHealthChecks(services, configuration);
         services.AddHostedService<RabbitMqNotificationConsumerHostedService>();
         services.AddHostedService<NotificationDispatcherHostedService>();
         AddSwagger(services);
 
         return services;
+    }
+
+    private static void AddHealthChecks(IServiceCollection services, IConfiguration configuration)
+    {
+        var timeout = GetDependencyTimeout(configuration);
+        var rabbitMqOptions = configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>()
+            ?? new RabbitMqOptions();
+        var dispatcherOptions = configuration.GetSection(NotificationDispatcherOptions.SectionName).Get<NotificationDispatcherOptions>()
+            ?? new NotificationDispatcherOptions();
+        var healthChecks = services.AddHealthChecks()
+            .AddCheck(
+                "self",
+                () => HealthCheckResult.Healthy(),
+                tags: [HealthCheckTags.Live, HealthCheckTags.Ready])
+            .AddCheck<DatabaseHealthCheck>(
+                "postgresql",
+                failureStatus: HealthStatus.Unhealthy,
+                tags: [HealthCheckTags.Ready, HealthCheckTags.Dependency, HealthCheckTags.Critical],
+                timeout: timeout);
+
+        if (rabbitMqOptions.Enabled)
+        {
+            healthChecks.AddCheck<RabbitMqHealthCheck>(
+                "rabbitmq",
+                failureStatus: HealthStatus.Unhealthy,
+                tags: [HealthCheckTags.Ready, HealthCheckTags.Dependency, HealthCheckTags.Critical],
+                timeout: timeout);
+        }
+
+        if (dispatcherOptions.Enabled)
+        {
+            healthChecks.AddCheck<SmtpHealthCheck>(
+                "smtp",
+                failureStatus: HealthStatus.Degraded,
+                tags: [HealthCheckTags.Dependency, HealthCheckTags.Optional],
+                timeout: timeout);
+        }
+    }
+
+    private static TimeSpan GetDependencyTimeout(IConfiguration configuration)
+    {
+        var seconds = configuration.GetValue("HealthChecks:DependencyTimeoutSeconds", 5);
+
+        return TimeSpan.FromSeconds(Math.Clamp(seconds, 1, 30));
     }
 
 

@@ -65,7 +65,13 @@ public sealed class OcelotRouteTests
         Assert.Contains(routes, route => IsRoute(route, "/api/templates/{everything}", "DELETE", requiresAuthentication: true));
         Assert.Contains(routes, route => IsRoute(route, "/api/templates/{everything}", "OPTIONS", requiresAuthentication: true));
         Assert.Contains(routes, route => IsRoute(route, "/authcore/health", "GET", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/authcore/health/live", "GET", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/authcore/health/ready", "GET", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/authcore/health/dependencies", "GET", requiresAuthentication: false));
         Assert.Contains(routes, route => IsRoute(route, "/notificationcore/health", "GET", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/notificationcore/health/live", "GET", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/notificationcore/health/ready", "GET", requiresAuthentication: false));
+        Assert.Contains(routes, route => IsRoute(route, "/notificationcore/health/dependencies", "GET", requiresAuthentication: false));
     }
 
     [Fact]
@@ -122,7 +128,13 @@ public sealed class OcelotRouteTests
         AssertRouteRateLimit(routes, "/api/notifications/test-email", 5, "1m", 60);
 
         AssertHealthRouteIsNotRateLimited(routes, "/authcore/health");
+        AssertHealthRouteIsNotRateLimited(routes, "/authcore/health/live");
+        AssertHealthRouteIsNotRateLimited(routes, "/authcore/health/ready");
+        AssertHealthRouteIsNotRateLimited(routes, "/authcore/health/dependencies");
         AssertHealthRouteIsNotRateLimited(routes, "/notificationcore/health");
+        AssertHealthRouteIsNotRateLimited(routes, "/notificationcore/health/live");
+        AssertHealthRouteIsNotRateLimited(routes, "/notificationcore/health/ready");
+        AssertHealthRouteIsNotRateLimited(routes, "/notificationcore/health/dependencies");
     }
 
     [Fact]

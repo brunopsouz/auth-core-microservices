@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Shared.Observability;
@@ -60,7 +61,7 @@ public static class ApiDependencyInjection
         services.AddScoped<IAuthenticatedUserAccessValidator, AuthenticatedUserAccessValidator>();
         services.AddSingleton<IGoogleExternalLoginCommandFactory, GoogleExternalLoginCommandFactory>();
         services.AddScoped<IGoogleExternalAuthenticationFlow, GoogleExternalAuthenticationFlow>();
-        services.AddSingleton<ExternalAuthenticationMetrics>();
+        services.AddSingleton<AuthBusinessMetrics>();
         services.AddScoped<IExternalAuthenticationOptionsProvider, ConfiguredExternalAuthenticationOptionsProvider>();
         services.AddScoped<IAuthenticatedSessionContext>(serviceProvider =>
         {
@@ -79,16 +80,51 @@ public static class ApiDependencyInjection
                 policy.Requirements.Add(new ActiveSessionRequirement());
             });
         });
-        services.AddHealthChecks()
-            .AddCheck<DatabaseHealthCheck>("postgresql")
-            .AddCheck<RedisHealthCheck>("redis")
-            .AddCheck<OutboxHealthCheck>("outbox");
+        AddHealthChecks(services, configuration);
         services.AddHostedService<OutboxHostedService>();
 
         AddAuthentication(services, configuration);
         AddSwagger(services);
 
         return services;
+    }
+
+    private static void AddHealthChecks(IServiceCollection services, IConfiguration configuration)
+    {
+        var timeout = GetDependencyTimeout(configuration);
+        var outboxOptions = configuration.GetSection(OutboxOptions.SectionName).Get<OutboxOptions>()
+            ?? new OutboxOptions();
+        var healthChecks = services.AddHealthChecks()
+            .AddCheck(
+                "self",
+                () => HealthCheckResult.Healthy(),
+                tags: [HealthCheckTags.Live, HealthCheckTags.Ready])
+            .AddCheck<DatabaseHealthCheck>(
+                "postgresql",
+                failureStatus: HealthStatus.Unhealthy,
+                tags: [HealthCheckTags.Ready, HealthCheckTags.Dependency, HealthCheckTags.Critical],
+                timeout: timeout)
+            .AddCheck<RedisHealthCheck>(
+                "redis",
+                failureStatus: HealthStatus.Unhealthy,
+                tags: [HealthCheckTags.Ready, HealthCheckTags.Dependency, HealthCheckTags.Critical],
+                timeout: timeout);
+
+        if (outboxOptions.Enabled)
+        {
+            healthChecks.AddCheck<RabbitMqHealthCheck>(
+                "rabbitmq",
+                failureStatus: HealthStatus.Degraded,
+                tags: [HealthCheckTags.Dependency, HealthCheckTags.Optional],
+                timeout: timeout);
+        }
+    }
+
+    private static TimeSpan GetDependencyTimeout(IConfiguration configuration)
+    {
+        var seconds = configuration.GetValue("HealthChecks:DependencyTimeoutSeconds", 5);
+
+        return TimeSpan.FromSeconds(Math.Clamp(seconds, 1, 30));
     }
 
     /// <summary>

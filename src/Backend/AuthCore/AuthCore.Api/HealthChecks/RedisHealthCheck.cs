@@ -39,15 +39,17 @@ internal sealed class RedisHealthCheck : IHealthCheck
         try
         {
             if (!_connectionMultiplexer.IsConnected)
-                return HealthCheckResult.Unhealthy("Redis não está conectado.");
+                return new HealthCheckResult(context.Registration.FailureStatus);
 
-            await _connectionMultiplexer.GetDatabase().PingAsync();
+            await _connectionMultiplexer.GetDatabase()
+                .PingAsync()
+                .WaitAsync(cancellationToken);
 
-            return HealthCheckResult.Healthy("Redis acessível.");
+            return HealthCheckResult.Healthy();
         }
-        catch (Exception exception)
+        catch
         {
-            return HealthCheckResult.Unhealthy("Falha ao validar a conectividade com o Redis.", exception);
+            return new HealthCheckResult(context.Registration.FailureStatus);
         }
     }
 }

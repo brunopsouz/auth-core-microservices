@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using AuthCore.Api.Observability;
 using AuthCore.Api.Security;
+using AuthCore.Application.Common.Exceptions;
 using AuthCore.Application.UseCases.Authentication.ExternalLogin;
+using AuthCore.Domain.Common.Exceptions;
 using Microsoft.AspNetCore.Authentication;
 
 namespace AuthCore.Api.Authentication;
@@ -14,10 +16,8 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
     private const string ExternalCallbackFailedRedirectUrl =
         "/auth/error?reason=external_callback_failed";
     private const string ExternalCallbackFailedReason = "external_callback_failed";
-    private const string FailureResult = "failure";
     private const string GoogleCompletionPath = "/api/auth/external/google/complete";
     private const string MissingRequiredClaimsReason = "missing_required_claims";
-    private const string SuccessResult = "success";
 
     private readonly IAuthenticationCookieWriter _authenticationCookieWriter;
     private readonly ICompleteGoogleLoginUseCase _completeGoogleLoginUseCase;
@@ -25,8 +25,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
     private readonly IGoogleExternalLoginCommandFactory _googleExternalLoginCommandFactory;
     private readonly IGoogleOnboardingTicketStore _googleOnboardingTicketStore;
     private readonly ILogger<GoogleExternalAuthenticationFlow> _logger;
-    private readonly ExternalAuthenticationMetrics _metrics;
-    private readonly TimeProvider _timeProvider;
+    private readonly AuthBusinessMetrics _metrics;
 
     /// <summary>
     /// Operacao para criar instancia da classe.
@@ -36,8 +35,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
     /// <param name="externalReturnUrlValidator">Validador da URL de retorno.</param>
     /// <param name="googleExternalLoginCommandFactory">Fabrica do comando de login Google.</param>
     /// <param name="googleOnboardingTicketStore">Store do ticket temporario de onboarding Google.</param>
-    /// <param name="metrics">Metricas do fluxo de autenticacao externa.</param>
-    /// <param name="timeProvider">Provedor de tempo do fluxo.</param>
+    /// <param name="metrics">Métricas dos fluxos de autenticação.</param>
     /// <param name="logger">Logger do fluxo de autenticacao externa.</param>
     public GoogleExternalAuthenticationFlow(
         IAuthenticationCookieWriter authenticationCookieWriter,
@@ -45,8 +43,7 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         IExternalReturnUrlValidator externalReturnUrlValidator,
         IGoogleExternalLoginCommandFactory googleExternalLoginCommandFactory,
         IGoogleOnboardingTicketStore googleOnboardingTicketStore,
-        ExternalAuthenticationMetrics metrics,
-        TimeProvider timeProvider,
+        AuthBusinessMetrics metrics,
         ILogger<GoogleExternalAuthenticationFlow> logger)
     {
         ArgumentNullException.ThrowIfNull(authenticationCookieWriter);
@@ -55,7 +52,6 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         ArgumentNullException.ThrowIfNull(googleExternalLoginCommandFactory);
         ArgumentNullException.ThrowIfNull(googleOnboardingTicketStore);
         ArgumentNullException.ThrowIfNull(metrics);
-        ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(logger);
 
         _authenticationCookieWriter = authenticationCookieWriter;
@@ -64,7 +60,6 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         _googleExternalLoginCommandFactory = googleExternalLoginCommandFactory;
         _googleOnboardingTicketStore = googleOnboardingTicketStore;
         _metrics = metrics;
-        _timeProvider = timeProvider;
         _logger = logger;
     }
 
@@ -78,7 +73,6 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         _googleOnboardingTicketStore.Delete(httpContext.Response);
 
         var safeReturnUrl = _externalReturnUrlValidator.Validate(returnUrl);
-        _metrics.RecordGoogleLoginStarted();
         _logger.LogInformation(
             "GoogleLoginStarted. TraceId={TraceId}, HasReturnUrl={HasReturnUrl}.",
             Activity.Current?.TraceId.ToString(),
@@ -102,7 +96,6 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         ArgumentNullException.ThrowIfNull(httpContext);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var startedAtUtc = _timeProvider.GetUtcNow();
         var externalAuthentication = await httpContext.AuthenticateAsync(
             ExternalAuthenticationDefaults.ExternalScheme);
 
@@ -112,7 +105,6 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         {
             return await CompleteFailureAsync(
                 httpContext,
-                startedAtUtc,
                 ExternalCallbackFailedReason);
         }
 
@@ -128,14 +120,27 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         {
             return await CompleteFailureAsync(
                 httpContext,
-                startedAtUtc,
                 MissingRequiredClaimsReason);
         }
 
         await httpContext.SignOutAsync(ExternalAuthenticationDefaults.ExternalScheme);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var result = await _completeGoogleLoginUseCase.Execute(command, cancellationToken);
+        CompleteGoogleLoginResult result;
+        try
+        {
+            result = await _completeGoogleLoginUseCase.Execute(command, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            RecordGoogleAttempt(AuthBusinessMetrics.ResultCancelled, AuthBusinessMetrics.ReasonCancelled);
+            throw;
+        }
+        catch (AuthCoreException exception)
+        {
+            RecordGoogleAttempt(AuthBusinessMetrics.ResultFailure, NormalizeProjectExceptionReason(exception));
+            throw;
+        }
 
         if (result.Session is not null)
         {
@@ -154,8 +159,9 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
                     command.PictureUrl));
         }
 
-        _metrics.RecordGoogleLoginSucceeded(result.RequiresOnboarding);
-        RecordDuration(startedAtUtc, SuccessResult);
+        if (result.Session is not null)
+            RecordGoogleAttempt(AuthBusinessMetrics.ResultSuccess, AuthBusinessMetrics.ReasonNone);
+
         _logger.LogInformation(
             "GoogleLoginSucceeded. TraceId={TraceId}, UserIdentifier={UserIdentifier}, RequiresOnboarding={RequiresOnboarding}.",
             Activity.Current?.TraceId.ToString(),
@@ -167,18 +173,15 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
 
     private async Task<GoogleExternalAuthenticationResult> CompleteFailureAsync(
         HttpContext httpContext,
-        DateTimeOffset startedAtUtc,
         string reason)
     {
         await httpContext.SignOutAsync(ExternalAuthenticationDefaults.ExternalScheme);
 
-        if (reason.Equals(ExternalCallbackFailedReason, StringComparison.Ordinal))
-            _metrics.RecordGoogleLoginCancelled();
-
-        _metrics.RecordGoogleLoginFailed(reason);
-        RecordDuration(startedAtUtc, reason.Equals(ExternalCallbackFailedReason, StringComparison.Ordinal)
-            ? "cancelled"
-            : FailureResult);
+        RecordGoogleAttempt(
+            reason.Equals(ExternalCallbackFailedReason, StringComparison.Ordinal)
+                ? AuthBusinessMetrics.ResultCancelled
+                : AuthBusinessMetrics.ResultFailure,
+            NormalizeGoogleFailureReason(reason));
         _logger.LogWarning(
             "GoogleLoginFailed. TraceId={TraceId}, FailureReason={FailureReason}.",
             Activity.Current?.TraceId.ToString(),
@@ -187,8 +190,31 @@ internal sealed class GoogleExternalAuthenticationFlow : IGoogleExternalAuthenti
         return new GoogleExternalAuthenticationResult(ExternalCallbackFailedRedirectUrl);
     }
 
-    private void RecordDuration(DateTimeOffset startedAtUtc, string result)
+    private void RecordGoogleAttempt(string result, string reason)
     {
-        _metrics.RecordGoogleCallbackDuration(_timeProvider.GetUtcNow() - startedAtUtc, result);
+        _metrics.RecordAuthenticationAttempt(AuthBusinessMetrics.FlowGoogleSession, result, reason);
+    }
+
+    private static string NormalizeGoogleFailureReason(string reason)
+    {
+        return reason switch
+        {
+            ExternalCallbackFailedReason => AuthBusinessMetrics.ReasonCancelled,
+            MissingRequiredClaimsReason => AuthBusinessMetrics.ReasonValidationError,
+            _ => AuthBusinessMetrics.ReasonUnknown
+        };
+    }
+
+    private static string NormalizeProjectExceptionReason(AuthCoreException exception)
+    {
+        return exception switch
+        {
+            ValidationException => AuthBusinessMetrics.ReasonValidationError,
+            ForbiddenException => AuthBusinessMetrics.ReasonUserInactive,
+            UnauthorizedException => AuthBusinessMetrics.ReasonInvalidCredentials,
+            ConflictException => AuthBusinessMetrics.ReasonValidationError,
+            NotFoundException => AuthBusinessMetrics.ReasonUnknown,
+            _ => AuthBusinessMetrics.ReasonUnknown
+        };
     }
 }

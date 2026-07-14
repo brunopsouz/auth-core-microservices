@@ -1,6 +1,5 @@
-using System.Data;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using NotificationCore.Infrastructure.Abstractions.Data;
+using Npgsql;
 
 namespace NotificationCore.Api.HealthChecks;
 
@@ -10,20 +9,20 @@ namespace NotificationCore.Api.HealthChecks;
 internal sealed class DatabaseHealthCheck : IHealthCheck
 {
     /// <summary>
-    /// Campo que armazena db connection factory.
+    /// Campo que armazena a fonte de dados PostgreSQL.
     /// </summary>
-    private readonly IDbConnectionFactory _dbConnectionFactory;
+    private readonly NpgsqlDataSource _dataSource;
 
 
     /// <summary>
     /// Operação para criar instância da classe.
     /// </summary>
-    /// <param name="dbConnectionFactory">Fábrica de conexões abertas do banco.</param>
-    public DatabaseHealthCheck(IDbConnectionFactory dbConnectionFactory)
+    /// <param name="dataSource">Fonte de dados PostgreSQL compartilhada.</param>
+    public DatabaseHealthCheck(NpgsqlDataSource dataSource)
     {
-        ArgumentNullException.ThrowIfNull(dbConnectionFactory);
+        ArgumentNullException.ThrowIfNull(dataSource);
 
-        _dbConnectionFactory = dbConnectionFactory;
+        _dataSource = dataSource;
     }
 
 
@@ -41,15 +40,17 @@ internal sealed class DatabaseHealthCheck : IHealthCheck
 
         try
         {
-            using var connection = await _dbConnectionFactory.CreateOpenConnectionAsync(cancellationToken);
+            await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1";
 
-            return connection.State == ConnectionState.Open
-                ? HealthCheckResult.Healthy("Banco de dados acessível.")
-                : HealthCheckResult.Unhealthy("Conexão com o banco de dados não foi aberta.");
+            _ = await command.ExecuteScalarAsync(cancellationToken);
+
+            return HealthCheckResult.Healthy();
         }
-        catch (Exception exception)
+        catch
         {
-            return HealthCheckResult.Unhealthy("Falha ao validar a conectividade com o banco de dados.", exception);
+            return new HealthCheckResult(context.Registration.FailureStatus);
         }
     }
 }

@@ -10,11 +10,12 @@ namespace NotificationCore.Api.HealthChecks;
 /// </summary>
 internal sealed class RabbitMqHealthCheck : IHealthCheck
 {
+    private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(5);
+
     /// <summary>
     /// Campo que armazena options.
     /// </summary>
     private readonly RabbitMqOptions _options;
-
 
     /// <summary>
     /// Operação para criar instância da classe.
@@ -27,47 +28,59 @@ internal sealed class RabbitMqHealthCheck : IHealthCheck
         _options = options.Value;
     }
 
-
     /// <summary>
     /// Operação para verificar a saúde da conectividade com o RabbitMQ.
     /// </summary>
     /// <param name="context">Contexto da execução do health check.</param>
     /// <param name="cancellationToken">Token para cancelamento da operação.</param>
     /// <returns>Resultado do health check executado.</returns>
-    public Task<HealthCheckResult> CheckHealthAsync(
+    public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         if (!_options.Enabled)
-            return Task.FromResult(HealthCheckResult.Healthy("RabbitMQ desabilitado por configuração."));
+            return HealthCheckResult.Healthy();
 
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            await Task.Run(
+                    () =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
 
-            var factory = new ConnectionFactory
-            {
-                HostName = _options.Host,
-                Port = _options.Port,
-                VirtualHost = _options.VirtualHost,
-                UserName = _options.Username,
-                Password = _options.Password,
-                AutomaticRecoveryEnabled = false
-            };
+                        var factory = CreateConnectionFactory();
+                        using var connection = factory.CreateConnection();
+                        using var channel = connection.CreateModel();
 
-            using var connection = factory.CreateConnection();
-            using var channel = connection.CreateModel();
+                        if (!connection.IsOpen || !channel.IsOpen)
+                            throw new InvalidOperationException("RabbitMQ health check failed.");
+                    },
+                    cancellationToken)
+                .WaitAsync(cancellationToken);
 
-            return Task.FromResult(
-                connection.IsOpen && channel.IsOpen
-                    ? HealthCheckResult.Healthy("RabbitMQ acessível.")
-                    : HealthCheckResult.Unhealthy("Conexão com o RabbitMQ não foi aberta."));
+            return HealthCheckResult.Healthy();
         }
-        catch (Exception exception)
+        catch
         {
-            return Task.FromResult(HealthCheckResult.Unhealthy("Falha ao validar a conectividade com o RabbitMQ.", exception));
+            return new HealthCheckResult(context.Registration.FailureStatus);
         }
+    }
+
+    private ConnectionFactory CreateConnectionFactory()
+    {
+        return new ConnectionFactory
+        {
+            HostName = _options.Host,
+            Port = _options.Port,
+            VirtualHost = _options.VirtualHost,
+            UserName = _options.Username,
+            Password = _options.Password,
+            AutomaticRecoveryEnabled = false,
+            RequestedConnectionTimeout = ConnectionTimeout,
+            SocketReadTimeout = ConnectionTimeout,
+            SocketWriteTimeout = ConnectionTimeout
+        };
     }
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Shared.Messaging.Contracts;
 using Shared.Messaging.Contracts.Notifications;
 using AuthCore.Domain.Common.DomainEvents;
 using AuthCore.Domain.Common.Repositories;
@@ -31,8 +32,44 @@ public sealed class OutboxProcessorTests
         Assert.Single(publisher.PublishedMessages);
         Assert.Equal(notificationRequest.MessageId, publisher.PublishedMessages[0].Request.MessageId);
         Assert.Equal(payload, publisher.PublishedMessages[0].Payload);
+        Assert.Null(publisher.PublishedMessages[0].Metadata);
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.NotNull(outboxRepository.UpdatedMessages[0].ProcessedAtUtc);
+    }
+
+    [Fact]
+    public async Task ProcessPendingAsync_WhenNotificationRequestUsesEnvelope_ShouldPublishPayloadWithMetadata()
+    {
+        var notificationRequest = CreateNotificationRequest("user@example.com", "123456");
+        var envelope = new MessageEnvelope<SendTransactionalNotificationRequested>
+        {
+            Metadata = new MessageEnvelopeMetadata
+            {
+                CorrelationId = notificationRequest.CorrelationId,
+                TraceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+                TraceState = "vendor=value"
+            },
+            Payload = notificationRequest
+        };
+        var payload = JsonSerializer.Serialize(envelope);
+        var message = OutboxMessage.Create(
+            nameof(SendTransactionalNotificationRequested),
+            payload,
+            DateTime.UtcNow);
+        var outboxRepository = new FakeOutboxRepository(message);
+        var publisher = new SpyNotificationRequestPublisher();
+        var processor = CreateProcessor(outboxRepository, publisher);
+
+        var result = await processor.ProcessPendingAsync();
+
+        var published = Assert.Single(publisher.PublishedMessages);
+        Assert.Equal(1, result.ProcessedCount);
+        Assert.Equal(0, result.FailedCount);
+        Assert.Equal(notificationRequest.MessageId, published.Request.MessageId);
+        Assert.Equal(payload, published.Payload);
+        Assert.NotNull(published.Metadata);
+        Assert.Equal(envelope.Metadata.TraceParent, published.Metadata.TraceParent);
+        Assert.Equal(envelope.Metadata.TraceState, published.Metadata.TraceState);
     }
 
     [Fact]
@@ -62,6 +99,7 @@ public sealed class OutboxProcessorTests
         Assert.Equal("user@example.com", publisher.PublishedMessages[0].Request.Recipient);
         Assert.Equal("123456", publisher.PublishedMessages[0].Request.Variables["confirmationCode"]);
         Assert.Contains("auth-email-confirmation-legacy", publisher.PublishedMessages[0].Request.IdempotencyKey);
+        Assert.Null(publisher.PublishedMessages[0].Metadata);
         Assert.Single(outboxRepository.UpdatedMessages);
         Assert.NotNull(outboxRepository.UpdatedMessages[0].ProcessedAtUtc);
     }
@@ -256,19 +294,21 @@ public sealed class OutboxProcessorTests
 
     private sealed class SpyNotificationRequestPublisher : INotificationRequestPublisher
     {
-        public List<(SendTransactionalNotificationRequested Request, string Payload)> PublishedMessages { get; } = [];
+        public List<(SendTransactionalNotificationRequested Request, string Payload, MessageEnvelopeMetadata? Metadata)>
+            PublishedMessages { get; } = [];
 
         public Exception? ExceptionToThrow { get; init; }
 
         public Task PublishAsync(
             SendTransactionalNotificationRequested request,
             string payload,
+            MessageEnvelopeMetadata? metadata,
             CancellationToken cancellationToken = default)
         {
             if (ExceptionToThrow is not null)
                 throw ExceptionToThrow;
 
-            PublishedMessages.Add((request, payload));
+            PublishedMessages.Add((request, payload, metadata));
             return Task.CompletedTask;
         }
     }
