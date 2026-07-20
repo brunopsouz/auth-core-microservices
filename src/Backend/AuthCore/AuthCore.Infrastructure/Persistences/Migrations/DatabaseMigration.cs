@@ -72,6 +72,7 @@ internal static class DatabaseMigration
         }
 
         targetBuilder.Database = adminDatabase;
+        targetBuilder.Pooling = false;
 
         await using var connection = new NpgsqlConnection(targetBuilder.ConnectionString);
         await connection.OpenAsync(cancellationToken);

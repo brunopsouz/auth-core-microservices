@@ -216,7 +216,7 @@ public static class InfrastructureDependencyInjection
     /// <param name="configuration">Configuração da aplicação.</param>
     private static void AddMigrations(IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = GetPostgreSqlConnectionString(configuration);
+        var connectionString = BuildMigrationConnectionString(GetPostgreSqlConnectionString(configuration));
 
         services
             .AddFluentMigratorCore()
@@ -452,6 +452,19 @@ public static class InfrastructureDependencyInjection
             ApplicationName = string.IsNullOrWhiteSpace(configured.ApplicationName)
                 ? applicationName
                 : configured.ApplicationName
+        };
+
+        return builder.ConnectionString;
+    }
+
+    private static string BuildMigrationConnectionString(string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("Database connection string was not configured.");
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = false
         };
 
         return builder.ConnectionString;
