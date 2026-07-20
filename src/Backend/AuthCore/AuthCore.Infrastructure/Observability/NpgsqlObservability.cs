@@ -9,7 +9,6 @@ internal static class NpgsqlObservability
 {
     private static readonly string[] MetricTagKeys =
     [
-        "db.client.connection.pool.name",
         "db.system.name",
         "server.address",
         "server.port",

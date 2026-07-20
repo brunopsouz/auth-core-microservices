@@ -1,0 +1,53 @@
+apiVersion: 1
+
+prune: true
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+
+  - name: Jaeger
+    uid: jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: false
+
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -2m
+        spanEndTimeShift: 2m
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: '{$${__tags}} | trace_id = "$${__trace.traceId}"'
+        tags:
+          - key: service.name
+            value: service_name
+          - key: deployment.environment.name
+            value: deployment_environment_name
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        - name: TraceID
+          datasourceUid: jaeger
+          matcherRegex: '(?:TraceId|trace_id|traceid)["=: ]+([A-Fa-f0-9]{32})'
+          url: '$${__value.raw}'

@@ -112,7 +112,7 @@ Cada contexto possui seu proprio banco PostgreSQL em desenvolvimento, preservand
 | RabbitMQ | Transporte de mensagens assincronas entre AuthCore e NotificationCore. |
 | Servico SMTP | Envio real de e-mails por provedor configurado via variaveis `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME` e demais chaves SMTP do `.env.development`. |
 | Docker Compose | Sobe bancos, Redis, RabbitMQ, Gateway e APIs conforme o modo de execucao. |
-| OpenTelemetry Collector | Receiver OTLP opcional para validar traces, métricas e logs localmente via profile `observability`. |
+| OpenTelemetry Collector, Prometheus, Jaeger, Loki e Grafana | Stack local opcional para receber, armazenar e visualizar métricas, traces e logs via profile `observability`. |
 | FluentMigrator | Versiona e aplica mudancas de schema de cada contexto. |
 
 O guia operacional de observabilidade fica em [../../docs/observability.md](../../docs/observability.md).
@@ -349,15 +349,15 @@ Subir a aplicacao completa via Docker Compose:
 ./run.sh docker
 ```
 
-Subir a aplicação completa com OpenTelemetry Collector opcional:
+Subir o ambiente completo com a stack local de observabilidade:
 
 ```bash
-docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability up --build
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability up -d --build
 ```
 
-O Collector recebe OTLP por gRPC em `localhost:4317` e HTTP em `localhost:4318`, usando o exporter `debug` para inspeção local dos três sinais. As APIs enviam para `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` quando `OBSERVABILITY__OTLPENABLED=true`. O serviço não é dependência das APIs; subir sem o profile ou parar o Collector não encerra os serviços.
+O Collector recebe OTLP por gRPC em `localhost:4317` e HTTP em `localhost:4318`, expõe métricas em `localhost:8889/metrics`, envia traces para Jaeger e envia logs para Loki. O Prometheus fica em `localhost:9090`, o Jaeger em `localhost:16686`, o Loki em `localhost:3100` e o Grafana em `localhost:3000`. As credenciais do Grafana devem ser preenchidas apenas no `.env.development` local. As APIs enviam para `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` quando `OBSERVABILITY__OTLPENABLED=true`. A stack é operacional e não deve virar dependência de readiness das APIs.
 
-Para manter o Collector opcional, o exemplo de ambiente deixa `OBSERVABILITY__OTLPENABLED=false`. Altere para `true` no `.env.development` apenas quando for executar com `--profile observability`.
+Para manter o exporter OTLP opcional, o exemplo de ambiente deixa `OBSERVABILITY__OTLPENABLED=false`. Altere para `true` no `.env.development` apenas quando for executar com `--profile observability`.
 
 Encerrar containers:
 

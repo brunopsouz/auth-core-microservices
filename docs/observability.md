@@ -50,7 +50,7 @@ Por padrão, requisições bem-sucedidas, client errors e health checks não ger
 
 O log padronizado de conclusão de requisição não deve conter body, query string, headers sensíveis, cookies, tokens, senha, e-mail, payload de mensagem, connection string, SQL, parâmetros SQL, stack trace ou conteúdo SMTP.
 
-Logs gerais da aplicação também são enviados ao provider OpenTelemetry quando o exporter OTLP de logs está habilitado. Portanto, a validação de segurança precisa cobrir request logs e logs emitidos por publishers, workers, providers e exception handlers. O Collector local com exporter `debug` imprime esses logs no stdout do container; use apenas em ambiente local e sem dados reais de usuário.
+Logs gerais da aplicação também são enviados ao provider OpenTelemetry quando o exporter OTLP de logs está habilitado. Portanto, a validação de segurança precisa cobrir request logs e logs emitidos por publishers, workers, providers e exception handlers. A stack local documentada nesta seção envia métricas para Prometheus, traces para Jaeger e logs para Loki por meio do OpenTelemetry Collector.
 
 ## Traces
 
@@ -149,43 +149,165 @@ AuthCore registra `self`, PostgreSQL, Redis e RabbitMQ quando a Outbox está hab
 
 O Collector nunca é dependência de readiness.
 
-## Execução Local
+## Stack local de observabilidade
 
-Sem Collector:
+A stack local de observabilidade segue o fluxo:
 
-```bash
-./run.sh docker
+```text
+Aplicações .NET
+  -> OTLP gRPC/HTTP
+  -> OpenTelemetry Collector
+    -> métricas -> Prometheus -> Grafana
+    -> traces   -> Jaeger     -> Grafana
+    -> logs     -> Loki       -> Grafana
 ```
 
-Com Collector opcional:
+Responsabilidades:
+
+- OpenTelemetry SDK: permanece nos hosts e continua responsável por instrumentar logs, traces e métricas. O exporter OTLP é habilitado por `OBSERVABILITY__OTLPENABLED=true`.
+- OpenTelemetry Collector: recebe OTLP/gRPC e OTLP/HTTP, aplica `memory_limiter` e `batch`, expõe métricas em formato Prometheus, encaminha traces para Jaeger por OTLP/gRPC e encaminha logs para Loki por OTLP/HTTP.
+- Prometheus: coleta o exporter Prometheus do Collector e armazena métricas locais por sete dias.
+- Jaeger: armazena e consulta traces em modo all-in-one local com armazenamento em memória.
+- Loki: armazena logs locais em single binary com filesystem, structured metadata e retenção configurada.
+- Grafana: consulta Prometheus, Jaeger e Loki com data sources provisionados por arquivo e correlação trace/log.
+
+Versões locais fixas:
+
+| Componente | Imagem |
+| --- | --- |
+| OpenTelemetry Collector | `otel/opentelemetry-collector-contrib:0.104.0` |
+| Prometheus | `prom/prometheus:v2.53.0` |
+| Grafana | `grafana/grafana:11.1.0` |
+| Jaeger | `jaegertracing/jaeger:2.19.0` |
+| Loki | `grafana/loki:3.5.7` |
+
+Arquivos operacionais:
+
+| Finalidade | Arquivo |
+| --- | --- |
+| Collector | `src/Backend/observability/otel-collector/otel-collector.yml` |
+| Prometheus | `src/Backend/observability/prometheus/prometheus.yml` |
+| Loki | `src/Backend/observability/loki/loki.yml` |
+| Data sources Grafana | `src/Backend/observability/grafana/provisioning/datasources/prometheus.yml` |
+| Provider de dashboards | `src/Backend/observability/grafana/provisioning/dashboards/providers.yml` |
+| Dashboard | `src/Backend/observability/grafana/dashboards/authcore-overview.json` |
+
+Componentes e portas locais:
+
+| Componente | Responsabilidade | Porta local |
+| --- | --- | ---: |
+| Grafana | Visualização e correlação | 3000 |
+| Prometheus | Métricas | 9090 |
+| Jaeger | Traces | 16686 |
+| Loki | Logs | 3100 |
+| OTel Collector | Recepção e roteamento OTLP | 4317, 4318, 8889, 13133 |
+
+Como iniciar a stack completa com observabilidade:
 
 ```bash
-docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability up --build
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability up -d
 ```
 
-Antes de usar o profile de observabilidade, altere no `.env.development`:
+Esse comando também sobe os serviços sem profile do `docker-compose.yml`, incluindo APIs, bancos, Redis e RabbitMQ. Use-o quando quiser executar o ambiente local completo com Collector, Prometheus, Jaeger, Loki e Grafana.
+
+Como iniciar a stack completa com rebuild das APIs:
+
+```bash
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability up -d --build
+```
+
+Antes de usar o profile de observabilidade com telemetria das APIs, configure:
 
 ```env
 OBSERVABILITY__OTLPENABLED=true
 OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 ```
 
-O Collector escuta:
+Para APIs executadas diretamente no host, use:
 
-- OTLP gRPC: `localhost:4317`
-- OTLP HTTP: `localhost:4318`
+```env
+OBSERVABILITY__OTLPENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+```
 
-A configuração local do Collector fica em `src/Backend/observability/otel-collector-config.yaml` e usa exporter `debug`. Os logs do Collector são a forma local de inspecionar traces, métricas e logs sem Grafana/Tempo/Prometheus/Loki. Como o exporter `debug` imprime o conteúdo dos sinais recebidos, não use esse profile com tráfego real, credenciais reais ou payloads de usuário.
-
-Comandos úteis:
+Como encerrar:
 
 ```bash
-docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability logs -f otel-collector
-docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability stop otel-collector
-docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml down --remove-orphans
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability down
 ```
 
-Parar o Collector não deve derrubar APIs, health checks ou fluxo de negócio.
+Como remover os dados locais:
+
+```bash
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability down -v
+```
+
+O uso de `-v` apaga histórico do Prometheus, configurações persistidas do Grafana, dados locais do Loki e estado local dos demais containers.
+
+Endpoints locais:
+
+- Collector OTLP gRPC: `localhost:4317`
+- Collector OTLP HTTP: `localhost:4318`
+- Collector Prometheus exporter: `localhost:8889/metrics`
+- Collector health: `localhost:13133`
+- Prometheus: `localhost:9090`
+- Grafana: `localhost:3000`
+- Jaeger UI/API: `localhost:16686`
+- Loki API: `localhost:3100`
+
+As credenciais locais do Grafana vêm de `GRAFANA_ADMIN_USER` e `GRAFANA_ADMIN_PASSWORD`. Esses valores devem ser preenchidos apenas no `.env.development` local e não devem ser versionados.
+
+Persistência e retenção local:
+
+- Jaeger all-in-one usa armazenamento em memória. Reiniciar ou recriar o container remove os traces. Essa topologia é apenas para desenvolvimento e validação local; produção precisa de backend persistente e dimensionado separadamente.
+- Loki usa o volume Docker `loki-data`, montado em `/loki`. A retenção local padrão é `168h` e pode ser ajustada por `LOKI_RETENTION_PERIOD`.
+- Para limpar logs locais, execute `docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability down -v`.
+- O Loki local roda em single binary com filesystem. Produção deve avaliar volume diário, retenção, disponibilidade, object storage, replicação e operação antes de escolher a topologia.
+
+Consultas úteis:
+
+```logql
+{service_name="gateway-api"}
+{service_name="authcore-api", deployment_environment_name="Development"}
+{service_name="notificationcore-api"} | trace_id = "<trace-id>"
+{service_namespace="auth-core-microservices"} | correlationId = "obs-016-register"
+```
+
+O Loki normaliza atributos OTLP com ponto para labels como `service_name`, `service_namespace` e `deployment_environment_name`. A configuração local restringe labels indexadas a esses atributos estáveis. Trace ID, Span ID, Correlation ID, `service.instance.id`, IDs de usuário, request IDs, URL completa e identificadores únicos de negócio não devem ser promovidos manualmente como labels indexadas. Esses valores devem permanecer como structured metadata ou atributos consultáveis.
+
+Correlação no Grafana:
+
+- O data source `Jaeger` usa UID `jaeger` e aponta para `http://jaeger:16686`.
+- O data source `Loki` usa UID `loki` e aponta para `http://loki:3100`.
+- Em traces, `tracesToLogsV2` consulta Loki usando janela temporal do span e `trace_id`.
+- Em logs, `derivedFields` tenta extrair `TraceId`, `trace_id` ou `traceid` da linha renderizada e cria link para Jaeger. Como a validação local mostrou `trace_id` e `span_id` em structured metadata, a navegação mais confiável é consultar `| trace_id = "<trace-id>"` no Explore; a extração por regex depende de como o Grafana renderiza a linha.
+
+Validação operacional:
+
+```bash
+docker compose --env-file src/Backend/.env.development.example -f src/Backend/docker-compose.yml --profile observability config --quiet
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability ps
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability logs otel-collector
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability logs prometheus
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability logs jaeger
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability logs loki
+docker compose --env-file src/Backend/.env.development -f src/Backend/docker-compose.yml --profile observability logs grafana
+```
+
+Valide também:
+
+- `http://localhost:13133` para health do Collector. O endpoint existe, mas o container do Collector não usa `healthcheck` do Docker porque a imagem oficial não contém shell ou cliente HTTP para executar essa validação internamente.
+- `http://localhost:8889/metrics` para métricas expostas pelo Collector.
+- `http://localhost:9090/targets` para confirmar o target `authcore-otel-collector` como `UP`.
+- `http://localhost:16686/api/services` para confirmar serviços no Jaeger.
+- `http://localhost:3100/ready` para readiness do Loki.
+- `http://localhost:3100/loki/api/v1/series?match[]={service_name="gateway-api"}` para confirmar labels reais de streams novas. Se o volume `loki-data` já tiver dados antigos, `/labels` pode continuar listando labels históricas até limpeza ou retenção.
+- `http://localhost:3000` para confirmar login, data sources `Prometheus`, `Jaeger` e `Loki`, pasta `AuthCore` e dashboard `AuthCore / Overview`.
+- Séries com `service_name` iguais a `authcore-api`, `notificationcore-api` e `gateway-api` após gerar tráfego real.
+
+O dashboard usa os labels de resource `service_name`, `service_namespace`, `service_version` e `deployment_environment_name` convertidos pelo Collector. Esses atributos são estáveis e de baixa cardinalidade no projeto. Não use `OTEL_RESOURCE_ATTRIBUTES` para incluir `UserId`, `CorrelationId`, `TraceId`, `SpanId`, `SessionId`, e-mail, token, connection string, URL completa, query string, payload ou mensagens de exceção.
 
 ## Troubleshooting
 
@@ -200,7 +322,42 @@ Collector sem sinais:
 - Confirme que o profile foi ativado com `--profile observability`.
 - Confirme que `OBSERVABILITY__OTLPENABLED=true` está no `.env.development` usado pelo compose.
 - Gere tráfego HTTP ou execute fluxos que acionem Redis, RabbitMQ, SMTP ou banco.
-- Verifique os logs com `docker compose ... logs -f otel-collector`.
+- Verifique `http://localhost:8889/metrics` e os logs com `docker compose ... logs otel-collector`.
+
+Jaeger sem traces:
+
+- Confirme que `OBSERVABILITY__OTLPENABLED=true` foi aplicado antes de recriar as APIs.
+- Confirme que o Collector usa `otlp/jaeger` com endpoint `jaeger:4317`.
+- Consulte `http://localhost:16686/api/services`.
+- Gere tráfego via Gateway para criar spans de servidor e cliente.
+
+Loki sem logs:
+
+- Confirme que o Collector usa `otlphttp/loki` com endpoint `http://loki:3100/otlp`.
+- Não configure `/otlp/v1/logs` no endpoint do Collector; o exporter `otlphttp` adiciona `/v1/logs`.
+- Confirme `allow_structured_metadata: true`, schema `v13` e index `tsdb` em `loki.yml`.
+- Consulte labels reais antes de fixar queries ou links.
+
+Prometheus target `DOWN`:
+
+- Confirme que o Collector está healthy.
+- Confirme que `src/Backend/observability/prometheus/prometheus.yml` usa `otel-collector:8889`, não `localhost:8889`.
+- Confirme que os serviços estão na mesma network do Docker Compose.
+
+Dashboard sem dados:
+
+- Confirme que houve tráfego depois que `OBSERVABILITY__OTLPENABLED=true` foi aplicado.
+- Confirme se as APIs no Docker usam `http://otel-collector:4317`.
+- Confirme se APIs no host usam `http://localhost:4317`.
+- Consulte `http://localhost:8889/metrics` para identificar os nomes Prometheus reais; pontos são convertidos para underscores e counters tendem a receber sufixo `_total`.
+- Se o Grafana tiver volumes antigos, remova os volumes locais e suba novamente a stack.
+
+Falha de provisionamento do Grafana:
+
+- Verifique os logs de `grafana`.
+- Confirme que o data source usa `http://prometheus:9090`.
+- Confirme que os data sources usam `http://jaeger:16686` e `http://loki:3100`.
+- Confirme que o dashboard está em `src/Backend/observability/grafana/dashboards/authcore-overview.json`.
 
 Métricas Npgsql de pool ausentes:
 
@@ -223,8 +380,8 @@ Dados sensíveis em sinais:
 Validação mínima antes de concluir mudanças de observabilidade:
 
 ```bash
-dotnet build AuthCore.sln
-dotnet test AuthCore.sln
+dotnet build src/Backend/Backend.sln
+dotnet test src/Backend/Backend.sln
 docker compose --env-file src/Backend/.env.development.example -f src/Backend/docker-compose.yml config --quiet
 docker compose --env-file src/Backend/.env.development.example -f src/Backend/docker-compose.yml --profile observability config --quiet
 ```
@@ -251,42 +408,48 @@ Checklist funcional:
 - `/health/ready` e `/health` refletem readiness.
 - Collector desligado não altera startup, request ou health.
 - Stack Docker é válida com e sem profile `observability`.
+- Jaeger recebe traces reais.
+- Loki recebe logs reais.
+- Prometheus continua com target do Collector `UP`.
+- Logs permitem consultar por `service_name`, ambiente e `trace_id`.
+- Um `trace_id` encontrado no Loki retorna trace no Jaeger.
+- Um trace no Jaeger permite consultar logs relacionados no Loki pelo mesmo `trace_id`.
 
-## Evidências Desta Implementação
+## Evidências Desta Atualização
 
-Comandos executados durante a OBS-015:
+Comandos executados durante a atualização da stack local com Jaeger e Loki:
 
 ```bash
-docker compose --env-file src\Backend\.env.development.example -f src\Backend\docker-compose.yml config --quiet
-docker compose --env-file src\Backend\.env.development.example -f src\Backend\docker-compose.yml --profile observability config --quiet
-git diff --check -- docs\observability.md src\Backend\README.md
-dotnet build AuthCore.sln
-dotnet test AuthCore.sln --no-build
-dotnet list AuthCore.sln package --vulnerable --include-transitive
+docker compose --env-file .env.development --profile observability config --quiet
+docker compose --env-file .env.development --profile observability up -d --build
+docker compose --env-file .env.development --profile observability up -d --force-recreate otel-collector
+docker compose --env-file .env.development --profile observability up -d --force-recreate authcore-api notificationcore-api gateway-api grafana
+docker compose --env-file .env.development --profile observability ps
+Invoke-WebRequest http://localhost:13133
+Invoke-WebRequest http://localhost:3100/ready
+Invoke-WebRequest http://localhost:16686/api/services
+Invoke-WebRequest http://localhost:3100/loki/api/v1/labels
+Invoke-WebRequest http://localhost:9090/api/v1/targets
 ```
 
 Resultado:
 
-- a configuração Docker é válida com e sem o profile `observability`;
-- não houve erro de whitespace no escopo validado;
-- `dotnet build AuthCore.sln --no-restore` passou sem avisos;
-- `dotnet test AuthCore.sln --no-build` passou com 525 testes aprovados, 15 ignorados e 0 falhas;
-- `dotnet list AuthCore.sln package --vulnerable --include-transitive` não encontrou pacotes vulneráveis nas fontes atuais.
-
-Validação com infraestrutura real executada após subir PostgreSQL, Redis, RabbitMQ e o Collector opcional via Docker Compose:
-
-- `NpgsqlInstrumentationTests`: 8 testes aprovados, 0 ignorados;
-- `RedisInstrumentationTests`: 6 testes aprovados, 0 ignorados;
-- `RabbitMqInstrumentationTests`: 10 testes aprovados, 0 ignorados;
-- health checks dos containers reconstruídos: `/health`, `/health/live`, `/health/ready`, `/authcore/health` e `/notificationcore/health` retornaram `200`.
-
-Limitação registrada: a suíte padrão mantém os 15 testes de integração real ignorados quando as variáveis `AUTHCORE_TEST_POSTGRES`, `NOTIFICATIONCORE_TEST_POSTGRES`, `AUTHCORE_TEST_REDIS`, `OBSERVABILITY_POSTGRES_REQUIRED`, `OBSERVABILITY_REDIS_REQUIRED` e `OBSERVABILITY_RABBITMQ_REQUIRED` não estão configuradas. Isso é intencional para permitir execução local sem infraestrutura. Para validação ponta a ponta, execute os filtros de integração real com essas variáveis apontando para dependências disponíveis.
+- `docker compose --env-file .env.development --profile observability config --quiet` passou sem erros.
+- Jaeger, Loki, Prometheus, Grafana, PostgreSQL, Redis e RabbitMQ ficaram `healthy`.
+- O Collector respondeu `{"status":"Server available"}` em `http://localhost:13133` e não apresentou export failures contínuos nos logs.
+- Jaeger retornou serviços `authcore-api`, `gateway-api`, `notificationcore-api` e `jaeger`.
+- Loki retornou séries novas com labels reais estáveis `deployment_environment_name`, `service_name` e `service_namespace` após a configuração explícita de labels OTLP. O endpoint `/labels` ainda pode listar `service_instance_id` enquanto houver dados antigos no volume local.
+- Loki retornou logs dos serviços `authcore-api`, `gateway-api` e `notificationcore-api`.
+- O fluxo `POST /api/auth/register` via Gateway retornou 201 na primeira chamada e 409 na repetição, gerando logs correlacionados.
+- O trace `e0718fa16146bf4dc2d60a1995cbf945` apareceu no Loki e retornou no Jaeger com spans Gateway -> AuthCore -> Npgsql -> RabbitMQ publish -> RabbitMQ consume -> NotificationCore -> Npgsql.
+- Consultas Loki por `| trace_id = "e0718fa16146bf4dc2d60a1995cbf945"` retornaram logs relacionados em `gateway-api`, `authcore-api` e `notificationcore-api`.
+- Prometheus manteve o target `authcore-otel-collector` como `UP`.
+- A API autenticada do Grafana não foi validada por credencial porque o volume local já possuía senha anterior; os arquivos de provisionamento foram montados e os logs não indicaram falha nos data sources.
 
 ## Evolução
 
 Fora do escopo atual:
 
-- dashboards;
 - alertas;
 - SLOs;
 - política de retenção;
