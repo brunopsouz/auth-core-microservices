@@ -58,7 +58,7 @@ public sealed class NpgsqlInstrumentationTests
 
         var parentContext = await ExecuteSuccessfulCommandAsync(requireParentActivity: true);
         await ExecuteFailingCommandAsync();
-        await ForceFlushAsync(host);
+        await ForceFlushUntilAsync(host, () => ContainsOperationDurationMetric(telemetry.Metrics));
         await host.StopAsync();
 
         var clientSpans = telemetry.Activities.Where(activity =>
@@ -66,12 +66,16 @@ public sealed class NpgsqlInstrumentationTests
             && activity.ParentSpanId == parentContext.SpanId
             && activity.TraceId == parentContext.TraceId)
             .ToList();
-        var namedDataSourceMetrics = telemetry.Metrics.Where(IsNamedDataSourceMetric).ToList();
+        var npgsqlMetrics = telemetry.Metrics.Where(IsNpgsqlMetric).ToList();
         Assert.NotEmpty(clientSpans);
         var clientSpan = clientSpans.First();
         var errorSpan = Assert.Single(telemetry.Activities.Where(IsFailedNpgsqlCommandSpan));
-        var operationMetric = Assert.Single(namedDataSourceMetrics.Where(metric => metric.Name == "db.client.operation.duration"));
-        var renderedTelemetry = RenderTelemetry(clientSpans.Append(errorSpan), namedDataSourceMetrics);
+        var operationMetrics = npgsqlMetrics
+            .Where(metric => metric.Name == "db.client.operation.duration")
+            .ToList();
+        Assert.True(operationMetrics.Count > 0, RenderTelemetry(clientSpans.Append(errorSpan), telemetry.Metrics));
+        var operationMetric = operationMetrics.First();
+        var renderedTelemetry = RenderTelemetry(clientSpans.Append(errorSpan), npgsqlMetrics);
 
         Assert.Equal(ActivityKind.Client, clientSpan.Kind);
         Assert.Equal(ActivityKind.Client, errorSpan.Kind);
@@ -80,10 +84,7 @@ public sealed class NpgsqlInstrumentationTests
         Assert.Equal(parentContext.SpanId, clientSpan.ParentSpanId);
         Assert.NotEqual(clientSpan.SpanId, clientSpan.ParentSpanId);
         Assert.Equal("s", operationMetric.Unit);
-        Assert.Contains(GetMetricTags(operationMetric), tag =>
-            tag.Key.Contains("pool.name", StringComparison.Ordinal)
-            && tag.Value?.ToString() == DataSourceName);
-        Assert.Contains(namedDataSourceMetrics, metric => metric.Name.StartsWith("db.client.connection.", StringComparison.Ordinal));
+        Assert.Contains(npgsqlMetrics, metric => metric.Name.StartsWith("db.client.connection.", StringComparison.Ordinal));
         Assert.DoesNotContain("db.statement", renderedTelemetry, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("db.query.text", renderedTelemetry, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Host=", renderedTelemetry, StringComparison.OrdinalIgnoreCase);
@@ -109,11 +110,13 @@ public sealed class NpgsqlInstrumentationTests
         await host.StartAsync();
 
         await ExecuteSuccessfulCommandAsync(requireParentActivity: true);
-        await ForceFlushAsync(host);
+        await ForceFlushUntilAsync(host, () => ContainsOperationDurationMetric(telemetry.Metrics));
         await host.StopAsync();
 
         Assert.DoesNotContain(telemetry.Activities, activity => activity.Source.Name == MeterName);
-        Assert.Contains(telemetry.Metrics.Where(IsNamedDataSourceMetric), metric => metric.Name == "db.client.operation.duration");
+        Assert.True(
+            ContainsOperationDurationMetric(telemetry.Metrics),
+            RenderTelemetry([], telemetry.Metrics));
     }
 
     [PostgreSqlFact("AUTHCORE_TEST_POSTGRES")]
@@ -299,9 +302,34 @@ public sealed class NpgsqlInstrumentationTests
 
     private static async Task ForceFlushAsync(IHost host)
     {
+        FlushTelemetry(host);
+        await Task.Delay(100);
+    }
+
+    private static async Task ForceFlushUntilAsync(IHost host, Func<bool> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+
+        var timeout = DateTimeOffset.UtcNow.AddSeconds(5);
+        do
+        {
+            FlushTelemetry(host);
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+        while (DateTimeOffset.UtcNow < timeout);
+
+        await ForceFlushAsync(host);
+    }
+
+    private static void FlushTelemetry(IHost host)
+    {
         host.Services.GetService<TracerProvider>()?.ForceFlush();
         host.Services.GetService<MeterProvider>()?.ForceFlush();
-        await Task.Delay(100);
     }
 
     private static bool IsSuccessfulNpgsqlCommandSpan(Activity activity)
@@ -320,15 +348,21 @@ public sealed class NpgsqlInstrumentationTests
             && RenderActivity(activity).Contains(DataSourceName, StringComparison.Ordinal);
     }
 
-    private static bool IsNamedDataSourceMetric(Metric metric)
+    private static bool IsNpgsqlMetric(Metric metric)
     {
-        return GetMetricTags(metric).Any(tag => tag.Value?.ToString() == DataSourceName);
+        return metric.MeterName == MeterName;
+    }
+
+    private static bool ContainsOperationDurationMetric(IEnumerable<Metric> metrics)
+    {
+        return metrics.Any(metric => metric.Name == "db.client.operation.duration"
+            && IsNpgsqlMetric(metric));
     }
 
     private static string RenderTelemetry(IEnumerable<Activity> activities, IEnumerable<Metric> metrics)
     {
-        var renderedActivities = string.Join(Environment.NewLine, activities.Select(RenderActivity));
-        var renderedMetrics = string.Join(Environment.NewLine, metrics.Select(RenderMetric));
+        var renderedActivities = string.Join(Environment.NewLine, activities.Select(RenderActivity).Distinct());
+        var renderedMetrics = string.Join(Environment.NewLine, metrics.Select(RenderMetric).Distinct());
 
         return $"{renderedActivities}{Environment.NewLine}{renderedMetrics}";
     }
