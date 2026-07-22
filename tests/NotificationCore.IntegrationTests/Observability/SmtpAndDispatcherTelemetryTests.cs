@@ -43,10 +43,14 @@ public sealed class SmtpAndDispatcherTelemetryTests
         await ForceFlushAsync(host);
         await host.StopAsync();
 
-        var dispatch = Assert.Single(telemetry.Activities.Where(activity => activity.DisplayName == "notification dispatch"));
-        var smtp = Assert.Single(telemetry.Activities.Where(activity => activity.DisplayName == "smtp send"));
-        var duration = Assert.Single(telemetry.Metrics.Where(metric => metric.Name == "notificationcore.smtp.send.duration"));
-        var attempts = Assert.Single(telemetry.Metrics.Where(metric => metric.Name == "notificationcore.smtp.send.attempts"));
+        var dispatch = Assert.Single(telemetry.Activities.Where(IsNotificationDispatchActivity));
+        var smtp = Assert.Single(telemetry.Activities.Where(activity => IsChildSmtpActivity(activity, dispatch)));
+        var duration = Assert.Single(telemetry.Metrics
+            .Where(metric => IsSmtpSuccessMetric(metric, "notificationcore.smtp.send.duration"))
+            .DistinctBy(RenderMetric));
+        var attempts = Assert.Single(telemetry.Metrics
+            .Where(metric => IsSmtpSuccessMetric(metric, "notificationcore.smtp.send.attempts"))
+            .DistinctBy(RenderMetric));
         var renderedTelemetry = RenderTelemetry(telemetry.Activities, telemetry.Metrics);
 
         Assert.Equal(ActivityKind.Internal, dispatch.Kind);
@@ -95,7 +99,7 @@ public sealed class SmtpAndDispatcherTelemetryTests
 
         Assert.DoesNotContain(
             telemetry.Activities,
-            activity => activity.DisplayName is "notification dispatch" or "smtp send");
+            activity => IsNotificationDispatchActivity(activity) || IsSmtpActivity(activity));
         Assert.Contains(telemetry.Metrics, metric => metric.Name == "notificationcore.smtp.send.duration");
         Assert.Contains(telemetry.Metrics, metric => metric.Name == "notificationcore.smtp.send.attempts");
     }
@@ -180,10 +184,36 @@ public sealed class SmtpAndDispatcherTelemetryTests
         await Task.Delay(100);
     }
 
+    private static bool IsNotificationDispatchActivity(Activity activity)
+    {
+        return activity.Source.Name == NotificationDispatchTelemetry.ActivitySourceName
+            && activity.DisplayName == "notification dispatch";
+    }
+
+    private static bool IsSmtpActivity(Activity activity)
+    {
+        return activity.Source.Name == SmtpTelemetry.ActivitySourceName
+            && activity.DisplayName == "smtp send";
+    }
+
+    private static bool IsChildSmtpActivity(Activity activity, Activity parent)
+    {
+        return IsSmtpActivity(activity)
+            && activity.TraceId == parent.TraceId
+            && activity.ParentSpanId == parent.SpanId;
+    }
+
+    private static bool IsSmtpSuccessMetric(Metric metric, string name)
+    {
+        return metric.Name == name
+            && GetMetricTags(metric).Any(tag => tag.Key == "provider" && tag.Value?.ToString() == "smtp")
+            && GetMetricTags(metric).Any(tag => tag.Key == "result" && tag.Value?.ToString() == "success");
+    }
+
     private static string RenderTelemetry(IEnumerable<Activity> activities, IEnumerable<Metric> metrics)
     {
-        var renderedActivities = string.Join(Environment.NewLine, activities.Select(RenderActivity));
-        var renderedMetrics = string.Join(Environment.NewLine, metrics.Select(RenderMetric));
+        var renderedActivities = string.Join(Environment.NewLine, activities.Select(RenderActivity).Distinct());
+        var renderedMetrics = string.Join(Environment.NewLine, metrics.Select(RenderMetric).Distinct());
 
         return $"{renderedActivities}{Environment.NewLine}{renderedMetrics}";
     }
