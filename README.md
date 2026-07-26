@@ -74,11 +74,14 @@ O objetivo é combinar controle de revogação e gestão de sessões, boa perfor
 | Cache | Redis 7 | Armazenamento técnico para sessões e suporte à autenticação |
 | Mensageria | RabbitMQ 3 | Comunicação assíncrona entre AuthCore e NotificationCore |
 | E-mail | Serviço SMTP configurável | Envio real de notificações por provedor definido no ambiente |
+| Observabilidade | OpenTelemetry Collector + Prometheus + Jaeger + Loki + Grafana | Coleta e visualização local de métricas, traces e logs via profile `observability` |
 | Infra local | Docker + Docker Compose | Ambiente local de desenvolvimento e execução dos serviços |
 | Migrações | FluentMigrator | Versionamento e aplicação de mudanças no banco |
 | Segurança | BCrypt.Net + JWT Bearer Authentication | Hash de senhas e autenticação por token |
 | Testes e documentação | xUnit + Swagger/OpenAPI | Testes automatizados e documentação interativa das APIs |
 | Pacotes frontend | pnpm | Instalação e gerenciamento de dependências web |
+
+A stack de observabilidade é opcional no ambiente local. O fluxo operacional, portas, data sources do Grafana e comandos Docker ficam no [README do Backend](src/Backend/README.md) e no guia [docs/observability.md](docs/observability.md).
 
 ## Arquitetura
 
