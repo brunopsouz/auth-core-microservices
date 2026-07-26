@@ -142,10 +142,10 @@ public sealed class OcelotRouteTests
     {
         var compose = File.ReadAllText(GetDockerComposePath());
 
-        Assert.Contains("${AUTHENTICATION__GOOGLE__CLIENTID}", compose, StringComparison.Ordinal);
-        Assert.Contains("${AUTHENTICATION__GOOGLE__CLIENTSECRET}", compose, StringComparison.Ordinal);
-        Assert.Contains("${AUTHENTICATION__GOOGLE__CALLBACKPATH}", compose, StringComparison.Ordinal);
-        Assert.Contains("${AUTHENTICATION__ALLOWEDRETURNURLS__0}", compose, StringComparison.Ordinal);
+        Assert.Contains("AUTHENTICATION__GOOGLE__CLIENTID: ${AUTHENTICATION__GOOGLE__CLIENTID:-}", compose, StringComparison.Ordinal);
+        Assert.Contains("AUTHENTICATION__GOOGLE__CLIENTSECRET: ${AUTHENTICATION__GOOGLE__CLIENTSECRET:-}", compose, StringComparison.Ordinal);
+        Assert.Contains("AUTHENTICATION__GOOGLE__CALLBACKPATH: ${AUTHENTICATION__GOOGLE__CALLBACKPATH:-/api/auth/external/google/callback}", compose, StringComparison.Ordinal);
+        Assert.Contains("AUTHENTICATION__ALLOWEDRETURNURLS__0: ${AUTHENTICATION__ALLOWEDRETURNURLS__0:-}", compose, StringComparison.Ordinal);
         Assert.Contains("${DATAPROTECTION__APPLICATIONNAME:-AuthCore}", compose, StringComparison.Ordinal);
         Assert.Contains("${DATAPROTECTION__KEYNAME:-data-protection-keys}", compose, StringComparison.Ordinal);
         Assert.Contains("${DATAPROTECTION__REQUIRECERTIFICATE:-false}", compose, StringComparison.Ordinal);
