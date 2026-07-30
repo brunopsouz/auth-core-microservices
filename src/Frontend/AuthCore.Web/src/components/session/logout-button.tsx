@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { logoutSession } from "@/features/auth/api/session-auth";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -15,10 +16,7 @@ export function LogoutButton() {
     setIsPending(true);
 
     try {
-      const response = await fetch("/api/auth/session/logout", {
-        method: "POST",
-        headers: buildCsrfHeaders(),
-      });
+      const response = await logoutSession();
 
       if (!response.ok) {
         toast.error("Nao foi possivel encerrar a sessao.");
@@ -45,22 +43,4 @@ export function LogoutButton() {
       {isPending ? "Saindo..." : "Sair"}
     </Button>
   );
-}
-
-function buildCsrfHeaders(): HeadersInit {
-  const token = getCookieValue("XSRF-TOKEN");
-
-  return token
-    ? {
-        "X-CSRF-TOKEN": token,
-      }
-    : {};
-}
-
-function getCookieValue(name: string) {
-  const cookie = document.cookie
-    .split("; ")
-    .find((value) => value.startsWith(`${name}=`));
-
-  return cookie ? decodeURIComponent(cookie.split("=")[1] ?? "") : null;
 }

@@ -26,6 +26,11 @@ import {
 } from "@/components/ui/input-otp";
 import { PhoneNumberField } from "@/components/auth/phone-number-field";
 import { startGoogleAuthentication } from "@/features/auth/api/google-auth";
+import {
+  completeRegistration,
+  register,
+  resendVerification,
+} from "@/features/auth/api/session-auth";
 import { readApiError } from "@/lib/http-errors";
 import { isValidPhoneNumber } from "react-phone-number-input";
 
@@ -77,18 +82,7 @@ export function RegisterForm() {
     setIsPending(true);
 
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          FirstName: registration.firstName,
-          LastName: registration.lastName,
-          Email: registration.email,
-          Contact: registration.contact,
-        }),
-      });
+      const response = await register(registration);
 
       if (!response.ok) {
         setResendEmail(registration.email);
@@ -133,17 +127,11 @@ export function RegisterForm() {
     setIsPending(true);
 
     try {
-      const response = await fetch("/api/auth/complete-registration", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          Email: pendingRegistration.email,
-          Code: verificationCode,
-          Password: String(formData.get("password") ?? ""),
-          ConfirmPassword: String(formData.get("confirmPassword") ?? ""),
-        }),
+      const response = await completeRegistration({
+        email: pendingRegistration.email,
+        code: verificationCode,
+        password: String(formData.get("password") ?? ""),
+        confirmPassword: String(formData.get("confirmPassword") ?? ""),
       });
 
       if (!response.ok) {
@@ -170,15 +158,7 @@ export function RegisterForm() {
     setIsResending(true);
 
     try {
-      const response = await fetch("/api/auth/resend-verification", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          Email: targetEmail,
-        }),
-      });
+      const response = await resendVerification(targetEmail);
 
       if (!response.ok) {
         setError(await readApiError(response));

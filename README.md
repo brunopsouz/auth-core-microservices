@@ -14,9 +14,9 @@
 
 </div>
 
-AuthCore é um boilerplate full-stack para autenticação, gestão de usuários e notificações transacionais. A ideia é adotar uma autenticação híbrida, combinando sessão server-side de longa duração como fonte principal de controle, JWT de curta duração como token de acesso usado na maioria das requisições, e cookies HttpOnly para transportar os identificadores/tokens no navegador sem expor o JWT diretamente ao JavaScript do frontend.
+AuthCore é um boilerplate full-stack para autenticação, gestão de usuários e notificações transacionais. A proposta é adotar uma arquitetura de autenticação híbrida que combina uma sessão server-side de longa duração como principal mecanismo de controle, um JWT de curta duração para autenticação na maioria das requisições e cookies HttpOnly para transportar os identificadores e tokens no navegador sem expor o JWT diretamente ao JavaScript do frontend.
 
-O objetivo é combinar controle de revogação e gestão de sessões, boa performance nas requisições comuns, compatibilidade com Gateway e microserviços, menor exposição do token no client-side e possibilidade de bloquear novas emissões de JWT quando a sessão principal for revogada.
+O objetivo é unir o controle de revogação e o gerenciamento de sessões à boa performance nas requisições comuns, além de garantir compatibilidade com gateways e microserviços, reduzir a exposição do token no client-side e permitir o bloqueio da emissão de novos JWTs quando a sessão principal for revogada.
 
 ## Sumário
 

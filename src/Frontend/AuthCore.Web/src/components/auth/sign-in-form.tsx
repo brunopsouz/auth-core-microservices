@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { startGoogleAuthentication } from "@/features/auth/api/google-auth";
+import { signIn } from "@/features/auth/api/session-auth";
 import { readApiError } from "@/lib/http-errors";
 
 export function SignInForm() {
@@ -29,15 +30,9 @@ export function SignInForm() {
     setIsPending(true);
 
     try {
-      const response = await fetch("/api/auth/session/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          Email: String(formData.get("email") ?? ""),
-          Password: String(formData.get("password") ?? ""),
-        }),
+      const response = await signIn({
+        email: String(formData.get("email") ?? ""),
+        password: String(formData.get("password") ?? ""),
       });
 
       if (!response.ok) {
